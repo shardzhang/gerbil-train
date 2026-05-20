@@ -1,0 +1,11 @@
+name: explicit_implicit_multitask
+
+explicit:
+  enabled: true
+  type: regression
+  label_field: rating
+
+implicit:
+  enabled: true
+  type: binary
+  positive_threshold: 4

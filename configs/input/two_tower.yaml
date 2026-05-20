@@ -1,0 +1,27 @@
+name: two_tower_input
+task: ranking
+description: MovieLens 1M dataset for multitask two-tower recommendation experiments.
+
+query_features:
+  dense:
+    - user_age
+    - user_activity_score
+  sparse:
+    - user_id
+    - gender
+    - occupation
+
+item_features:
+  dense:
+    - item_popularity
+    - item_ctr_30d
+  sparse:
+    - item_id
+    - category
+    - release_year
+
+query_encoder:
+  combine_sparse_dense: concat
+
+item_encoder:
+  combine_sparse_dense: concat

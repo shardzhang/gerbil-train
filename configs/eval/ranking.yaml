@@ -1,0 +1,17 @@
+task: ranking
+description: Ranking evaluation for recommendation experiments.
+
+metrics:
+  - recall@10
+  - recall@50
+  - ndcg@10
+  - ndcg@50
+  - mrr@10
+
+evaluation:
+  topk: [10, 50]
+  batch_size: 2048
+  group_by: user_id
+  label_field: label
+  exclude_history: true
+  use_all_items: false

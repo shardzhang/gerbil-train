@@ -1,0 +1,33 @@
+name: ml1m
+description: MovieLens 1M dataset.
+
+source:
+  format: parquet
+
+paths:
+  users: data/ml1m/users.parquet
+  items: data/ml1m/items.parquet
+  interactions: data/ml1m/interactions.parquet
+
+columns:
+  user_id: user_id
+  item_id: item_id
+  label: rating
+  timestamp: timestamp
+
+tables:
+  users:
+    primary_key: user_id
+  items:
+    primary_key: item_id
+  interactions:
+    user_key: user_id
+    item_key: item_id
+    label_key: rating
+    timestamp_key: timestamp
+
+split:
+  strategy: leave_one_out
+  train: train.parquet
+  valid: valid.parquet
+  test: test.parquet

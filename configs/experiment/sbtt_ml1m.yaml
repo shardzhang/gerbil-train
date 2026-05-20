@@ -1,0 +1,17 @@
+experiment_name: sbtt_ml1m_v1
+output_dir: outputs/sbtt_ml1m_v1
+seed: 42
+tags:
+  - sbtt
+  - two_tower
+  - multitask
+  - ml1m
+
+data: configs/data/ml1m.yaml
+input: configs/input/two_tower.yaml
+sampling: configs/sampling/implicit_neg_sampling.yaml
+task: configs/task/multitask_explicit_implicit.yaml
+model: configs/model/shared_bottom_two_tower.yaml
+train: configs/train/base.yaml
+eval: configs/eval/ranking.yaml
+export: configs/export/serving.yaml

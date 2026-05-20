@@ -1,0 +1,62 @@
+name: shared_bottom_two_tower
+type: two_tower
+task: multitask_retrieval
+description: Shared-Bottom Two-Tower model with explicit and implicit task-specific towers.
+
+model:
+  query_input_dim: 128
+  item_input_dim: 128
+  embedding_dim: 32
+  normalize_embedding: false
+  score_fn: dot
+
+  shared_bottom:
+    hidden_dims: [256, 128]
+    activation: relu
+    dropout: 0.1
+    batch_norm: false
+
+  explicit_tower:
+    hidden_dims: [128, 64]
+    activation: relu
+    dropout: 0.1
+    batch_norm: false
+
+  implicit_tower:
+    hidden_dims: [128, 64]
+    activation: relu
+    dropout: 0.1
+    batch_norm: false
+
+training:
+  stage1:
+    enabled: true
+    name: implicit_pretrain
+    objective: sampled_softmax
+    num_negatives: 100
+    temperature: 1.0
+    stop_gradient_on_shared_bottom: false
+
+  stage2:
+    enabled: true
+    name: explicit_finetune
+    objective: mse
+    stop_gradient_on_shared_bottom: true
+
+loss:
+  implicit:
+    weight: 1.0
+    reduction: mean
+  explicit:
+    weight: 1.0
+    reduction: mean
+
+output:
+  return_scores: true
+  return_explicit_embedding: true
+  return_implicit_embedding: true
+
+export:
+  serving_tower: explicit
+  export_query_tower: true
+  export_item_tower: true
