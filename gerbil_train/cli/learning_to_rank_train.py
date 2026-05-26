@@ -122,8 +122,6 @@ def main() -> None:
 
     trainer.load_checkpoint(str(model_path))
     test_metrics = trainer.evaluate(test_loader, ks=(1, 3, 5, 10))
-
-    print("\n")
     print(f"Test NDCG@1  = {test_metrics[1]:.4f}")
     print(f"Test NDCG@3  = {test_metrics[3]:.4f}")
     print(f"Test NDCG@5  = {test_metrics[5]:.4f}")

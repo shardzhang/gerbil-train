@@ -2,7 +2,7 @@
 
 from .config import load_experiment_config, load_yaml
 from .nn import build_mlp, get_activation
-from .plot import load_curve_values, save_curve_values, save_training_curves
+from .plot import load_curve_values, save_curve_values
 from .seed import set_seed
 
 __all__ = [
@@ -12,6 +12,5 @@ __all__ = [
     "load_experiment_config",
     "load_yaml",
     "save_curve_values",
-    "save_training_curves",
     "set_seed",
 ]

@@ -49,7 +49,6 @@ class BaseTrainer:
         :param wait: Initial early stopping wait counter
         :param seed: Optional random seed for reproducibility
         """
-
         self.model: nn.Module = model
         self.optimizer: Optimizer = optimizer
         self.scheduler: LRScheduler | ReduceLROnPlateau | None = scheduler
@@ -68,6 +67,7 @@ class BaseTrainer:
         self.global_step: int = 0
         self.writer = None
 
+
     def setup(self) -> None:
         """Prepare trainer state before training starts.
 
@@ -76,15 +76,19 @@ class BaseTrainer:
         """
         if self.seed is not None:
             set_seed(self.seed)
+        
         self.model.to(self.device)
+
         if self.best_checkpoint_path is not None:
             self.best_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        
 
     def cleanup(self) -> None:
         """Release resources after training completes.
 
         Subclasses can override this to close writers, files, or other handles.
         """
+
 
     def fit(self, *, epochs: int) -> None:
         """Run the full training lifecycle.
@@ -96,14 +100,17 @@ class BaseTrainer:
                 3.1 on-epoch-start hook
                 3.2 train one epoch -> train one step
                     - on-train-step-start hook
-                    - forward
-                    - compute loss
-                    - backward
-                    - optimizer step
+                    - zero_grad
+                    - forward_step
+                    - compute_loss
+                    - backward_step
+                    - clip_gradients
+                    - optimizer_step
+                    - scheduler_step
                     - on-train-step-end hook
                 3.3 validate
                     - on-validation-start hook
-                    - validate
+                    - forward
                     - on-validation-end hook
                 3.4 on-epoch-end hook
                 3.5 early-stop check
@@ -126,12 +133,10 @@ class BaseTrainer:
                     f"train_{key}": value for key, value in train_metrics.items()
                 }
 
-                self.on_validation_start(epoch)
                 val_metrics = self.validate(epoch)
                 metrics.update(
                     {f"val_{key}": value for key, value in val_metrics.items()}
                 )
-                self.on_validation_end(val_metrics)
 
                 self.on_epoch_end(epoch, metrics)
 
@@ -140,6 +145,302 @@ class BaseTrainer:
         finally:
             self.on_train_end()
             self.cleanup()
+
+
+    """
+    2. on-train-start hook
+    """
+    def on_train_start(self) -> None:
+        """Hook called before the first training epoch."""
+
+
+    """
+    4. on-train-end hook
+    """
+    def on_train_end(self) -> None:
+        """Hook called once after the training loop ends.
+
+        The default implementation persists training artifacts such as saved
+        curve values and plots.
+        """
+
+
+    """
+    3.1 on-epoch-start hook
+    """
+    def on_epoch_start(self, epoch: int) -> None:
+        """Hook called before each epoch starts.
+
+        :param epoch: Zero-based epoch index
+        """
+
+
+    """
+    3.4 on-epoch-end hook
+    """
+    def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
+        """Hook called after each epoch ends.
+
+        Subclasses can use this hook to record aggregated metrics, write
+        summaries, or print epoch-level progress information.
+
+        :param epoch: Zero-based epoch index
+        :param metrics: Aggregated metrics for the epoch
+        """
+
+
+    """
+    3.2 train one epoch
+    """
+    def train_one_epoch(self, epoch: int) -> dict[str, float]:
+        """Train for one epoch.
+
+        :param epoch: Zero-based epoch index
+        :return: Epoch-level metrics
+        """
+        # Typically loops over the training dataloader and calls ``self.train_one_step``.
+        raise NotImplementedError
+
+
+    """
+    3.2 train one step
+    """
+    def train_one_step(self, batch: dict[str, Any]) -> dict[str, float]:
+        """Run one optimization step.
+
+        :param batch: Input batch for one training step
+        :return: Dictionary of step-level training metrics
+        """
+        # 1. self.on_train_step_start hook
+        # 2. zero_grad
+        # 3. forward_step
+        # 4. compute_loss
+        # 5. backward_step
+        # 6. clip_gradients
+        # 7. optimizer_step
+        # 8. scheduler_step
+        # 9. self.on_train_step_end hook
+        raise NotImplementedError
+
+
+    """
+    3.2 on train step start hooks
+    """
+    def on_train_step_start(self, batch: Any) -> None:
+        """Hook called before each train step.
+
+        :param batch: Raw step batch
+        """
+
+
+    """
+    3.2 on train step end hook
+    """
+    def on_train_step_end(self, metrics: dict[str, float]) -> None:
+        """Hook called after each train step.
+
+        :param metrics: Step-level metrics
+        """
+
+
+    """
+    zero grad
+    """
+    def zero_grad(self) -> None:
+        """Clear accumulated gradients."""
+        self.optimizer.zero_grad(set_to_none=True)
+
+
+    """
+    forward step
+    """
+    def forward_step(self, batch: Any) -> Any:
+        """Run one model forward pass."""
+        raise NotImplementedError
+
+    """
+    compute loss
+    """
+    def compute_loss(self, batch: Any, outputs: Any) -> torch.Tensor:
+        """Compute one training loss value."""
+        raise NotImplementedError
+
+
+    """
+    compute metrics
+    """
+    def compute_metrics(self, batch: Any, outputs: Any) -> dict[str, float]:
+        """Compute metrics from one batch and model outputs."""
+        raise NotImplementedError
+
+
+    """
+    backward step
+    """
+    def backward_step(self, loss: torch.Tensor) -> None:
+        """Run backpropagation for one loss value."""
+        loss.backward()
+
+
+    """
+    clip gradients
+    """
+    def clip_gradients(self) -> None:
+        """Clip gradients when a max norm is configured."""
+        if self.gradient_clip_norm is None:
+            return
+        torch.nn.utils.clip_grad_norm_(
+            self.model.parameters(),
+            max_norm=self.gradient_clip_norm,
+        )
+
+
+    """
+    optimizer step
+    """
+    def optimizer_step(self) -> None:
+        """Apply one optimizer update."""
+        self.optimizer.step()
+
+
+    """
+    scheduler step
+    """
+    def scheduler_step(self, metric: float | None = None) -> None:
+        """Advance the learning rate scheduler.
+
+        :param metric: Metric required by ``ReduceLROnPlateau``
+        """
+        if self.scheduler is None:
+            return
+        if isinstance(self.scheduler, ReduceLROnPlateau):
+            if metric is None:
+                raise ValueError("metric is required for ReduceLROnPlateau")
+            self.scheduler.step(metric)
+            return
+        self.scheduler.step()
+
+
+    """
+    3.3 validate
+    """
+    def validate(self, epoch: int | None = None) -> dict[str, float]:
+        """Run validation.
+
+        :param epoch: Optional zero-based epoch index
+        :return: Validation metrics
+        """
+        # self.on_validation_start(epoch)
+        # val_metrics = self.validate(epoch)
+        # self.on_validation_end(val_metrics)
+        raise NotImplementedError
+    
+
+    def on_validation_start(self, epoch: int) -> None:
+        """Hook called before validation starts.
+
+        This hook is called once per epoch before the validation routine runs,
+        even if the concrete ``validate`` implementation later returns an empty
+        metrics dictionary.
+
+        :param epoch: Zero-based epoch index
+        """
+
+
+    def on_validation_end(self, metrics: dict[str, float]) -> None:
+        """Hook called after validation ends.
+
+        :param metrics: Validation metrics for the current epoch
+        """
+
+
+    """
+    evaluate
+    """
+    def evaluate(self, *args: Any, **kwargs: Any) -> dict[str, float]:
+        """Run evaluation outside the training loop."""
+        # self.on_evaluate_start hook
+        # self.forward_step
+        # self.on_evaluate_end hook
+        raise NotImplementedError
+
+
+    def on_evaluate_start(self) -> None:
+        """Hook called before evaluation starts."""
+
+
+    def on_evaluate_end(self, metrics: dict[str, float]) -> None:
+        """Hook called after evaluation ends.
+
+        :param metrics: Evaluation metrics
+        """
+
+
+    """
+    predict
+    """
+    def predict(self, *args: Any, **kwargs: Any) -> dict[str, float]:
+        """Run prediction outside the training loop."""
+        # self.on_predict_start hook
+        # self.forward_step
+        # self.on_predict_end hook
+        raise NotImplementedError
+
+
+    def on_predict_start(self) -> None:
+        """Hook called before prediction starts."""
+        pass
+
+
+    def on_predict_end(self) -> None:
+        """Hook called after prediction ends."""
+        pass
+
+
+    def save_checkpoint(self, path: str | Path) -> None:
+        """Save model, optimizer, and trainer state.
+
+        :param path: Destination checkpoint path
+        """
+        checkpoint_path = Path(path)
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint = {
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "best_metric": self.best_metric,
+            "wait": self.wait,
+            "current_epoch": self.current_epoch,
+            "global_step": self.global_step,
+        }
+
+        if self.scheduler is not None:
+            checkpoint["scheduler_state_dict"] = self.scheduler.state_dict()
+        torch.save(checkpoint, checkpoint_path)
+
+
+    def load_checkpoint(self, path: str | Path) -> None:
+        """Load model, optimizer, and trainer state.
+
+        :param path: Source checkpoint path
+        """
+        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            self.model.load_state_dict(checkpoint["model_state_dict"])
+            
+            if "optimizer_state_dict" in checkpoint:
+                self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            
+            if self.scheduler is not None and "scheduler_state_dict" in checkpoint:
+                self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+            
+            self.best_metric = checkpoint.get("best_metric", self.best_metric)
+            self.wait = checkpoint.get("wait", self.wait)
+            self.current_epoch = checkpoint.get("current_epoch", self.current_epoch)
+            self.global_step = checkpoint.get("global_step", self.global_step)
+            return
+        
+        self.model.load_state_dict(checkpoint)
+
 
     def update_best_state(self, metrics: dict[str, float]) -> bool:
         """Check whether the monitored metric improved.
@@ -172,6 +473,7 @@ class BaseTrainer:
             return True
         return False
 
+
     def is_better(self, value: float) -> bool:
         """Compare a scalar metric using the configured monitor mode.
 
@@ -180,9 +482,11 @@ class BaseTrainer:
         """
         if self.best_metric is None:
             return True
+        
         if self.monitor_mode == "min":
             return value < self.best_metric
         return value > self.best_metric
+
 
     def move_batch_to_device(self, batch: Any) -> Any:
         """Move tensors in a batch structure to the trainer device.
@@ -192,329 +496,21 @@ class BaseTrainer:
         """
         if isinstance(batch, torch.Tensor):
             return batch.to(self.device)
+        
         if isinstance(batch, dict):
             return {
                 key: self.move_batch_to_device(value) for key, value in batch.items()
             }
+        
         if isinstance(batch, list):
             return [self.move_batch_to_device(value) for value in batch]
+        
         if isinstance(batch, tuple):
             return tuple(self.move_batch_to_device(value) for value in batch)
+        
         return batch
 
-    """
-    zero grad
-    """
-
-    def zero_grad(self) -> None:
-        """Clear accumulated gradients."""
-        self.optimizer.zero_grad(set_to_none=True)
-
-    """
-    backward
-    """
-
-    def backward_step(self, loss: torch.Tensor) -> None:
-        """Run backpropagation for one loss value."""
-        loss.backward()
-
-    """
-    clip gradients
-    """
-
-    def clip_gradients(self) -> None:
-        """Clip gradients when a max norm is configured."""
-        if self.gradient_clip_norm is None:
-            return
-        torch.nn.utils.clip_grad_norm_(
-            self.model.parameters(),
-            max_norm=self.gradient_clip_norm,
-        )
-
-    """
-    optimizer step
-    """
-
-    def optimizer_step(self) -> None:
-        """Apply one optimizer update."""
-        self.optimizer.step()
-
-    """
-    scheduler step
-    """
-
-    def scheduler_step(self, metric: float | None = None) -> None:
-        """Advance the learning rate scheduler.
-
-        :param metric: Metric required by ``ReduceLROnPlateau``
-        """
-        if self.scheduler is None:
-            return
-        if isinstance(self.scheduler, ReduceLROnPlateau):
-            if metric is None:
-                raise ValueError("metric is required for ReduceLROnPlateau")
-            self.scheduler.step(metric)
-            return
-        self.scheduler.step()
 
     def log_message(self, message: str) -> None:
         """Emit a trainer log message."""
         print(message)
-
-    def save_checkpoint(self, path: str | Path) -> None:
-        """Save model, optimizer, and trainer state.
-
-        :param path: Destination checkpoint path
-        """
-        checkpoint_path = Path(path)
-        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint = {
-            "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-            "best_metric": self.best_metric,
-            "wait": self.wait,
-            "current_epoch": self.current_epoch,
-            "global_step": self.global_step,
-        }
-        if self.scheduler is not None:
-            checkpoint["scheduler_state_dict"] = self.scheduler.state_dict()
-        torch.save(checkpoint, checkpoint_path)
-
-    def load_checkpoint(self, path: str | Path) -> None:
-        """Load model, optimizer, and trainer state.
-
-        :param path: Source checkpoint path
-        """
-        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
-        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
-            self.model.load_state_dict(checkpoint["model_state_dict"])
-            if "optimizer_state_dict" in checkpoint:
-                self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-            if self.scheduler is not None and "scheduler_state_dict" in checkpoint:
-                self.scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-            self.best_metric = checkpoint.get("best_metric", self.best_metric)
-            self.wait = checkpoint.get("wait", self.wait)
-            self.current_epoch = checkpoint.get("current_epoch", self.current_epoch)
-            self.global_step = checkpoint.get("global_step", self.global_step)
-            return
-        self.model.load_state_dict(checkpoint)
-
-    def save_training_artifacts(self) -> None:
-        """Persist all training artifacts collected by the trainer."""
-        self.save_loss_curve()
-        self.save_metric_curve()
-        self.plot_loss_curve()
-        self.plot_metric_curve()
-
-    """
-    2. on-train-start hook
-    """
-
-    def on_train_start(self) -> None:
-        """Hook called before the first training epoch."""
-
-    """
-    4. on-train-end hook
-    """
-
-    def on_train_end(self) -> None:
-        """Hook called once after the training loop ends.
-
-        The default implementation persists training artifacts such as saved
-        curve values and plots.
-        """
-        self.save_training_artifacts()
-
-    """
-    3.1 on-epoch-start hook
-    """
-
-    def on_epoch_start(self, epoch: int) -> None:
-        """Hook called before each epoch starts.
-
-        :param epoch: Zero-based epoch index
-        """
-
-    """
-    3.4 on-epoch-end hook
-    """
-
-    def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
-        """Hook called after each epoch ends.
-
-        Subclasses can use this hook to record aggregated metrics, write
-        summaries, or print epoch-level progress information.
-
-        :param epoch: Zero-based epoch index
-        :param metrics: Aggregated metrics for the epoch
-        """
-
-    """
-    3.3 validate
-    """
-
-    def on_validation_start(self, epoch: int) -> None:
-        """Hook called before validation starts.
-
-        This hook is called once per epoch before the validation routine runs,
-        even if the concrete ``validate`` implementation later returns an empty
-        metrics dictionary.
-
-        :param epoch: Zero-based epoch index
-        """
-
-    def on_validation_end(self, metrics: dict[str, float]) -> None:
-        """Hook called after validation ends.
-
-        :param metrics: Validation metrics for the current epoch
-        """
-
-    """
-    on train step hooks
-    """
-
-    def on_train_step_start(self, batch: Any) -> None:
-        """Hook called before each train step.
-
-        :param batch: Raw step batch
-        """
-
-    """
-    on train step end hook
-    """
-
-    def on_train_step_end(self, metrics: dict[str, float]) -> None:
-        """Hook called after each train step.
-
-        :param metrics: Step-level metrics
-        """
-
-    """
-    evaluate
-    """
-
-    def on_evaluate_start(self) -> None:
-        """Hook called before evaluation starts."""
-
-    def on_evaluate_end(self, metrics: dict[str, float]) -> None:
-        """Hook called after evaluation ends.
-
-        :param metrics: Evaluation metrics
-        """
-
-    def on_predict_start(self) -> None:
-        """Hook called before prediction starts."""
-
-    def on_predict_end(self) -> None:
-        """Hook called after prediction ends."""
-
-    """
-    persist training artifacts
-    """
-
-    def save_loss_curve(self) -> None:
-        """Persist loss-curve values to disk.
-
-        Subclasses can override this to save numeric loss values in a format
-        that can later be reloaded for plotting.
-        """
-
-    def save_metric_curve(self) -> None:
-        """Persist metric-curve values to disk.
-
-        Subclasses can override this to save numeric metric values in a format
-        that can later be reloaded for plotting.
-        """
-
-    """
-    plot training artifacts
-    """
-
-    def plot_loss_curve(self) -> None:
-        """Plot and save the training loss curve.
-
-        Subclasses can override this when they track loss history.
-        """
-
-    def plot_metric_curve(self) -> None:
-        """Plot and save tracked metric curves.
-
-        Subclasses can override this when they track validation or test metrics.
-        """
-
-    """
-    3.2 train one epoch
-    """
-
-    def train_one_epoch(self, epoch: int) -> dict[str, float]:
-        """Train for one epoch.
-
-        :param epoch: Zero-based epoch index
-        :return: Epoch-level metrics
-        """
-        # Typically loops over the training dataloader and calls ``self.train_one_step``.
-        raise NotImplementedError
-
-    """
-    3.2 train one step
-    """
-
-    def train_one_step(self, batch: dict[str, Any]) -> dict[str, float]:
-        """Run one optimization step.
-
-        :param batch: Input batch for one training step
-        :return: Dictionary of step-level training metrics
-        """
-        # 1. on-train-step-start hook
-        # 2. forward
-        # 3. compute loss
-        # 4. compute metrics
-        # 5. backward
-        # 6. optimizer step
-        # 7. scheduler step
-        # 8. on-train-step-end hook
-        raise NotImplementedError
-
-    """
-    3.3 validate
-    """
-
-    def validate(self, epoch: int | None = None) -> dict[str, float]:
-        """Run validation.
-
-        :param epoch: Optional zero-based epoch index
-        :return: Validation metrics
-        """
-        raise NotImplementedError
-
-    """
-    evaluate
-    """
-
-    def evaluate(self, *args: Any, **kwargs: Any) -> dict[str, float]:
-        """Run evaluation outside the training loop."""
-        raise NotImplementedError
-
-    """
-    forward
-    """
-
-    def forward_step(self, batch: Any) -> Any:
-        """Run one model forward pass."""
-        raise NotImplementedError
-
-    """
-    loss
-    """
-
-    def compute_loss(self, batch: Any, outputs: Any) -> torch.Tensor:
-        """Compute one training loss value."""
-        raise NotImplementedError
-
-    """
-    metrics
-    """
-
-    def compute_metrics(self, batch: Any, outputs: Any) -> dict[str, float]:
-        """Compute metrics from one batch and model outputs."""
-        raise NotImplementedError

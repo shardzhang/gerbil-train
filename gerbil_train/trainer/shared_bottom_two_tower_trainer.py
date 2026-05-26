@@ -219,6 +219,7 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
             self.current_epoch = epoch
         return {}
 
+
     def evaluate(self) -> dict[str, float]:
         """Run evaluation.
 

@@ -10,7 +10,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-__all__ = ["load_curve_values", "save_curve_values", "save_training_curves"]
+__all__ = ["load_curve_values", "save_curve_values"]
 
 
 def save_curve_values(values: Sequence[float], path: str | Path) -> None:
@@ -55,30 +55,3 @@ def load_curve_values(path: str | Path) -> list[float]:
 
     return values
 
-
-def save_training_curves(
-    train_loss_history: Sequence[float],
-    val_ndcg_history: Sequence[float],
-    plot_path: str | Path,
-) -> None:
-    """Save a figure containing training loss and validation NDCG curves.
-
-    :param train_loss_history: Sequence of training loss values by epoch
-    :param val_ndcg_history: Sequence of validation NDCG values by epoch
-    :param plot_path: Destination file path for the generated figure
-    """
-    plot_path = Path(plot_path)
-    plot_path.parent.mkdir(parents=True, exist_ok=True)
-
-    plt.figure(figsize=(12, 4))
-    plt.subplot(1, 2, 1)
-    plt.plot(train_loss_history)
-    plt.title("Train Loss")
-
-    plt.subplot(1, 2, 2)
-    plt.plot(val_ndcg_history)
-    plt.title("Val NDCG@5")
-
-    plt.tight_layout()
-    plt.savefig(plot_path)
-    plt.close()

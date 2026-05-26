@@ -11,15 +11,13 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
+from matplotlib import pyplot as plt
 
 from gerbil_train.losses.ranking import compute_loss
 from gerbil_train.metrics.ranking import ndcg_score
 from gerbil_train.trainer.base_trainer import BaseTrainer
-from gerbil_train.utils.plot import (
-    load_curve_values,
-    save_curve_values,
-    save_training_curves,
-)
+from gerbil_train.utils.plot import save_curve_values
+
 
 __all__ = [
     "LearningToRankTrainer",
@@ -41,6 +39,7 @@ class LearningToRankTrainer(BaseTrainer):
 
     def __init__(
         self,
+        *,
         model: nn.Module,
         optimizer: optim.Optimizer,
         scheduler: Any = None,
@@ -99,6 +98,7 @@ class LearningToRankTrainer(BaseTrainer):
         self.val_loader: DataLoader | None = None
         self.loss_name = ""
 
+
     def setup(self) -> None:
         """Prepare training directories and tensorboard writer.
 
@@ -110,6 +110,14 @@ class LearningToRankTrainer(BaseTrainer):
         if self.log_dir is not None:
             self.log_dir.mkdir(parents=True, exist_ok=True)
             self.writer = SummaryWriter(log_dir=str(self.log_dir))
+
+
+    def cleanup(self) -> None:
+        """Close runtime resources such as the TensorBoard writer."""
+        if self.writer is not None:
+            self.writer.close()
+            self.writer = None
+
 
     def fit(
         self,
@@ -141,68 +149,6 @@ class LearningToRankTrainer(BaseTrainer):
             best_ndcg=self.best_metric or 0.0,
         )
 
-    def cleanup(self) -> None:
-        """Close runtime resources such as the TensorBoard writer."""
-        if self.writer is not None:
-            self.writer.close()
-            self.writer = None
-
-    def _curve_text_paths(self) -> tuple[Path | None, Path | None]:
-        """Return the text-file paths used for persisted training curves."""
-        if self.plot_path is None:
-            return None, None
-        loss_path = self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt")
-        metric_path = self.plot_path.with_name(f"{self.plot_path.stem}_metric.txt")
-        return loss_path, metric_path
-
-    def save_loss_curve(self) -> None:
-        """Save training-loss values to a text file."""
-        loss_path, _ = self._curve_text_paths()
-        if loss_path is None:
-            return
-        save_curve_values(self.train_loss_history, loss_path)
-
-    def save_metric_curve(self) -> None:
-        """Save validation-metric values to a text file."""
-        _, metric_path = self._curve_text_paths()
-        if metric_path is None:
-            return
-        save_curve_values(self.val_ndcg_history, metric_path)
-
-    def plot_loss_curve(self) -> None:
-        """Render the combined training-curves figure from saved values."""
-        if self.plot_path is None:
-            return
-
-        loss_path, metric_path = self._curve_text_paths()
-        train_loss_history = (
-            load_curve_values(loss_path)
-            if loss_path is not None and loss_path.exists()
-            else self.train_loss_history
-        )
-        val_ndcg_history = (
-            load_curve_values(metric_path)
-            if metric_path is not None and metric_path.exists()
-            else self.val_ndcg_history
-        )
-        save_training_curves(
-            train_loss_history,
-            val_ndcg_history,
-            self.plot_path,
-        )
-
-    def plot_metric_curve(self) -> None:
-        """Render the metric-related figure artifact."""
-        self.plot_loss_curve()
-
-    def on_validation_end(self, metrics: dict[str, float]) -> None:
-        """Advance the scheduler after validation.
-
-        :param metrics: Validation metrics for the current epoch
-        """
-        ndcg = metrics.get("ndcg")
-        if ndcg is not None:
-            self.scheduler_step(ndcg)
 
     def train_one_epoch(self, epoch: int) -> dict[str, float]:
         """Train over all ranking groups for one epoch.
@@ -224,6 +170,73 @@ class LearningToRankTrainer(BaseTrainer):
             total_loss += step_metrics["loss"]
             train_pbar.set_postfix(loss=f"{total_loss / step:.4f}")
         return {"loss": total_loss / len(self.train_loader)}
+
+
+    def train_one_step(self, batch: dict[str, Any]) -> dict[str, float]:
+        """Run one optimization step on a single query group.
+
+        :param batch: Query-group batch with feature and label tensors
+        :return: Step-level training metrics
+        """
+        self.on_train_step_start(batch)
+
+        batch = self.move_batch_to_device(batch)
+        self.zero_grad()
+        outputs = self.forward_step(batch)
+        loss = self.compute_loss(batch, outputs)
+        self.backward_step(loss)
+        self.clip_gradients()
+        self.optimizer_step()
+        self.global_step += 1
+        metrics = {"loss": float(loss.item())}
+
+        self.on_train_step_end(metrics)
+        return metrics
+    
+
+    def on_train_end(self):
+        self.save_training_curves()
+
+
+    def validate(self, epoch: int | None = None) -> dict[str, float]:
+        """Evaluate NDCG on the validation split.
+
+        :param epoch: Optional zero-based epoch index
+        :return: Validation metrics dictionary
+        """
+        # self.on_validation_start(epoch)
+
+        self.model.eval()
+        epoch_index = self.current_epoch if epoch is None else epoch
+        epoch_display = epoch_index + 1
+        ndcg_sum = 0.0
+
+        with torch.no_grad():
+            val_pbar = tqdm(
+                self.val_loader,
+                desc=f"Epoch {epoch_display}/{self.max_epochs} [val]",
+                leave=False,
+            )
+            for step, batch in enumerate(val_pbar, start=1):
+                batch = self.move_batch_to_device(batch)
+                outputs = self.forward_step(batch)
+                ndcg_sum += self.compute_metrics(batch, outputs)["ndcg"]
+                val_pbar.set_postfix(ndcg=f"{ndcg_sum / step:.4f}")
+        metrics = {"ndcg": ndcg_sum / len(self.val_loader)}
+
+        self.on_validation_end(metrics)
+        return metrics
+
+
+    def on_validation_end(self, metrics: dict[str, float]) -> None:
+        """Advance the scheduler after validation.
+
+        :param metrics: Validation metrics for the current epoch
+        """
+        ndcg = metrics.get("ndcg")
+        if ndcg is not None:
+            self.scheduler_step(ndcg)
+
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         """Record epoch history, log TensorBoard scalars, and print progress.
@@ -257,50 +270,6 @@ class LearningToRankTrainer(BaseTrainer):
                 f"Epoch {epoch + 1:2d} | loss: {train_loss:.4f} | NDCG@{self.val_k} val: {val_ndcg:.4f}"
             )
 
-    def train_one_step(self, batch: dict[str, Any]) -> dict[str, float]:
-        """Run one optimization step on a single query group.
-
-        :param batch: Query-group batch with feature and label tensors
-        :return: Step-level training metrics
-        """
-        self.on_train_step_start(batch)
-
-        batch = self.move_batch_to_device(batch)
-        self.zero_grad()
-        outputs = self.forward_step(batch)
-        loss = self.compute_loss(batch, outputs)
-        self.backward_step(loss)
-        self.clip_gradients()
-        self.optimizer_step()
-        self.global_step += 1
-        metrics = {"loss": float(loss.item())}
-
-        self.on_train_step_end(metrics)
-        return metrics
-
-    def validate(self, epoch: int | None = None) -> dict[str, float]:
-        """Evaluate NDCG on the validation split.
-
-        :param epoch: Optional zero-based epoch index
-        :return: Validation metrics dictionary
-        """
-        self.model.eval()
-        epoch_index = self.current_epoch if epoch is None else epoch
-        epoch_display = epoch_index + 1
-        ndcg_sum = 0.0
-
-        with torch.no_grad():
-            val_pbar = tqdm(
-                self.val_loader,
-                desc=f"Epoch {epoch_display}/{self.max_epochs} [val]",
-                leave=False,
-            )
-            for step, batch in enumerate(val_pbar, start=1):
-                batch = self.move_batch_to_device(batch)
-                outputs = self.forward_step(batch)
-                ndcg_sum += self.compute_metrics(batch, outputs)["ndcg"]
-                val_pbar.set_postfix(ndcg=f"{ndcg_sum / step:.4f}")
-        return {"ndcg": ndcg_sum / len(self.val_loader)}
 
     def evaluate(
         self,
@@ -313,7 +282,8 @@ class LearningToRankTrainer(BaseTrainer):
         :param ks: Sequence of NDCG cutoffs to compute
         :return: Mapping from cutoff k to mean NDCG@k
         """
-        self.on_evaluate_start()
+        # self.on_evaluate_start()
+
         dataloader = self.val_loader if dataloader is None else dataloader
         self.model.eval()
         ndcg_totals = {k: 0.0 for k in ks}
@@ -326,8 +296,19 @@ class LearningToRankTrainer(BaseTrainer):
                     ndcg_totals[k] += float(ndcg_score(batch["y"], outputs, k=k))
 
         metrics = {k: ndcg_totals[k] / len(dataloader) for k in ks}
+        
         self.on_evaluate_end({f"ndcg@{k}": value for k, value in metrics.items()})
         return metrics
+    
+
+    def on_evaluate_end(self, metrics: dict[str, float]) -> None:
+        """Log evaluation results.
+
+        :param metrics: Evaluation metrics for the current evaluation run
+        """
+        metric_str = " | ".join(f"{key}: {value:.4f}" for key, value in metrics.items())
+        self.log_message(f"Evaluation results | {metric_str}")  
+    
 
     def forward_step(self, batch: dict[str, Any]):
         """Run the ranking model on one query group's feature matrix.
@@ -336,6 +317,7 @@ class LearningToRankTrainer(BaseTrainer):
         :return: Predicted document scores for the group
         """
         return self.model(batch["X"])
+
 
     def compute_loss(self, batch: dict[str, Any], outputs: Any) -> torch.Tensor:
         """Compute the configured ranking loss for one query group.
@@ -346,6 +328,7 @@ class LearningToRankTrainer(BaseTrainer):
         """
         return compute_loss(self.loss_name, outputs, batch["y"])
 
+
     def compute_metrics(self, batch: dict[str, Any], outputs: Any) -> dict[str, float]:
         """Compute validation NDCG for one query group.
 
@@ -354,3 +337,41 @@ class LearningToRankTrainer(BaseTrainer):
         :return: Metric dictionary for the query group
         """
         return {"ndcg": float(ndcg_score(batch["y"], outputs, k=self.val_k))}
+
+
+    def _curve_text_paths(self) -> tuple[Path | None, Path | None]:
+        """Return the text-file paths used for persisted training curves."""
+        if self.plot_path is None:
+            return None, None
+
+        loss_path = self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt")
+        metric_path = self.plot_path.with_name(f"{self.plot_path.stem}_metric.txt")
+        return loss_path, metric_path
+
+
+    def save_training_curves(self) -> None:
+        """Save a figure containing training loss and validation NDCG curves.
+
+        :param train_loss_history: Sequence of training loss values by epoch
+        :param val_ndcg_history: Sequence of validation NDCG values by epoch
+        :param plot_path: Destination file path for the generated figure
+        """
+        self.plot_path.parent.mkdir(parents=True, exist_ok=True)
+
+        plt.figure(figsize=(12, 4))
+        plt.subplot(1, 2, 1)
+        plt.plot(self.train_loss_history)
+        plt.title("Train Loss")
+
+        plt.subplot(1, 2, 2)
+        plt.plot(self.val_ndcg_history)
+        plt.title("Val NDCG@5")
+
+        plt.tight_layout()
+        plt.savefig(self.plot_path)
+        plt.close()
+                
+        loss_path, metric_path = self._curve_text_paths()
+        save_curve_values(self.train_loss_history, loss_path)
+        save_curve_values(self.val_ndcg_history, metric_path)
+    
