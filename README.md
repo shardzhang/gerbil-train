@@ -39,18 +39,21 @@ Typical workflow:
 ```bash
 gerbil-train/
 ├─ README.md
-├─ pyproject.toml
+├─ requirements.txt
+├─ checkpoints/
 ├─ configs/
-├─ scripts/
 ├─ gerbil_train/
 │  ├─ cli/
 │  ├─ data/
-│  ├─ models/
+│  ├─ export/
+│  ├─ inference/
 │  ├─ losses/
 │  ├─ metrics/
+│  ├─ models/
+│  ├─ registry/
 │  ├─ trainer/
-│  ├─ export/
 │  └─ utils/
+├─ scripts/
 └─ tests/
 ```
 

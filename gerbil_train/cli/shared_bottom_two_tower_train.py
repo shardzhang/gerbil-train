@@ -1,38 +1,29 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from typing import Any
 
-import yaml
 from torch.utils.data import DataLoader
 
+from gerbil_train.data.shared_bottom_two_tower_dataset import (
+    SharedBottomTwoTowerExplicitDataset,
+    SharedBottomTwoTowerImplicitDataset,
+)
 from gerbil_train.models.shared_bottom_two_tower import SharedBottomTwoTower
-from gerbil_train.data.shared_bottom_two_tower_dataset import SharedBottomTwoTowerExplicitDataset, SharedBottomTwoTowerImplicitDataset
-from gerbil_train.trainer.shared_bottom_two_tower_trainer import SBTTTrainer
+from gerbil_train.trainer.shared_bottom_two_tower_trainer import (
+    SharedBottomTwoTowerTrainer,
+)
+from gerbil_train.utils.config import load_experiment_config
 
 
-def load_yaml(path: str | Path) -> dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+def build_dataloaders(
+    cfg: dict[str, Any],
+) -> tuple[DataLoader | None, DataLoader | None]:
+    """Build dataloaders for the shared-bottom two-tower training pipeline.
 
-
-def load_experiment_config(experiment_path: str | Path) -> dict[str, Any]:
-    
-    exp = load_yaml(experiment_path)
-
-    config = {
-        "experiment": exp,
-        "data": load_yaml(exp["data"]),
-        "model": load_yaml(exp["model"]),
-        "train": load_yaml(exp["train"]),
-        "eval": load_yaml(exp["eval"]),
-        "export": load_yaml(exp["export"]),
-    }
-    return config
-
-
-def build_dataloaders(cfg: dict[str, Any]) -> tuple[DataLoader | None, DataLoader | None]:
+    :param cfg: Fully resolved experiment configuration dictionary
+    :return: Tuple of ``(implicit_loader, explicit_loader)``
+    """
     data_cfg = cfg["data"]
     loader_cfg = data_cfg["loader"]
 
@@ -73,6 +64,11 @@ def build_dataloaders(cfg: dict[str, Any]) -> tuple[DataLoader | None, DataLoade
 
 
 def build_model(cfg: dict[str, Any]) -> SharedBottomTwoTower:
+    """Build the shared-bottom two-tower model from configuration.
+
+    :param cfg: Fully resolved experiment configuration dictionary
+    :return: Configured ``SharedBottomTwoTower`` instance
+    """
     model_cfg = cfg["model"]["model"]
 
     return SharedBottomTwoTower(
@@ -88,26 +84,46 @@ def build_model(cfg: dict[str, Any]) -> SharedBottomTwoTower:
         normalize_embedding=model_cfg.get("normalize_embedding", False),
     )
 
-def build_trainer(cfg: dict[str, Any], model: SharedBottomTwoTower) -> SBTTTrainer:
+
+def build_trainer(
+    cfg: dict[str, Any], model: SharedBottomTwoTower
+) -> SharedBottomTwoTowerTrainer:
+    """Build the trainer for the shared-bottom two-tower model.
+
+    :param cfg: Fully resolved experiment configuration dictionary
+    :param model: Model instance to train
+    :return: Configured ``SharedBottomTwoTowerTrainer``
+    """
     train_cfg = cfg["train"]
 
-    return SBTTTrainer(
+    return SharedBottomTwoTowerTrainer(
         model=model,
         device=train_cfg["device"],
         implicit_lr=train_cfg["optimizer"]["implicit"]["lr"],
         explicit_lr=train_cfg["optimizer"]["explicit"]["lr"],
         weight_decay=train_cfg["optimizer"]["implicit"]["weight_decay"],
         gradient_clip_norm=train_cfg["trainer"].get("gradient_clip_norm"),
+        monitor="train_loss",
+        monitor_mode="min",
+        patience=0,
+        best_checkpoint_path=None,
+        best_metric=None,
+        wait=0,
+        seed=train_cfg.get("seed", 42),
     )
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for shared-bottom two-tower training."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True, help="Path to experiment yaml")
+    parser.add_argument(
+        "--config", type=str, required=True, help="Path to experiment yaml"
+    )
     return parser.parse_args()
 
 
 def main() -> None:
+    """Run the shared-bottom two-tower training entrypoint."""
     args = parse_args()
     cfg = load_experiment_config(args.config)
 

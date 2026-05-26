@@ -40,9 +40,15 @@ class SharedBottomTwoTowerImplicitDataset(Dataset):
         self.size = size
 
     def __len__(self) -> int:
+        """Return the synthetic dataset size."""
         return self.size
 
     def __getitem__(self, index: int) -> dict[str, Tensor]:
+        """Return one synthetic implicit-training sample.
+
+        :param index: Sample index
+        :return: Dictionary containing implicit-training tensors
+        """
         query_features = torch.randn(self.query_input_dim)
         pos_item_features = torch.randn(self.item_input_dim)
         neg_item_features = torch.randn(self.num_negatives, self.item_input_dim)
@@ -84,9 +90,15 @@ class SharedBottomTwoTowerExplicitDataset(Dataset):
         self.size = size
 
     def __len__(self) -> int:
+        """Return the synthetic dataset size."""
         return self.size
 
     def __getitem__(self, index: int) -> dict[str, Tensor]:
+        """Return one synthetic explicit-training sample.
+
+        :param index: Sample index
+        :return: Dictionary containing explicit-training tensors
+        """
         query_features = torch.randn(self.query_input_dim)
         item_features = torch.randn(self.item_input_dim)
         label = torch.rand(())

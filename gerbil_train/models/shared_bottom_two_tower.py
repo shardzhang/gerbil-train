@@ -20,55 +20,15 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
+from gerbil_train.utils.nn import build_mlp
 
 __all__ = ["SBTTOutput", "SharedBottomTwoTower"]
 
 
-def get_activation(name: str) -> nn.Module:
-    """Get the activation function by name.
-    :param name: Name of the activation function ("relu", "gelu", "tanh")
-    :return: An nn.Module representing the activation function
-    """
-    name = name.lower()
-    if name == "relu":
-        return nn.ReLU()
-    if name == "gelu":
-        return nn.GELU()
-    if name == "tanh":
-        return nn.Tanh()
-    raise ValueError(f"Unsupported activation: {name}")
-
-
-def build_mlp(
-    input_dim: int,
-    hidden_dims: Sequence[int],
-    dropout: float = 0.0,
-    activation: str = "relu",
-    batch_norm: bool = False,
-) -> nn.Sequential:
-    """Build a multi-layer perceptron (MLP) with optional dropout, batch normalization, and activation.
-    :param input_dim: Dimension of the input features
-    :param hidden_dims: List of hidden layer dimensions
-    :param dropout: Dropout rate to apply after each hidden layer (default: 0.0)
-    :param activation: Activation function to use (default: "relu")
-    :param batch_norm: Whether to apply batch normalization after each hidden layer (default: False)
-    :return: An nn.Sequential model representing the MLP
-    """
-    layers: list[nn.Module] = []
-    prev_dim = input_dim
-    for hidden_dim in hidden_dims:
-        layers.append(nn.Linear(prev_dim, hidden_dim))
-        if batch_norm:
-            layers.append(nn.BatchNorm1d(hidden_dim))
-        layers.append(get_activation(activation))
-        if dropout > 0:
-            layers.append(nn.Dropout(dropout))
-        prev_dim = hidden_dim
-    return nn.Sequential(*layers)
-
-
 @dataclass
 class SBTTOutput:
+    """Structured outputs returned by ``SharedBottomTwoTower.forward``."""
+
     explicit_query_embedding: Tensor
     explicit_item_embedding: Tensor
     explicit_score: Tensor
@@ -79,10 +39,10 @@ class SBTTOutput:
 
 class SharedBottomTwoTower(nn.Module):
     """Shared-Bottom Two-Tower for retrieval/recommendation.
-    
+
     Query side:
       shared bottom -> explicit tower / implicit tower
-    
+
     Item side:
       shared bottom -> explicit tower / implicit tower
     """
@@ -184,7 +144,10 @@ class SharedBottomTwoTower(nn.Module):
 
     def _maybe_normalize(self, x: Tensor) -> Tensor:
         """Optionally normalize the input tensor.
-        推荐系统双塔模型里非常标准的Embedding归一化函数. 开启后相似度计算从 “内积” 变成标准 “余弦相似度”
+
+        In two-tower retrieval models, enabling embedding normalization turns
+        the similarity computation from a raw dot product into cosine-style
+        similarity.
 
         :param: x: [batch_size, embedding_dim]
         :return: [batch_size, embedding_dim]
@@ -215,7 +178,11 @@ class SharedBottomTwoTower(nn.Module):
         """
         return self.item_shared_bottom(item_features)
 
-    def encode_query_explicit(self, query_features: Tensor, detach_shared: bool = False, ) -> Tensor:
+    def encode_query_explicit(
+        self,
+        query_features: Tensor,
+        detach_shared: bool = False,
+    ) -> Tensor:
         """Encode query features through the explicit sub-tower.
         :param: query_features: [batch_size, query_input_dim]
         :param: detach_shared: whether to detach the shared bottom features
@@ -228,7 +195,11 @@ class SharedBottomTwoTower(nn.Module):
         q_exp = self.query_explicit_head(q_exp)
         return self._maybe_normalize(q_exp)
 
-    def encode_item_explicit(self, item_features: Tensor, detach_shared: bool = False,) -> Tensor:
+    def encode_item_explicit(
+        self,
+        item_features: Tensor,
+        detach_shared: bool = False,
+    ) -> Tensor:
         """Encode item features through the explicit sub-tower.
         :param: item_features: [batch_size, item_input_dim]
         :param: detach_shared: whether to detach the shared bottom features
@@ -261,15 +232,26 @@ class SharedBottomTwoTower(nn.Module):
         i_imp = self.item_implicit_head(i_imp)
         return self._maybe_normalize(i_imp)
 
-    def forward(self, query_features: Tensor, item_features: Tensor, detach_shared_for_explicit: bool = False,) -> SBTTOutput:
+    def forward(
+        self,
+        query_features: Tensor,
+        item_features: Tensor,
+        detach_shared_for_explicit: bool = False,
+    ) -> SBTTOutput:
         """Forward pass for the shared bottom two-tower model.
         :param: query_features: [batch_size, query_input_dim]
         :param: item_features: [batch_size, item_input_dim]
         :param: detach_shared_for_explicit: whether to detach the shared bottom features for the explicit sub-tower
         :return: SBTTOutput containing explicit and implicit embeddings and scores
         """
-        q_exp = self.encode_query_explicit(query_features, detach_shared=detach_shared_for_explicit,)
-        i_exp = self.encode_item_explicit(item_features, detach_shared=detach_shared_for_explicit,)
+        q_exp = self.encode_query_explicit(
+            query_features,
+            detach_shared=detach_shared_for_explicit,
+        )
+        i_exp = self.encode_item_explicit(
+            item_features,
+            detach_shared=detach_shared_for_explicit,
+        )
         q_imp = self.encode_query_implicit(query_features)
         i_imp = self.encode_item_implicit(item_features)
 
