@@ -7,7 +7,6 @@ from typing import Any, Sequence
 import torch
 import torch.optim as optim
 from torch import nn
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
@@ -19,10 +18,7 @@ from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils.plot import save_curve_values
 
 
-__all__ = [
-    "LearningToRankTrainer",
-    "LearningToRankTrainingResult",
-]
+__all__ = ["LearningToRankTrainer", "LearningToRankTrainingResult"]
 
 
 @dataclass
@@ -44,16 +40,16 @@ class LearningToRankTrainer(BaseTrainer):
         optimizer: optim.Optimizer,
         scheduler: Any = None,
         device: torch.device | str = "cpu",
-        gradient_clip_norm: float | None = None,
+        gradient_clip_norm: float = None,
         monitor: str = "val_ndcg",
         monitor_mode: str = "max",
         patience: int = 5,
-        best_checkpoint_path: str | Path | None = None,
-        best_metric: float | None = None,
+        best_checkpoint_path: str = None,
+        best_metric: float = None,
         wait: int = 0,
-        seed: int | None = 42,
-        log_dir: str | Path | None = None,
-        plot_path: str | Path | None = None,
+        seed: int = 42,
+        log_dir: str = None,
+        plot_path: str = None,
         val_k: int = 5,
     ) -> None:
         """Initialize the learning-to-rank trainer.

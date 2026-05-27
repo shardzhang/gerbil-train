@@ -15,6 +15,11 @@ from gerbil_train.trainer.learning_to_rank_trainer import LearningToRankTrainer
 
 warnings.filterwarnings("ignore")
 
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+print(f"Project root directory: {PROJECT_ROOT.resolve()}")
+DEFAULT_DATASET_PATH = PROJECT_ROOT.parent / "data" / "MSLR-WEB10K.pt"
+DEFAULT_CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints" / "ltr"
+
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for learning-to-rank training."""
@@ -28,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-path",
         type=Path,
-        default=Path("/Users/dazhang/PycharmProject/data/MSLR-WEB10K.pt"),
+        default=DEFAULT_DATASET_PATH,
         help="Path to the MSLR-WEB10K.pt file",
     )
     parser.add_argument(
@@ -46,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--checkpoint-dir",
         type=Path,
-        default=Path("/Users/dazhang/PycharmProject/GERBIL-TRAIN/checkpoints/ltr"),
+        default=DEFAULT_CHECKPOINT_DIR,
         help="Directory to save model checkpoints",
     )
     parser.add_argument(
