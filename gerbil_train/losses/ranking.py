@@ -232,14 +232,21 @@ def listnet_loss(scores, labels):
     return -torch.sum(label_probs * log_score_probs)
 
 
-def compute_loss(loss_name, scores, labels):
-    """Dispatch ranking loss by name."""
+def compute_loss(loss_name, scores, labels, k=None):
+    """Dispatch ranking loss by name.
+
+    :param loss_name: Ranking loss name
+    :param scores: Predicted scores for one query group
+    :param labels: Ground-truth relevance labels for one query group
+    :param k: Optional ranking cutoff used by LambdaRank-style losses
+    :return: Scalar loss tensor
+    """
     if loss_name == "mse":
         return mse_loss(scores, labels)
     if loss_name == "ranknet":
         return ranknet_group_loss_via_pairs(scores, labels)
     if loss_name == "lambdarank":
-        loss, _ = lambdarank_group_loss(scores, labels)
+        loss, _ = lambdarank_group_loss(scores, labels, k=k)
         return loss
     if loss_name == "listmle":
         return listmle_loss(scores, labels)
