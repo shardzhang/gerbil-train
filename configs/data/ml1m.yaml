@@ -1,13 +1,25 @@
 name: ml1m
-description: MovieLens 1M dataset.
+description: MovieLens 1M raw dataset.
 
-source:
-  format: parquet
+# parquet/csv/tfrecord/jsonl/dat
+format: dat
 
 paths:
-  users: data/ml1m/users.parquet
-  items: data/ml1m/items.parquet
-  interactions: data/ml1m/interactions.parquet
+  root: ../data/ml-1m
+  users: ../data/ml-1m/users.dat
+  items: ../data/ml-1m/movies.dat
+  interactions: ../data/ml-1m/ratings.dat
+  # The current shared-bottom CLI still reads these keys.
+  train_implicit: ../data/ml-1m/ratings.dat
+  train_explicit: ../data/ml-1m/ratings.dat
+
+read:
+  separator: "::"
+  encoding: latin-1
+
+validation:
+  enabled: true
+  num_negatives: 99
 
 columns:
   user_id: user_id
@@ -28,6 +40,43 @@ tables:
 
 split:
   strategy: leave_one_out
-  train: train.parquet
-  valid: valid.parquet
-  test: test.parquet
+  files:
+    train: train.parquet
+    valid: valid.parquet
+    test: test.parquet
+
+
+features:
+  query:
+    dense:
+      - user_age
+      - user_activity_score
+    sparse:
+      - user_id_idx
+      - gender_idx
+      - occupation_idx
+
+  item:
+    dense:
+      - item_popularity
+      - item_ctr_30d
+    sparse:
+      - item_id_idx
+      - category_idx
+      - release_year_idx
+
+label:
+  explicit:
+    field: rating
+    type: regression
+
+  implicit:
+    field: clicked
+    type: binary
+    positive_value: 1
+
+query_encoder:
+  combine_sparse_dense: concat
+
+item_encoder:
+  combine_sparse_dense: concat

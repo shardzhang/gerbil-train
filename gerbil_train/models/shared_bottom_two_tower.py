@@ -14,7 +14,7 @@ Paper: 2019-Improving Relevance Prediction with Transfer Learning in Large-scale
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 from dataclasses import dataclass
 
 import torch
@@ -47,41 +47,37 @@ class SharedBottomTwoTower(nn.Module):
       shared bottom -> explicit tower / implicit tower
     """
 
-    def __init__(
-        self,
-        query_input_dim: int,
-        item_input_dim: int,
-        shared_hidden_dims: Sequence[int],
-        explicit_hidden_dims: Sequence[int],
-        implicit_hidden_dims: Sequence[int],
-        embedding_dim: int,
-        dropout: float = 0.0,
-        activation: str = "relu",
-        batch_norm: bool = False,
-        normalize_embedding: bool = False,
-        temperature: float = 0.07,
-    ) -> None:
+    def __init__(self, config: Mapping[str, Any]) -> None:
         """Initialize the Shared-Bottom Two-Tower model.
-        :param query_input_dim: Dimensionality of query input features
-        :param item_input_dim: Dimensionality of item input features
-        :param shared_hidden_dims: List of hidden layer dimensions for the shared bottom
-        :param explicit_hidden_dims: List of hidden layer dimensions for the explicit tower
-        :param implicit_hidden_dims: List of hidden layer dimensions for the implicit tower
-        :param embedding_dim: Dimensionality of the output embeddings
-        :param dropout: Dropout rate to apply after each hidden layer (default: 0.0)
-        :param activation: Activation function to use (default: "relu")
-        :param batch_norm: Whether to apply batch normalization after each hidden layer (default: False)
-        :param normalize_embedding: Whether to L2 normalize the output embeddings (default: False)
-        :param temperature: Temperature for scaling the implicit scores (default: 0.07)
+
+        :param config: Model configuration mapping matching the shared-bottom YAML structure
         """
         super().__init__()
 
-        if len(shared_hidden_dims) == 0:
-            raise ValueError("shared_hidden_dims must not be empty")
-        if len(explicit_hidden_dims) == 0:
-            raise ValueError("explicit_hidden_dims must not be empty")
-        if len(implicit_hidden_dims) == 0:
-            raise ValueError("implicit_hidden_dims must not be empty")
+        query_input_dim = int(config["query_input_dim"])
+        item_input_dim = int(config["item_input_dim"])
+        shared_bottom = self._get_tower_config(config, "shared_bottom")
+        explicit_tower = self._get_tower_config(config, "explicit_tower")
+        implicit_tower = self._get_tower_config(config, "implicit_tower")
+        embedding_dim = int(config["embedding_dim"])
+        normalize_embedding = bool(config.get("normalize_embedding", False))
+        temperature = float(config.get("temperature", 0.07))
+
+        shared_hidden_dims = self._get_hidden_dims(shared_bottom, "shared_bottom")
+        explicit_hidden_dims = self._get_hidden_dims(explicit_tower, "explicit_tower")
+        implicit_hidden_dims = self._get_hidden_dims(implicit_tower, "implicit_tower")
+
+        shared_activation = str(shared_bottom.get("activation", "relu"))
+        shared_dropout = float(shared_bottom.get("dropout", 0.0))
+        shared_batch_norm = bool(shared_bottom.get("batch_norm", False))
+
+        explicit_activation = str(explicit_tower.get("activation", shared_activation))
+        explicit_dropout = float(explicit_tower.get("dropout", shared_dropout))
+        explicit_batch_norm = bool(explicit_tower.get("batch_norm", shared_batch_norm))
+
+        implicit_activation = str(implicit_tower.get("activation", shared_activation))
+        implicit_dropout = float(implicit_tower.get("dropout", shared_dropout))
+        implicit_batch_norm = bool(implicit_tower.get("batch_norm", shared_batch_norm))
 
         self.normalize_embedding = normalize_embedding
         self.temperature = temperature
@@ -90,27 +86,26 @@ class SharedBottomTwoTower(nn.Module):
         self.query_shared_bottom = build_mlp(
             input_dim=query_input_dim,
             hidden_dims=shared_hidden_dims,
-            dropout=dropout,
-            activation=activation,
-            batch_norm=batch_norm,
+            batch_norm=shared_batch_norm,
+            activation=shared_activation,
+            dropout=shared_dropout,
         )
         query_shared_dim = shared_hidden_dims[-1]
 
         self.query_explicit_tower = build_mlp(
             input_dim=query_shared_dim,
             hidden_dims=explicit_hidden_dims,
-            dropout=dropout,
-            activation=activation,
-            batch_norm=batch_norm,
+            batch_norm=explicit_batch_norm,
+            activation=explicit_activation,
+            dropout=explicit_dropout,
         )
         self.query_implicit_tower = build_mlp(
             input_dim=query_shared_dim,
             hidden_dims=implicit_hidden_dims,
-            dropout=dropout,
-            activation=activation,
-            batch_norm=batch_norm,
+            batch_norm=implicit_batch_norm,
+            activation=implicit_activation,
+            dropout=implicit_dropout,
         )
-
         self.query_explicit_head = nn.Linear(explicit_hidden_dims[-1], embedding_dim)
         self.query_implicit_head = nn.Linear(implicit_hidden_dims[-1], embedding_dim)
 
@@ -118,29 +113,54 @@ class SharedBottomTwoTower(nn.Module):
         self.item_shared_bottom = build_mlp(
             input_dim=item_input_dim,
             hidden_dims=shared_hidden_dims,
-            dropout=dropout,
-            activation=activation,
-            batch_norm=batch_norm,
+            batch_norm=shared_batch_norm,
+            activation=shared_activation,
+            dropout=shared_dropout,
         )
         item_shared_dim = shared_hidden_dims[-1]
 
         self.item_explicit_tower = build_mlp(
             input_dim=item_shared_dim,
             hidden_dims=explicit_hidden_dims,
-            dropout=dropout,
-            activation=activation,
-            batch_norm=batch_norm,
+            batch_norm=explicit_batch_norm,
+            activation=explicit_activation,
+            dropout=explicit_dropout,
         )
         self.item_implicit_tower = build_mlp(
             input_dim=item_shared_dim,
             hidden_dims=implicit_hidden_dims,
-            dropout=dropout,
-            activation=activation,
-            batch_norm=batch_norm,
+            batch_norm=implicit_batch_norm,
+            activation=implicit_activation,
+            dropout=implicit_dropout,
         )
-
         self.item_explicit_head = nn.Linear(explicit_hidden_dims[-1], embedding_dim)
         self.item_implicit_head = nn.Linear(implicit_hidden_dims[-1], embedding_dim)
+
+    @staticmethod
+    def _get_tower_config(config: Mapping[str, Any], name: str) -> Mapping[str, Any]:
+        """Return one validated tower config block.
+
+        :param config: Model configuration mapping
+        :param name: Tower config name
+        :return: Tower configuration mapping
+        """
+        tower_config = config.get(name)
+        if not isinstance(tower_config, Mapping):
+            raise ValueError(f"{name} must be a mapping")
+        return tower_config
+
+    @staticmethod
+    def _get_hidden_dims(config: Mapping[str, Any], name: str) -> Sequence[int]:
+        """Return validated hidden dimensions from one tower config block.
+
+        :param config: Tower configuration mapping
+        :param name: Human-readable config block name for error messages
+        :return: Hidden layer dimensions
+        """
+        hidden_dims = config.get("hidden_dims")
+        if not hidden_dims:
+            raise ValueError(f"{name}.hidden_dims must not be empty")
+        return hidden_dims
 
     def _maybe_normalize(self, x: Tensor) -> Tensor:
         """Optionally normalize the input tensor.
@@ -158,25 +178,12 @@ class SharedBottomTwoTower(nn.Module):
 
     def dot_score(self, lhs: Tensor, rhs: Tensor) -> Tensor:
         """Compute dot product score between two sets of embeddings.
+
         :param: lhs: [batch_size, embedding_dim]
         :param: rhs: [batch_size, embedding_dim]
         :return: [batch_size]
         """
         return torch.sum(lhs * rhs, dim=-1) / self.temperature
-
-    def encode_query_shared(self, query_features: Tensor) -> Tensor:
-        """Encode query features through the shared bottom.
-        :param: query_features: [batch_size, query_input_dim]
-        :return: [batch_size, shared_hidden_dims[-1]]
-        """
-        return self.query_shared_bottom(query_features)
-
-    def encode_item_shared(self, item_features: Tensor) -> Tensor:
-        """Encode item features through the shared bottom.
-        :param: item_features: [batch_size, item_input_dim]
-        :return: [batch_size, shared_hidden_dims[-1]]
-        """
-        return self.item_shared_bottom(item_features)
 
     def encode_query_explicit(
         self,
@@ -184,15 +191,15 @@ class SharedBottomTwoTower(nn.Module):
         detach_shared: bool = False,
     ) -> Tensor:
         """Encode query features through the explicit sub-tower.
+
         :param: query_features: [batch_size, query_input_dim]
         :param: detach_shared: whether to detach the shared bottom features
         :return: [batch_size, embedding_dim]
         """
-        q_shared = self.encode_query_shared(query_features)
+        q_shared = self.query_shared_bottom(query_features)
         if detach_shared:
             q_shared = q_shared.detach()
-        q_exp = self.query_explicit_tower(q_shared)
-        q_exp = self.query_explicit_head(q_exp)
+        q_exp = self.query_explicit_head(self.query_explicit_tower(q_shared))
         return self._maybe_normalize(q_exp)
 
     def encode_item_explicit(
@@ -201,35 +208,35 @@ class SharedBottomTwoTower(nn.Module):
         detach_shared: bool = False,
     ) -> Tensor:
         """Encode item features through the explicit sub-tower.
+
         :param: item_features: [batch_size, item_input_dim]
         :param: detach_shared: whether to detach the shared bottom features
         :return: [batch_size, embedding_dim]
         """
-        i_shared = self.encode_item_shared(item_features)
+        i_shared = self.item_shared_bottom(item_features)
         if detach_shared:
             i_shared = i_shared.detach()
-        i_exp = self.item_explicit_tower(i_shared)
-        i_exp = self.item_explicit_head(i_exp)
+        i_exp = self.item_explicit_head(self.item_explicit_tower(i_shared))
         return self._maybe_normalize(i_exp)
 
     def encode_query_implicit(self, query_features: Tensor) -> Tensor:
         """Encode query features through the implicit sub-tower.
+
         :param: query_features: [batch_size, query_input_dim]
         :return: [batch_size, embedding_dim]
         """
-        q_shared = self.encode_query_shared(query_features)
-        q_imp = self.query_implicit_tower(q_shared)
-        q_imp = self.query_implicit_head(q_imp)
+        q_shared = self.query_shared_bottom(query_features)
+        q_imp = self.query_implicit_head(self.query_implicit_tower(q_shared))
         return self._maybe_normalize(q_imp)
 
     def encode_item_implicit(self, item_features: Tensor) -> Tensor:
         """Encode item features through the implicit sub-tower.
+
         :param: item_features: [batch_size, item_input_dim]
         :return: [batch_size, embedding_dim]
         """
-        i_shared = self.encode_item_shared(item_features)
-        i_imp = self.item_implicit_tower(i_shared)
-        i_imp = self.item_implicit_head(i_imp)
+        i_shared = self.item_shared_bottom(item_features)
+        i_imp = self.item_implicit_head(self.item_implicit_tower(i_shared))
         return self._maybe_normalize(i_imp)
 
     def forward(
@@ -245,14 +252,12 @@ class SharedBottomTwoTower(nn.Module):
         :return: SBTTOutput containing explicit and implicit embeddings and scores
         """
         q_exp = self.encode_query_explicit(
-            query_features,
-            detach_shared=detach_shared_for_explicit,
-        )
-        i_exp = self.encode_item_explicit(
-            item_features,
-            detach_shared=detach_shared_for_explicit,
+            query_features, detach_shared=detach_shared_for_explicit
         )
         q_imp = self.encode_query_implicit(query_features)
+        i_exp = self.encode_item_explicit(
+            item_features, detach_shared=detach_shared_for_explicit
+        )
         i_imp = self.encode_item_implicit(item_features)
 
         return SBTTOutput(

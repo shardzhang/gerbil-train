@@ -1,4 +1,7 @@
-"""Ranking losses"""
+"""Ranking losses
+
+Paper: 
+"""
 
 import torch
 import torch.nn as nn

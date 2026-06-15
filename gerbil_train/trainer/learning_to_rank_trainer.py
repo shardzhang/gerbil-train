@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from matplotlib import pyplot as plt
 
-from gerbil_train.losses.ranking import compute_loss
+from gerbil_train.losses.ranking import compute_loss as compute_ranking_loss
 from gerbil_train.metrics.ranking import ndcg_score
 from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils.plot import save_curve_values
@@ -35,41 +35,57 @@ class LearningToRankTrainer(BaseTrainer):
 
     def __init__(
         self,
-        *,
         model: nn.Module,
-        optimizer: optim.Optimizer,
-        scheduler: Any = None,
-        device: torch.device | str = "cpu",
-        gradient_clip_norm: float = None,
-        monitor: str = "val_ndcg",
-        monitor_mode: str = "max",
-        patience: int = 5,
-        best_checkpoint_path: str = None,
-        best_metric: float = None,
-        wait: int = 0,
-        seed: int = 42,
-        log_dir: str = None,
-        plot_path: str = None,
-        val_k: int = 5,
+        config: dict[str, Any],
     ) -> None:
         """Initialize the learning-to-rank trainer.
 
         :param model: Ranking model that produces one score per document
-        :param optimizer: Optimizer used to update model parameters
-        :param scheduler: Optional learning rate scheduler
-        :param device: Device used for training and evaluation
-        :param gradient_clip_norm: Optional gradient clipping threshold
-        :param monitor: Metric name used for checkpointing and early stopping
-        :param monitor_mode: Whether smaller or larger monitored values are better
-        :param patience: Early stopping patience measured in validation checks
-        :param best_checkpoint_path: Optional destination path for the best checkpoint
-        :param best_metric: Initial best monitored metric
-        :param wait: Initial early stopping wait counter
-        :param seed: Optional random seed for reproducibility
-        :param log_dir: Optional TensorBoard log directory
-        :param plot_path: Optional output path for the rendered training-curves figure
-        :param val_k: Cutoff used for validation NDCG@k
+        :param config: Training configuration mapping
         """
+        optimizer_cfg = config.get("optimizer", {})
+        scheduler_cfg = config.get("scheduler", {})
+        checkpoint_cfg = config.get("checkpoint", {})
+        early_stop_cfg = config.get("early_stop", {})
+        logging_cfg = config.get("logging", {})
+        evaluation_cfg = config.get("evaluation", {})
+        gradient_cfg = config.get("gradient", {})
+
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=float(optimizer_cfg.get("lr", 0.001)),
+            weight_decay=float(optimizer_cfg.get("weight_decay", 0.0)),
+        )
+
+        scheduler: Any = None
+        if scheduler_cfg.get("enabled", True):
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode=str(scheduler_cfg.get("mode", "max")),
+                factor=float(scheduler_cfg.get("factor", 0.5)),
+                patience=int(scheduler_cfg.get("patience", 3)),
+            )
+
+        device = config.get(
+            "device",
+            "cuda" if torch.cuda.is_available() else "cpu",
+        )
+        gradient_clip_norm = gradient_cfg.get("clip_grad_norm")
+        monitor = str(checkpoint_cfg.get("monitor", "val_ndcg"))
+        monitor_mode = str(checkpoint_cfg.get("mode", "max"))
+        patience = (
+            int(early_stop_cfg.get("patience", 5))
+            if early_stop_cfg.get("enabled", True)
+            else 0
+        )
+        best_checkpoint_path = checkpoint_cfg.get("best_checkpoint_path")
+        best_metric = None
+        wait = 0
+        seed = config.get("seed", 42)
+        log_dir = logging_cfg.get("log_dir")
+        plot_path = logging_cfg.get("plot_path")
+        val_k = int(evaluation_cfg.get("val_k", 5))
+
         super().__init__(
             model=model,
             optimizer=optimizer,
@@ -85,6 +101,7 @@ class LearningToRankTrainer(BaseTrainer):
             seed=seed,
         )
 
+        self.config = config
         self.val_k = val_k
         self.log_dir = Path(log_dir) if log_dir is not None else None
         self.plot_path = Path(plot_path) if plot_path is not None else None
@@ -92,7 +109,8 @@ class LearningToRankTrainer(BaseTrainer):
         self.val_ndcg_history: list[float] = []
         self.train_loader: DataLoader | None = None
         self.val_loader: DataLoader | None = None
-        self.loss_name = ""
+        self.loss_name = str(config.get("loss_name", "lambdarank"))
+        self.epochs = int(config.get("epochs", 30))
 
     def setup(self) -> None:
         """Prepare training directories and tensorboard writer.
@@ -116,25 +134,19 @@ class LearningToRankTrainer(BaseTrainer):
         self,
         train_loader: DataLoader,
         val_loader: DataLoader,
-        *,
-        loss_name: str,
-        epochs: int,
     ) -> LearningToRankTrainingResult:
         """Run learning-to-rank training and return summarized history.
 
         :param train_loader: Training dataloader
         :param val_loader: Validation dataloader
-        :param loss_name: Ranking loss name to optimize
-        :param epochs: Number of training epochs
         :return: Aggregated training history and best score
         """
         self.train_loader = train_loader
         self.val_loader = val_loader
-        self.loss_name = loss_name
         self.train_loss_history.clear()
         self.val_ndcg_history.clear()
 
-        super().fit(epochs=epochs)
+        super().fit(epochs=self.epochs)
 
         return LearningToRankTrainingResult(
             train_loss_history=list(self.train_loss_history),
@@ -174,7 +186,7 @@ class LearningToRankTrainer(BaseTrainer):
         batch = self.move_batch_to_device(batch)
         self.zero_grad()
         outputs = self.forward_step(batch)
-        loss = self.compute_loss(batch, outputs)
+        loss = self.compute_loss(outputs, batch)
         self.backward_step(loss)
         self.clip_gradients()
         self.optimizer_step()
@@ -209,7 +221,7 @@ class LearningToRankTrainer(BaseTrainer):
             for step, batch in enumerate(val_pbar, start=1):
                 batch = self.move_batch_to_device(batch)
                 outputs = self.forward_step(batch)
-                ndcg_sum += self.compute_metrics(batch, outputs)["ndcg"]
+                ndcg_sum += self.compute_metrics(outputs, y=batch["y"])["ndcg"]
                 val_pbar.set_postfix(ndcg=f"{ndcg_sum / step:.4f}")
         metrics = {"ndcg": ndcg_sum / len(self.val_loader)}
 
@@ -294,7 +306,7 @@ class LearningToRankTrainer(BaseTrainer):
         metric_str = " | ".join(f"{key}: {value:.4f}" for key, value in metrics.items())
         self.log_message(f"Evaluation results | {metric_str}")
 
-    def forward_step(self, batch: dict[str, Any]):
+    def forward_step(self, batch: dict[str, Any]) -> torch.Tensor:
         """Run the ranking model on one query group's feature matrix.
 
         :param batch: Query-group batch containing the ``X`` feature tensor
@@ -302,20 +314,20 @@ class LearningToRankTrainer(BaseTrainer):
         """
         return self.model(batch["X"])
 
-    def compute_loss(self, batch: dict[str, Any], outputs: Any) -> torch.Tensor:
+    def compute_loss(self, outputs: torch.Tensor, batch: dict[str, Any]) -> torch.Tensor:
         """Compute the configured ranking loss for one query group.
 
-        :param batch: Query-group batch containing labels in ``y``
         :param outputs: Predicted document scores
+        :param batch: Query-group batch containing labels in ``y``
         :return: Scalar loss tensor
         """
-        return compute_loss(self.loss_name, outputs, batch["y"], k=self.val_k)
+        return compute_ranking_loss(self.loss_name, outputs, batch["y"], k=self.val_k)
 
-    def compute_metrics(self, batch: dict[str, Any], outputs: Any) -> dict[str, float]:
+    def compute_metrics(self, outputs: torch.Tensor, batch: dict[str, Any]) -> dict[str, float]:
         """Compute validation NDCG for one query group.
 
-        :param batch: Query-group batch containing labels in ``y``
         :param outputs: Predicted document scores
+        :param batch: Query-group batch containing labels in ``y``
         :return: Metric dictionary for the query group
         """
         return {"ndcg": float(ndcg_score(batch["y"], outputs, k=self.val_k))}
@@ -349,6 +361,7 @@ class LearningToRankTrainer(BaseTrainer):
 
         plt.tight_layout()
         plt.savefig(self.plot_path)
+        print(f"Saved training curves to {self.plot_path.resolve()}")
         plt.close()
 
         loss_path, metric_path = self._curve_text_paths()

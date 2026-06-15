@@ -6,8 +6,19 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+import argparse
 
-__all__ = ["load_yaml", "load_experiment_config"]
+__all__ = ["load_yaml", "load_experiment_config", "parse_args"]
+
+
+def parse_args(path: Path) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=path,
+    )
+    return parser.parse_args()
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -27,13 +38,17 @@ def load_experiment_config(experiment_path: str | Path) -> dict[str, Any]:
     :return: Dictionary containing the resolved config sections
     """
     exp = load_yaml(experiment_path)
-
-    config = {
+    data = load_yaml(exp["data"])
+    model = load_yaml(exp["model"])
+    train = load_yaml(exp["train"])
+    
+    config: dict[str, Any] = {
         "experiment": exp,
-        "data": load_yaml(exp["data"]),
-        "model": load_yaml(exp["model"]),
-        "train": load_yaml(exp["train"]),
-        "eval": load_yaml(exp["eval"]),
-        "export": load_yaml(exp["export"]),
+        "data": data,
+        "model": model,
+        "train": train,
     }
+    for key in ("eval", "export"):
+        if key in exp:
+            config[key] = load_yaml(exp[key])
     return config

@@ -1,0 +1,73 @@
+seed: 42
+device: cuda
+
+trainer:
+  # epochs: 10
+  implicit_epochs: 3
+  explicit_epochs: 2
+  batch_size: 256
+  num_workers: 4
+  log_interval: 100
+  val_interval: 1
+
+optimizer:
+  implicit:
+    type: adam
+    lr: 0.001
+    weight_decay: 0.00001
+  explicit:
+    type: adam
+    lr: 0.0005
+    weight_decay: 0.00001
+
+scheduler:
+  implicit:
+    enabled: false
+    type: step_lr
+    step_size: 2
+    gamma: 0.5
+  explicit:
+    enabled: false
+    type: reduce_on_plateau
+    factor: 0.5
+    patience: 2
+    monitor: val_loss
+    mode: min
+
+mixed_precision:
+  enabled: false
+  dtype: float16
+
+gradient:
+  clip_grad_norm: 5.0
+  accumulation_steps: 1
+
+checkpoint:
+  dir: checkpoints/sbtt_ml1m_v1
+  save_best_only: true
+  save_last: true
+  save_every_epoch: false
+  monitor: val_ndcg@10
+  # monitor: val_ndcg@10
+  mode: max
+
+early_stop:
+  enabled: true
+  monitor: val_ndcg@10
+  mode: max
+  patience: 2
+
+evaluation:
+  validation_k: 10
+
+logging:
+  level: info
+  use_tqdm: true
+  log_to_file: true
+  log_file: train.log
+
+
+resume:
+  enabled: false
+  checkpoint_path: null
+  strict: true

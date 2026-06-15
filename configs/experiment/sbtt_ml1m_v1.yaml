@@ -1,0 +1,12 @@
+name: sbtt_ml1m_v1
+description: Shared-bottom two-tower model for MovieLens 1M dataset.
+tags:
+  - sbtt
+  - two_tower
+  - multitask
+  - ml1m
+
+data: configs/data/ml1m.yaml
+model: configs/model/shared_bottom_two_tower.yaml
+train: configs/train/shared_bottom_two_tower.yaml
+eval: configs/eval/ranking.yaml

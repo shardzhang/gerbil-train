@@ -1,5 +1,0 @@
-name: implicit_negative_sampling
-
-enabled: true
-num_negatives: 10
-strategy: random

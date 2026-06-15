@@ -11,6 +11,7 @@ __all__ = ["build_mlp", "get_activation"]
 
 def get_activation(name: str) -> nn.Module:
     """Get the activation function by name.
+
     :param name: Name of the activation function ("relu", "gelu", "tanh")
     :return: An nn.Module representing the activation function
     """
@@ -27,16 +28,17 @@ def get_activation(name: str) -> nn.Module:
 def build_mlp(
     input_dim: int,
     hidden_dims: Sequence[int],
-    dropout: float = 0.0,
-    activation: str = "relu",
     batch_norm: bool = False,
+    activation: str = "relu",
+    dropout: float = 0.0,
 ) -> nn.Sequential:
     """Build a multi-layer perceptron (MLP) with optional dropout, batch normalization, and activation.
+
     :param input_dim: Dimension of the input features
     :param hidden_dims: List of hidden layer dimensions
-    :param dropout: Dropout rate to apply after each hidden layer (default: 0.0)
-    :param activation: Activation function to use (default: "relu")
     :param batch_norm: Whether to apply batch normalization after each hidden layer (default: False)
+    :param activation: Activation function to use (default: "relu")
+    :param dropout: Dropout rate to apply after each hidden layer (default: 0.0)
     :return: An nn.Sequential model representing the MLP
     """
     layers: list[nn.Module] = []

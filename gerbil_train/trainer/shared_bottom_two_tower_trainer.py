@@ -5,13 +5,17 @@ from pathlib import Path
 from typing import Any
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor, optim
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
+from matplotlib import pyplot as plt
 
+from gerbil_train.metrics.ranking import ndcg_score
 from gerbil_train.models.shared_bottom_two_tower import SharedBottomTwoTower
 from gerbil_train.trainer.base_trainer import BaseTrainer
+from gerbil_train.utils.plot import save_curve_values
 
 __all__ = ["SharedBottomTwoTowerTrainer", "StageResult"]
 
@@ -35,38 +39,62 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         2. Fine-tune on explicit relevance labeled data
     """
 
-    def __init__(
-        self,
-        model: SharedBottomTwoTower,
-        device: str = "cuda",
-        implicit_lr: float = 1e-3,
-        explicit_lr: float = 1e-4,
-        weight_decay: float = 1e-5,
-        gradient_clip_norm: float | None = None,
-        monitor: str = "train_loss",
-        monitor_mode: str = "min",
-        patience: int = 0,
-        best_checkpoint_path: str | Path | None = None,
-        best_metric: float | None = None,
-        wait: int = 0,
-        seed: int | None = 42,
-    ) -> None:
+    def __init__(self, model: nn.Module, config: dict[str, Any]) -> None:
         """Initialize the shared-bottom two-tower trainer.
 
         :param model: Shared-bottom two-tower model instance
-        :param device: Device used for training and evaluation
-        :param implicit_lr: Learning rate for the implicit stage optimizer
-        :param explicit_lr: Learning rate for the explicit stage optimizer
-        :param weight_decay: Weight decay applied to both optimizers
-        :param gradient_clip_norm: Optional gradient clipping threshold
-        :param monitor: Metric name used for checkpointing and early stopping
-        :param monitor_mode: Whether smaller or larger monitored values are better
-        :param patience: Early stopping patience measured in epochs
-        :param best_checkpoint_path: Optional destination path for the best checkpoint
-        :param best_metric: Initial best monitored metric
-        :param wait: Initial early stopping wait counter
-        :param seed: Optional random seed for reproducibility
+        :param config: Train configuration mapping
         """
+        optimizer_cfg = config.get("optimizer", {})
+        trainer_cfg = config.get("trainer", {})
+        gradient_cfg = config.get("gradient", {})
+        checkpoint_cfg = config.get("checkpoint", {})
+        early_stop_cfg = config.get("early_stop", {})
+        implicit_optimizer_cfg = optimizer_cfg.get("implicit", {})
+        explicit_optimizer_cfg = optimizer_cfg.get("explicit", {})
+
+        checkpoint_dir = checkpoint_cfg.get("dir")
+        self.checkpoint_dir = (
+            Path(checkpoint_dir) if checkpoint_dir is not None else None
+        )
+        self.save_best_only = bool(checkpoint_cfg.get("save_best_only", False))
+        self.save_last = bool(checkpoint_cfg.get("save_last", False))
+        self.save_every_epoch = bool(checkpoint_cfg.get("save_every_epoch", False))
+
+        configured_best_checkpoint_path = checkpoint_cfg.get("best_checkpoint_path")
+        if configured_best_checkpoint_path is not None:
+            best_checkpoint_path = Path(configured_best_checkpoint_path)
+        elif self.checkpoint_dir is not None and self.save_best_only:
+            best_checkpoint_path = self.checkpoint_dir / "best_model.pth"
+        else:
+            best_checkpoint_path = None
+
+        self.last_checkpoint_path = (
+            self.checkpoint_dir / "last_model.pth"
+            if self.checkpoint_dir is not None and self.save_last
+            else None
+        )
+
+        configured_device = str(config.get("device", "cuda"))
+        if configured_device == "cuda" and not torch.cuda.is_available():
+            device = "cpu"
+        else:
+            device = configured_device
+        implicit_lr = float(implicit_optimizer_cfg.get("lr", 1e-3))
+        explicit_lr = float(explicit_optimizer_cfg.get("lr", 1e-4))
+        weight_decay = float(implicit_optimizer_cfg.get("weight_decay", 1e-5))
+        gradient_clip_norm = gradient_cfg.get("clip_grad_norm")
+        monitor = str(checkpoint_cfg.get("monitor", "train_loss"))
+        monitor_mode = str(checkpoint_cfg.get("mode", "min"))
+        patience = (
+            int(early_stop_cfg.get("patience", 0))
+            if early_stop_cfg.get("enabled", False)
+            else 0
+        )
+        best_metric = None
+        wait = 0
+        seed = config.get("seed", 42)
+
         explicit_optimizer = optim.Adam(
             model.parameters(),
             lr=explicit_lr,
@@ -87,63 +115,108 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
             seed=seed,
         )
 
+        self.config = config
         self.implicit_optimizer = optim.Adam(
             self.model.parameters(),
             lr=implicit_lr,
             weight_decay=weight_decay,
         )
-        self.explicit_optimizer = self.optimizer
+        self.explicit_optimizer = explicit_optimizer
         self.current_stage = "explicit"
         self.current_loader: DataLoader | None = None
+        self.validation_loader: DataLoader | None = None
         self.stage_epochs = 0
+        self.implicit_epochs = int(trainer_cfg.get("implicit_epochs", 1))
+        self.explicit_epochs = int(trainer_cfg.get("explicit_epochs", 1))
+        self.implicit_loss_history: list[float] = []
+        self.explicit_loss_history: list[float] = []
+        evaluation_cfg = config.get("evaluation", {})
+        self.validation_k = int(evaluation_cfg.get("validation_k", 10))
+        self.validation_history: list[float] = []
+
+    def setup(self) -> None:
+        """Prepare trainer resources before training starts."""
+        super().setup()
+        if self.checkpoint_dir is not None:
+            self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     def fit(
         self,
         implicit_loader: DataLoader | None,
         explicit_loader: DataLoader | None,
-        implicit_epochs: int = 1,
-        explicit_epochs: int = 1,
+        validation_loader: DataLoader | None = None,
     ) -> None:
         """Run the two-stage training pipeline.
 
         :param implicit_loader: Dataloader for implicit training; can be ``None`` to skip
         :param explicit_loader: Dataloader for explicit training; can be ``None`` to skip
-        :param implicit_epochs: Number of implicit training epochs
-        :param explicit_epochs: Number of explicit training epochs
+        :param validation_loader: Optional ranking validation dataloader
         """
         self.setup()
         self.on_train_start()
+        self.validation_loader = validation_loader
         try:
             if implicit_loader is not None:
                 self.current_stage = "implicit"
                 self.current_loader = implicit_loader
                 self.optimizer = self.implicit_optimizer
-                self.stage_epochs = implicit_epochs
-                for epoch in range(implicit_epochs):
+                self.stage_epochs = self.implicit_epochs
+                for epoch in range(self.implicit_epochs):
                     self.current_epoch = epoch
                     self.on_epoch_start(epoch)
                     train_metrics = self.train_one_epoch(epoch)
                     metrics = {
                         f"train_{key}": value for key, value in train_metrics.items()
                     }
+                    val_metrics = self.validate(epoch)
+                    metrics.update(
+                        {f"val_{key}": value for key, value in val_metrics.items()}
+                    )
                     self.on_epoch_end(epoch, metrics)
+                    if self.update_best_state(metrics):
+                        break
 
             if explicit_loader is not None:
                 self.current_stage = "explicit"
                 self.current_loader = explicit_loader
                 self.optimizer = self.explicit_optimizer
-                self.stage_epochs = explicit_epochs
-                for epoch in range(explicit_epochs):
+                self.stage_epochs = self.explicit_epochs
+                for epoch in range(self.explicit_epochs):
                     self.current_epoch = epoch
                     self.on_epoch_start(epoch)
                     train_metrics = self.train_one_epoch(epoch)
                     metrics = {
                         f"train_{key}": value for key, value in train_metrics.items()
                     }
+                    val_metrics = self.validate(epoch)
+                    metrics.update(
+                        {f"val_{key}": value for key, value in val_metrics.items()}
+                    )
                     self.on_epoch_end(epoch, metrics)
+                    if self.update_best_state(metrics):
+                        break
         finally:
             self.on_train_end()
             self.cleanup()
+
+    def on_train_end(self) -> None:
+        """Persist configured checkpoint artifacts when training finishes."""
+        self.save_training_artifacts()
+
+        if (
+            self.save_best_only
+            and self.best_checkpoint_path is not None
+            and not self.best_checkpoint_path.exists()
+        ):
+            self.save_checkpoint(self.best_checkpoint_path)
+            self.log_message(
+                "Monitored metric was unavailable; saved final state as fallback best checkpoint "
+                f"to {self.best_checkpoint_path}"
+            )
+
+        if self.last_checkpoint_path is not None:
+            self.save_checkpoint(self.last_checkpoint_path)
+            self.log_message(f"Saved last checkpoint to {self.last_checkpoint_path}")
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         """Log aggregated stage metrics at the end of an epoch.
@@ -153,11 +226,109 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         """
         loss = metrics.get("train_loss")
         steps = metrics.get("train_steps")
+        val_ndcg = metrics.get(f"val_ndcg@{self.validation_k}")
         if loss is None or steps is None:
             return
-        self.log_message(
-            f"[{self.current_stage}] epoch={epoch + 1} loss={loss:.6f} steps={int(steps)}"
+        message = f"[{self.current_stage}] epoch={epoch + 1} loss={loss:.6f} steps={int(steps)}"
+        if val_ndcg is not None:
+            message += f" val_ndcg@{self.validation_k}={val_ndcg:.6f}"
+            self.validation_history.append(float(val_ndcg))
+        self.log_message(message)
+
+        if self.current_stage == "implicit":
+            self.implicit_loss_history.append(float(loss))
+        else:
+            self.explicit_loss_history.append(float(loss))
+
+        if self.save_every_epoch and self.checkpoint_dir is not None:
+            epoch_checkpoint_path = (
+                self.checkpoint_dir / f"{self.current_stage}_epoch_{epoch + 1}.pth"
+            )
+            self.save_checkpoint(epoch_checkpoint_path)
+            self.log_message(f"Saved epoch checkpoint to {epoch_checkpoint_path}")
+
+    def _curve_paths(self) -> tuple[Path | None, Path | None, Path | None]:
+        """Return output paths for shared-bottom training artifacts."""
+        if self.checkpoint_dir is None:
+            return None, None, None
+        implicit_loss_path = self.checkpoint_dir / "implicit_loss.txt"
+        explicit_loss_path = self.checkpoint_dir / "explicit_loss.txt"
+        loss_plot_path = self.checkpoint_dir / "training_loss.png"
+        return implicit_loss_path, explicit_loss_path, loss_plot_path
+
+    def save_loss_curve(self) -> None:
+        """Persist shared-bottom stage loss histories to text files."""
+        implicit_loss_path, explicit_loss_path, _ = self._curve_paths()
+        if implicit_loss_path is None or explicit_loss_path is None:
+            return
+        save_curve_values(self.implicit_loss_history, implicit_loss_path)
+        save_curve_values(self.explicit_loss_history, explicit_loss_path)
+
+    def save_metric_curve(self) -> None:
+        """Persist shared-bottom validation metric history to a text file."""
+        if self.checkpoint_dir is None:
+            return
+        metric_path = self.checkpoint_dir / f"validation_ndcg@{self.validation_k}.txt"
+        save_curve_values(self.validation_history, metric_path)
+
+    def plot_loss_curve(self) -> None:
+        """Render a combined shared-bottom loss curve figure."""
+        _, _, loss_plot_path = self._curve_paths()
+        if loss_plot_path is None:
+            return
+
+        plt.figure(figsize=(10, 5))
+        if self.implicit_loss_history:
+            implicit_epochs = range(1, len(self.implicit_loss_history) + 1)
+            plt.plot(
+                implicit_epochs,
+                self.implicit_loss_history,
+                linewidth=2,
+                label="implicit",
+            )
+        if self.explicit_loss_history:
+            explicit_epochs = range(1, len(self.explicit_loss_history) + 1)
+            plt.plot(
+                explicit_epochs,
+                self.explicit_loss_history,
+                linewidth=2,
+                label="explicit",
+            )
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.title("Shared-Bottom Training Loss")
+        plt.grid(True, linestyle="--", alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        loss_plot_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(loss_plot_path)
+        plt.close()
+
+    def plot_metric_curve(self) -> None:
+        """Render a validation metric figure when validation history exists."""
+        if self.checkpoint_dir is None or not self.validation_history:
+            return
+
+        metric_plot_path = (
+            self.checkpoint_dir / f"validation_ndcg@{self.validation_k}.png"
         )
+        epochs = range(1, len(self.validation_history) + 1)
+        plt.figure(figsize=(10, 5))
+        plt.plot(
+            epochs,
+            self.validation_history,
+            linewidth=2,
+            label=f"ndcg@{self.validation_k}",
+        )
+        plt.xlabel("Epoch")
+        plt.ylabel("NDCG")
+        plt.title("Shared-Bottom Validation NDCG")
+        plt.grid(True, linestyle="--", alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        metric_plot_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(metric_plot_path)
+        plt.close()
 
     def train_one_epoch(self, epoch: int) -> dict[str, float]:
         """Train one epoch for the current stage.
@@ -197,7 +368,7 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         batch = self.move_batch_to_device(batch)
         self.zero_grad()
         outputs = self.forward_step(batch)
-        loss = self.compute_loss(batch, outputs)
+        loss = self.compute_loss(outputs, batch)
         self.backward_step(loss)
         self.clip_gradients()
         self.optimizer_step()
@@ -209,30 +380,75 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
     def validate(self, epoch: int | None = None) -> dict[str, float]:
         """Run validation.
 
-        Validation is not part of the current SBTT training flow, so this
-        method returns an empty metric dictionary.
-
         :param epoch: Optional zero-based epoch index
-        :return: Empty validation metrics dictionary
+        :return: Ranking validation metrics dictionary
         """
         if epoch is not None:
             self.current_epoch = epoch
-        return {}
+        if self.validation_loader is None:
+            return {}
 
+        self.model.eval()
+        ndcg_total = 0.0
+        total_steps = 0
 
-    def evaluate(self) -> dict[str, float]:
-        """Run evaluation.
+        with torch.no_grad():
+            for batch in self.validation_loader:
+                batch = self.move_batch_to_device(batch)
+                outputs = self.model(
+                    query_features=batch["query_features"],
+                    item_features=batch["item_features"],
+                    detach_shared_for_explicit=True,
+                )
+                ndcg_total += float(
+                    ndcg_score(
+                        batch["labels"],
+                        outputs.explicit_score,
+                        k=self.validation_k,
+                    )
+                )
+                total_steps += 1
 
-        The generic evaluation interface is not used in the current SBTT flow.
+        return {f"ndcg@{self.validation_k}": ndcg_total / max(total_steps, 1)}
 
-        :return: Empty evaluation metrics dictionary
+    def evaluate(self, dataloader: DataLoader | None = None) -> dict[str, float]:
+        """Run explicit ranking evaluation on a held-out test loader.
+
+        :param dataloader: Test ranking dataloader
+        :return: Test ranking metrics dictionary
         """
         self.on_evaluate_start()
-        metrics: dict[str, float] = {}
+        if dataloader is None:
+            metrics: dict[str, float] = {}
+            self.on_evaluate_end(metrics)
+            return metrics
+
+        self.model.eval()
+        ndcg_total = 0.0
+        total_steps = 0
+
+        with torch.no_grad():
+            for batch in dataloader:
+                batch = self.move_batch_to_device(batch)
+                outputs = self.model(
+                    query_features=batch["query_features"],
+                    item_features=batch["item_features"],
+                    detach_shared_for_explicit=True,
+                )
+                ndcg_total += float(
+                    ndcg_score(
+                        batch["labels"],
+                        outputs.explicit_score,
+                        k=self.validation_k,
+                    )
+                )
+                total_steps += 1
+
+        metrics = {f"test_ndcg@{self.validation_k}": ndcg_total / max(total_steps, 1)}
         self.on_evaluate_end(metrics)
         return metrics
 
-    def forward_step(self, batch: dict[str, Any]):
+    def forward_step(self, batch: dict[str, Any]) -> dict[str, Any]:
         """Prepare model inputs for the current stage.
 
         :param batch: Stage-specific batch dictionary
@@ -252,11 +468,11 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         )
         return outputs
 
-    def compute_loss(self, batch: dict[str, Any], outputs: Any) -> torch.Tensor:
+    def compute_loss(self, outputs: Any, batch: dict[str, Any]) -> torch.Tensor:
         """Dispatch to the implicit or explicit loss computation.
 
-        :param batch: Stage-specific batch dictionary
         :param outputs: Outputs returned by ``forward_step``
+        :param batch: Stage-specific batch dictionary
         :return: Scalar loss tensor
         """
         if self.current_stage == "implicit":
@@ -269,14 +485,14 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         return self.compute_explicit_loss(batch, outputs)
 
     def compute_metrics(
-        self, _batch: dict[str, Any], _outputs: Any
+        self, outputs: Any, batch: dict[str, Any]
     ) -> dict[str, float]:
         """Compute stage metrics.
 
         The current trainer only reports loss, so no additional metrics are returned.
 
-        :param _batch: Stage-specific batch dictionary
-        :param _outputs: Outputs returned by ``forward_step``
+        :param outputs: Outputs returned by ``forward_step``
+        :param batch: Unused
         :return: Empty metrics dictionary
         """
         return {}

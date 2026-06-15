@@ -1,0 +1,31 @@
+seed: 42
+device: cpu
+epochs: 1
+
+data:
+  batch_size: 512
+  num_workers: 2
+  pin_memory: false
+  drop_last: false
+
+optimizer:
+  type: adam
+  lr: 0.001
+  weight_decay: 0.0
+
+scheduler:
+  enabled: false
+
+checkpoint:
+  path: checkpoints/gwen_ml1m_tfrecord/best_model.pth
+  monitor: hit@1
+  mode: max
+
+early_stop:
+  enabled: false
+
+logging:
+  plot_path: checkpoints/gwen_ml1m_tfrecord/training_curves.png
+
+evaluation:
+  topk: 10

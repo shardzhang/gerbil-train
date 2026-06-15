@@ -1,0 +1,40 @@
+seed: 42
+device: cpu
+
+epochs: 3
+
+trainer:
+  batch_size: 256
+  num_workers: 0
+  pin_memory: false
+  drop_last: false
+
+optimizer:
+  type: adam
+  lr: 0.001
+  weight_decay: 0.0
+
+scheduler:
+  enabled: false
+  mode: max
+  factor: 0.5
+  patience: 2
+
+gradient:
+  clip_grad_norm: null
+
+checkpoint:
+  dir: checkpoints/deepfm_ml1m
+  best_checkpoint_path: checkpoints/deepfm_ml1m/best_model.pth
+  monitor: val_ndcg@10
+  mode: max
+
+early_stop:
+  enabled: true
+  patience: 2
+
+logging:
+  plot_path: checkpoints/deepfm_ml1m/training_curves.png
+
+evaluation:
+  validation_k: 10

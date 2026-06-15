@@ -11,3 +11,4 @@ tensorboard>=2.14
 black 
 ruff
 pyclean
+tfrecord

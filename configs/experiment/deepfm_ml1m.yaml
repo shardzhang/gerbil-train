@@ -1,0 +1,7 @@
+name: deepfm_ml1m
+description: DeepFM model for MovieLens 1M dataset.
+
+data: configs/data/ml1m.yaml
+model: configs/model/deepfm.yaml
+train: configs/train/deepfm.yaml
+eval: configs/eval/ranking.yaml

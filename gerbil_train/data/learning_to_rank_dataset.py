@@ -23,6 +23,7 @@ from torch.utils.data import DataLoader, Dataset
 __all__ = [
     "LearningToRankDataset",
     "build_ltr_dataloaders",
+    "convert_mslr_fold_to_pt",
     "load_letor_data",
     "load_mslr_data",
     "load_mslrweb10k_groups",
@@ -182,6 +183,74 @@ def normalize_query_features(features: np.ndarray, eps: float = 1e-6) -> np.ndar
     std = features.std(axis=0, keepdims=True)
     std = np.clip(std, eps, None)
     return (features - mean) / std
+
+
+def _group_rows_by_qid(
+    features: np.ndarray,
+    labels: np.ndarray,
+    qids: np.ndarray,
+) -> dict[int, tuple[np.ndarray, np.ndarray]]:
+    """Group flat ranking rows by query id.
+
+    :param features: Feature matrix of shape ``[num_rows, 136]``
+    :param labels: Relevance labels of shape ``[num_rows]``
+    :param qids: Query ids of shape ``[num_rows]``
+    :return: Mapping from query id to grouped ``(features, labels)`` arrays
+    """
+    grouped: dict[int, list[np.ndarray] | list[np.int64]] = {}
+    grouped_features: dict[int, list[np.ndarray]] = {}
+    grouped_labels: dict[int, list[int]] = {}
+
+    for feature_row, label, qid in zip(features, labels, qids):
+        qid_int = int(qid)
+        grouped_features.setdefault(qid_int, []).append(feature_row)
+        grouped_labels.setdefault(qid_int, []).append(int(label))
+
+    return {
+        qid: (
+            np.asarray(grouped_features[qid], dtype=np.float64),
+            np.asarray(grouped_labels[qid], dtype=np.int64),
+        )
+        for qid in sorted(grouped_features)
+    }
+
+
+def convert_mslr_fold_to_pt(
+    fold_dir: str | Path,
+    output_path: str | Path,
+) -> Path:
+    """Convert one raw MSLR-WEB10K fold directory into the grouped ``.pt`` format.
+
+    Expected input layout:
+      - ``train.txt``
+      - ``vali.txt``
+      - ``test.txt``
+
+    Output layout:
+    ``dict["train" | "vali" | "test"] -> dict[qid] -> (features, labels)``
+
+    :param fold_dir: Directory containing one raw MSLR fold
+    :param output_path: Destination ``.pt`` file path
+    :return: Saved output path
+    """
+    fold_dir = Path(fold_dir)
+    output_path = Path(output_path)
+
+    split_file_names = {
+        "train": "train.txt",
+        "vali": "vali.txt",
+        "test": "test.txt",
+    }
+    dataset: dict[str, dict[int, tuple[np.ndarray, np.ndarray]]] = {}
+
+    for split_name, file_name in split_file_names.items():
+        split_path = fold_dir / file_name
+        features, labels, qids = load_mslr_data(split_path)
+        dataset[split_name] = _group_rows_by_qid(features, labels, qids)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(dataset, output_path)
+    return output_path
 
 
 def load_mslrweb10k_groups(

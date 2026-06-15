@@ -1,0 +1,7 @@
+name: mslr_web10k
+description: MSLR-WEB10K grouped ranking dataset.
+
+format: pt
+
+paths:
+  dataset: ../data/MSLR-WEB10K.pt
