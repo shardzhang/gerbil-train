@@ -9,9 +9,12 @@ Paper:
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Sequence
 
 import torch.nn as nn
+
+from gerbil_train.config import LTRConfig
+from gerbil_train.utils.nn import get_activation
 
 __all__ = ["DeepRankNet"]
 
@@ -19,18 +22,20 @@ __all__ = ["DeepRankNet"]
 class DeepRankNet(nn.Module):
     """Feed-forward ranking model that predicts one relevance score per document."""
 
-    def __init__(self, config: Mapping[str, Any]) -> None:
+    def __init__(self, config: LTRConfig) -> None:
         """Initialize the ranking network.
 
-        :param config: Model configuration mapping
+        :param config: LTR model configuration
         """
         super().__init__()
-        input_dim = int(config.get("input_dim", 136))
-        hidden_dims = self._get_hidden_dims(config)
-        activation_name = str(config.get("activation", "relu"))
-        dropout = float(config.get("dropout", 0.1))
+        input_dim = int(config.input_dim)
+        hidden_dims = list(config.hidden_dims)
+        if not hidden_dims:
+            raise ValueError("hidden_dims must not be empty")
+        activation_name = str(config.activation)
+        dropout = float(config.dropout)
 
-        layers = []
+        layers: list[nn.Module] = []
         dims = [input_dim] + hidden_dims
         for in_dim, out_dim in zip(dims[:-1], dims[1:]):
             layers.append(nn.Linear(in_dim, out_dim))
@@ -47,14 +52,6 @@ class DeepRankNet(nn.Module):
         :return: Score tensor of shape ``[num_docs]``
         """
         return self.model(x).squeeze(-1)
-
-    @staticmethod
-    def _get_hidden_dims(config: Mapping[str, Any]) -> Sequence[int]:
-        """Return validated hidden dimensions from the model config."""
-        hidden_dims = config.get("hidden_dims", [256, 128, 64])
-        if not hidden_dims:
-            raise ValueError("hidden_dims must not be empty")
-        return hidden_dims
 
     @staticmethod
     def _get_activation(name: str) -> nn.Module:

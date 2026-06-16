@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from matplotlib import pyplot as plt
 
+from gerbil_train.config import DeepFMTrainConfig
 from gerbil_train.losses.ranking import compute_loss as compute_ranking_loss
 from gerbil_train.metrics.ranking import ndcg_score
 from gerbil_train.trainer.base_trainer import BaseTrainer
@@ -36,75 +37,65 @@ class LearningToRankTrainer(BaseTrainer):
     def __init__(
         self,
         model: nn.Module,
-        config: dict[str, Any],
+        config: DeepFMTrainConfig,
+        *,
+        loss_name: str = "lambdarank",
     ) -> None:
         """Initialize the learning-to-rank trainer.
 
         :param model: Ranking model that produces one score per document
-        :param config: Training configuration mapping
+        :param config: Training configuration
+        :param loss_name: Ranking loss type (lambdarank, listnet, etc.)
         """
-        optimizer_cfg = config.get("optimizer", {})
-        scheduler_cfg = config.get("scheduler", {})
-        checkpoint_cfg = config.get("checkpoint", {})
-        early_stop_cfg = config.get("early_stop", {})
-        logging_cfg = config.get("logging", {})
-        evaluation_cfg = config.get("evaluation", {})
-        gradient_cfg = config.get("gradient", {})
+        optimizer_cfg = config.optimizer
+        scheduler_cfg = config.scheduler
+        checkpoint_cfg = config.checkpoint
+        early_stop_cfg = config.early_stop
+        logging_cfg = config.logging
+        evaluation_cfg = config.evaluation
 
         optimizer = optim.Adam(
             model.parameters(),
-            lr=float(optimizer_cfg.get("lr", 0.001)),
-            weight_decay=float(optimizer_cfg.get("weight_decay", 0.0)),
+            lr=float(optimizer_cfg.lr or 1e-3),
+            weight_decay=float(optimizer_cfg.weight_decay or 0.0),
         )
 
-        scheduler: Any = None
-        if scheduler_cfg.get("enabled", True):
+        scheduler = None
+        if scheduler_cfg.enabled:
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer,
-                mode=str(scheduler_cfg.get("mode", "max")),
-                factor=float(scheduler_cfg.get("factor", 0.5)),
-                patience=int(scheduler_cfg.get("patience", 3)),
+                mode=str(scheduler_cfg.mode),
+                factor=float(scheduler_cfg.factor),
+                patience=int(scheduler_cfg.patience),
             )
 
-        device = config.get(
-            "device",
-            "cuda" if torch.cuda.is_available() else "cpu",
-        )
-        gradient_clip_norm = gradient_cfg.get("clip_grad_norm")
-        monitor = str(checkpoint_cfg.get("monitor", "val_ndcg"))
-        monitor_mode = str(checkpoint_cfg.get("mode", "max"))
-        patience = (
-            int(early_stop_cfg.get("patience", 5))
-            if early_stop_cfg.get("enabled", True)
-            else 0
-        )
-        best_checkpoint_path = checkpoint_cfg.get("best_checkpoint_path")
-        best_metric = None
-        wait = 0
-        seed = config.get("seed", 42)
-        log_dir = logging_cfg.get("log_dir")
-        plot_path = logging_cfg.get("plot_path")
-        val_k = int(evaluation_cfg.get("val_k", 5))
+        device = config.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
         super().__init__(
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
             device=device,
-            gradient_clip_norm=gradient_clip_norm,
-            monitor=monitor,
-            monitor_mode=monitor_mode,
-            patience=patience,
-            best_checkpoint_path=best_checkpoint_path,
-            best_metric=best_metric,
-            wait=wait,
-            seed=seed,
+            gradient_clip_norm=None,
+            monitor=str(checkpoint_cfg.monitor or "val_ndcg"),
+            monitor_mode=str(checkpoint_cfg.mode or "max"),
+            patience=0 if not early_stop_cfg.enabled else int(early_stop_cfg.patience),
+            best_checkpoint_path=checkpoint_cfg.path,
+            best_metric=None,
+            wait=0,
+            seed=config.seed,
         )
 
         self.config = config
-        self.val_k = val_k
-        self.log_dir = Path(log_dir) if log_dir is not None else None
-        self.plot_path = Path(plot_path) if plot_path is not None else None
+        self.epochs = int(config.epochs)
+        self.loss_name = loss_name
+        self.topk = int(evaluation_cfg.topk)
+        self.train_loader: DataLoader | None = None
+        self.val_loader: DataLoader | None = None
+        self.train_loss_history: list[float] = []
+        self.val_ndcg_history: list[float] = []
+        self.log_dir = None if logging_cfg.plot_path is None else Path(logging_cfg.plot_path).parent
+        self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
         self.train_loss_history: list[float] = []
         self.val_ndcg_history: list[float] = []
         self.train_loader: DataLoader | None = None
@@ -165,7 +156,7 @@ class LearningToRankTrainer(BaseTrainer):
 
         total_loss = 0.0
         train_pbar = tqdm(
-            self.train_loader,
+            self.train_loader, total=self.steps_per_epoch or None,
             desc=f"Epoch {epoch_display}/{self.max_epochs} [train]",
             leave=False,
         )
@@ -264,10 +255,11 @@ class LearningToRankTrainer(BaseTrainer):
             if val_ndcg is not None:
                 self.writer.add_scalar("NDCG/val", val_ndcg, epoch)
 
+        message = ""
         if train_loss is not None and val_ndcg is not None:
-            self.log_message(
-                f"Epoch {epoch + 1:2d} | loss: {train_loss:.4f} | NDCG@{self.val_k} val: {val_ndcg:.4f}"
-            )
+            message = f"Epoch {epoch + 1:2d} | loss: {train_loss:.4f} | NDCG@{self.topk} val: {val_ndcg:.4f}"
+        if message:
+            self.finalize_epoch(epoch, metrics, message)
 
     def evaluate(
         self,
@@ -321,7 +313,7 @@ class LearningToRankTrainer(BaseTrainer):
         :param batch: Query-group batch containing labels in ``y``
         :return: Scalar loss tensor
         """
-        return compute_ranking_loss(self.loss_name, outputs, batch["y"], k=self.val_k)
+        return compute_ranking_loss(self.loss_name, outputs, batch["y"], k=self.topk)
 
     def compute_metrics(self, outputs: torch.Tensor, batch: dict[str, Any]) -> dict[str, float]:
         """Compute validation NDCG for one query group.
@@ -330,7 +322,7 @@ class LearningToRankTrainer(BaseTrainer):
         :param batch: Query-group batch containing labels in ``y``
         :return: Metric dictionary for the query group
         """
-        return {"ndcg": float(ndcg_score(batch["y"], outputs, k=self.val_k))}
+        return {"ndcg": float(ndcg_score(batch["y"], outputs, k=self.topk))}
 
     def _curve_text_paths(self) -> tuple[Path | None, Path | None]:
         """Return the text-file paths used for persisted training curves."""

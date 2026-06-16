@@ -233,7 +233,7 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         if val_ndcg is not None:
             message += f" val_ndcg@{self.validation_k}={val_ndcg:.6f}"
             self.validation_history.append(float(val_ndcg))
-        self.log_message(message)
+        self.finalize_epoch(epoch, metrics, message)
 
         if self.current_stage == "implicit":
             self.implicit_loss_history.append(float(loss))

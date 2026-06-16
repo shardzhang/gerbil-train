@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 from pathlib import Path
+import torch
 from torch.utils.data import DataLoader
 
+from gerbil_train.config import SBTTConfig
 from gerbil_train.data.shared_bottom_two_tower_dataset import (
     ExplicitDataset,
     ImplicitDataset,
@@ -126,7 +128,7 @@ def main() -> None:
     # 0. load config and print basic info
     cfg = load_experiment_config(args.config)
     data_cfg = cfg["data"]
-    model_cfg = cfg["model"]["model"]
+    model_cfg = SBTTConfig.from_dict(cfg["model"]["model"])
     train_cfg = cfg["train"]
     print(
         "Training config | "
@@ -146,6 +148,9 @@ def main() -> None:
 
     # 2. model, trainer, and training
     model = SharedBottomTwoTower(model_cfg)
+    if train_cfg.compile.enabled:
+        model = torch.compile(model, mode=train_cfg.compile.mode)
+        print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
     trainer = SharedBottomTwoTowerTrainer(model, train_cfg)
     trainer.fit(implicit_loader, explicit_loader, validation_loader)
 

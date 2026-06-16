@@ -1,33 +1,13 @@
-type: deepfm
-family: ctr
-task: recommendation
-description: DeepFM model for sparse recommendation and CTR prediction.
+task: binary
+embedding:
+  default_emb_dim: 16
+  fields: {}
 
-model:
-  dense_input_dim: 0
-  embedding_dim: 16
+deep:
+  hidden_dims: [128, 64]
+  activation: relu
+  dropout: 0.1
+  batch_norm: false
 
-  sparse_fields:
-    user_id:
-      vocab_size: 6041
-    item_id:
-      vocab_size: 3953
-    gender:
-      vocab_size: 3
-    age:
-      vocab_size: 57
-    occupation:
-      vocab_size: 22
-    release_year:
-      vocab_size: 150
-    primary_genre:
-      vocab_size: 32
-
-  deep:
-    hidden_dims: [128, 64]
-    activation: relu
-    dropout: 0.1
-    batch_norm: false
-
-  output:
-    activation: sigmoid
+output:
+  activation: sigmoid

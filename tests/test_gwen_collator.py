@@ -6,15 +6,15 @@ from pathlib import Path
 
 import torch
 
-from gerbil_train.data.gwen_tfrecord_dataset import GwENBatchCollator, collect_tfrecord_part_files
+from gerbil_train.data.tfrecord_dataset import BatchCollator, collect_tfrecord_part_files
 
 
-class GwENBatchCollatorTests(unittest.TestCase):
-    """Tests for the GwEN batch collation logic."""
+class BatchCollatorTests(unittest.TestCase):
+    """Tests for the GWEN batch collation logic."""
 
     def setUp(self):
         self.field_names = ["user_age", "user_gender", "movie_genres"]
-        self.collator = GwENBatchCollator(self.field_names)
+        self.collator = BatchCollator(self.field_names)
 
     def test_collate_single_sample(self) -> None:
         """Single sample is collated correctly with offset=0."""
@@ -81,7 +81,7 @@ class GwENBatchCollatorTests(unittest.TestCase):
 
     def test_collate_three_samples_mixed_lengths(self) -> None:
         """Multiple samples with varying field lengths produce correct offsets."""
-        collator = GwENBatchCollator(["user_age"])
+        collator = BatchCollator(["user_age"])
         batch = [
             {"targets": 10, "field_indices": {"user_age": [1]}, "field_values": {"user_age": [1.0]}},
             {"targets": 20, "field_indices": {"user_age": [2, 3]}, "field_values": {"user_age": [1.0, 1.0]}},

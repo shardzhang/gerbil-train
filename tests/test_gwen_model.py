@@ -5,7 +5,7 @@ import unittest
 import torch
 
 from gerbil_train.config import GwENFieldEntry, GwENModelConfig
-from gerbil_train.models.gwen import GwEN
+from gerbil_train.models.gwen_multiclass_model import GwEN
 
 
 class GwENModelTests(unittest.TestCase):
@@ -72,11 +72,11 @@ class GwENModelTests(unittest.TestCase):
         logits = model(batch["feature_bags"])
         self.assertEqual(tuple(logits.shape), (2, 10))
 
-    def test_forward_hidden_shape(self) -> None:
-        """Verify forward_hidden returns the MLP hidden state."""
+    def test_encode_shape(self) -> None:
+        """Verify encode returns the MLP hidden state."""
         model = GwEN(self._make_config())
         batch = self._make_batch(batch_size=2)
-        hidden = model.forward_hidden(batch["feature_bags"])
+        hidden = model.encode(batch["feature_bags"])
         # hidden_dim should be the last MLP layer output = 4
         self.assertEqual(tuple(hidden.shape), (2, 4))
 

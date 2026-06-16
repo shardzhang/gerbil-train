@@ -1,0 +1,14 @@
+name: ml1m_binary_tfrecord
+description: MovieLens 1M pre-split TFRecord samples for GwEN rank training.
+
+format: tfrecord
+
+paths:
+  tfrecord_root: /Users/dazhang/PycharmProject/data/ml-1m/train_sample/rating/20260616
+  nn_pos_map_txt: /Users/dazhang/PycharmProject/data/ml-1m/train_sample/rating/20260616/pos_map.txt
+  nn_pos_map_json: /Users/dazhang/PycharmProject/data/ml-1m/train_sample/rating/20260616/pos_map.json
+
+split_subdirs:
+  train: train
+  val: val
+  test: test

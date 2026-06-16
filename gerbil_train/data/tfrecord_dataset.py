@@ -1,3 +1,5 @@
+"""Abstract TFRecord dataset with overridable target extraction."""
+
 from __future__ import annotations
 
 import json
@@ -12,101 +14,67 @@ from tfrecord.reader import tfrecord_iterator
 from torch.utils.data import IterableDataset, get_worker_info
 
 __all__ = [
-    "GwENBatchCollator",
-    "GwENFieldSpec",
-    "GwENTFRecordDataset",
+    "TFRecordDataset",
+    "BatchCollator",
+    "FieldSpec",
     "collect_tfrecord_part_files",
-    "load_gwen_field_specs",
-    "load_gwen_field_stats",
+    "count_tfrecord_records",
+    "load_field_specs",
+    "load_field_stats",
     "load_target_size",
 ]
 
 
 @dataclass(frozen=True)
-class GwENFieldSpec:
-    """One GwEN feature-field specification from ``nn_pos_map.txt``."""
-
+class FieldSpec:
+    """Specification of one feature field from ``pos_map.txt``."""
     name: str
     index: int
     field_type: int
     dim: int
 
 
-def load_gwen_field_specs(path: str | Path) -> list[GwENFieldSpec]:
-    """Load field specs from ``nn_pos_map.txt``.
-
-    Expected format:
-        ``field_name,field_index,field_type,dim``
-    """
+def load_field_specs(path: str | Path) -> list[FieldSpec]:
+    """Load field specs from ``pos_map.txt`` (columns: ``name,index,type,dim``)."""
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(f"nn_pos_map.txt not found: {path}")
-
-    specs: list[GwENFieldSpec] = []
+        raise FileNotFoundError(f"Field spec file not found: {path}")
+    specs: list[FieldSpec] = []
     with path.open("r", encoding="utf-8") as f:
-        for line_number, raw_line in enumerate(f, start=1):
-            line = raw_line.strip()
-            if not line:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("field_name,"):
                 continue
-            if line.startswith("field_name,"):
-                continue
-            parts = [part.strip() for part in line.split(",")]
+            parts = [p.strip() for p in line.split(",")]
             if len(parts) < 4:
-                raise ValueError(f"Invalid nn_pos_map line at {path}:{line_number}")
-            specs.append(GwENFieldSpec(name=parts[0], index=int(parts[1]), field_type=int(parts[2]), dim=int(parts[3])))
-    specs.sort(key=lambda spec: spec.index)
+                continue
+            specs.append(FieldSpec(name=parts[0], index=int(parts[1]), field_type=int(parts[2]), dim=int(parts[3])))
+    specs.sort(key=lambda s: s.index)
     return specs
 
 
 def load_target_size(path: str | Path) -> int:
-    """Load target vocabulary size from ``nn_pos_map.json``."""
+    """Load target vocabulary size from ``pos_map.json``."""
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(f"nn_pos_map.json not found: {path}")
-
+        raise FileNotFoundError(f"Target size file not found: {path}")
     with path.open("r", encoding="utf-8") as f:
         payload = json.load(f)
-
     if "target_size" in payload:
         return int(payload["target_size"])
-
     targets = payload.get("targets", {})
     if not isinstance(targets, Mapping) or not targets:
-        raise ValueError("Unable to infer target_size from nn_pos_map.json")
-
+        raise ValueError("Unable to infer target_size from JSON")
     return len(targets)
 
 
-def collect_tfrecord_part_files(root_dir: str | Path) -> list[Path]:
-    """Collect TFRecord part files under one root directory."""
-    root = Path(root_dir)
-    if not root.exists():
-        raise FileNotFoundError(f"TFRecord root directory not found: {root}")
-
-    files = [
-        path for path in root.glob("part-r-*") if path.is_file()
-        and not path.name.startswith(".")
-        and not path.name.endswith(".crc")
-    ]
-    files = sorted(files)
-    if not files:
-        raise FileNotFoundError(f"No TFRecord part files found in {root}")
-    return files
-
-
-def load_gwen_field_stats(path: str | Path) -> dict[str, dict[int, tuple[float, float]]]:
-    """Load continuous-feature mean and std from ``pos_map.json``.
-
-    Returns a mapping ``field_name -> {pos: (mean, std)}`` for field_type=0 features.
-    Each bucket position has its own mean/std.
-    """
+def load_field_stats(path: str | Path) -> dict[str, dict[int, tuple[float, float]]]:
+    """Load per-position mean/std for continuous features from ``pos_map.json``."""
     path = Path(path)
     if not path.exists():
-        raise FileNotFoundError(f"pos_map.json not found: {path}")
-
+        raise FileNotFoundError(f"Field stats file not found: {path}")
     with path.open("r", encoding="utf-8") as f:
         payload = json.load(f)
-
     stats: dict[str, dict[int, tuple[float, float]]] = {}
     for feature in payload.get("features", []):
         if int(feature.get("field_type", 1)) != 0:
@@ -121,8 +89,36 @@ def load_gwen_field_stats(path: str | Path) -> dict[str, dict[int, tuple[float, 
     return stats
 
 
-class GwENTFRecordDataset(IterableDataset):
-    """Iterable TFRecord dataset for GwEN multi-class training."""
+def collect_tfrecord_part_files(root_dir: str | Path) -> list[Path]:
+    """Collect ``part-r-*`` TFRecord files under a root directory."""
+    root = Path(root_dir)
+    if not root.exists():
+        raise FileNotFoundError(f"TFRecord root directory not found: {root}")
+    files = [
+        p for p in root.glob("part-r-*") if p.is_file()
+        and not p.name.startswith(".") and not p.name.endswith(".crc")
+    ]
+    files = sorted(files)
+    if not files:
+        raise FileNotFoundError(f"No TFRecord part files found in {root}")
+    return files
+
+
+def count_tfrecord_records(files: Sequence[str | Path]) -> int:
+    """Count total TFRecord records without parsing protobuf."""
+    total = 0
+    for f in files:
+        it = tfrecord_iterator(data_path=str(Path(f).resolve()), index_path=None)
+        for _ in it:
+            total += 1
+    return total
+
+
+class TFRecordDataset(IterableDataset):
+    """Abstract TFRecord dataset with overridable target extraction.
+
+    Subclasses must implement :meth:`_extract_target`.
+    """
 
     def __init__(
         self,
@@ -131,12 +127,14 @@ class GwENTFRecordDataset(IterableDataset):
         *,
         field_stats: dict[str, dict[int, tuple[float, float]]] | None = None,
         shuffle_files: bool = False,
+        shuffle_buffer: int = 0,
         seed: int = 42,
     ) -> None:
         self.tfrecord_files = [str(Path(path).resolve()) for path in tfrecord_files]
         self.field_names = list(field_names)
         self.field_stats = field_stats
         self.shuffle_files = shuffle_files
+        self.shuffle_buffer = shuffle_buffer
         self.seed = seed
 
         if not self.tfrecord_files:
@@ -144,44 +142,47 @@ class GwENTFRecordDataset(IterableDataset):
         if not self.field_names:
             raise ValueError("field_names must not be empty")
 
+    @staticmethod
+    def _extract_target(example: example_pb2.Example) -> int | float:
+        """Extract the target label from a TFRecord ``Example``.
+
+        Subclasses must override this method.
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def _extract_field_values(
+        example: example_pb2.Example,
+        field_name: str,
+    ) -> tuple[list[int], list[float]]:
+        """Extract indices and values for a named field from a TFRecord example.
+
+        :return: Tuple of ``(indices, values)``.
+        """
+        features = example.features.feature
+        idx_feat = features.get(f"{field_name}_index")
+        val_feat = features.get(f"{field_name}_value")
+        if idx_feat is None or val_feat is None:
+            return [], []
+        indices = [int(v) for v in idx_feat.int64_list.value]
+        values = [float(v) for v in val_feat.float_list.value]
+        return indices, values
+
     def _select_files_for_worker(self) -> list[str]:
         worker = get_worker_info()
         if worker is None:
-            selected_files = list(self.tfrecord_files)
+            selected = list(self.tfrecord_files)
             worker_seed = self.seed
         else:
-            selected_files = self.tfrecord_files[worker.id :: worker.num_workers]
+            selected = self.tfrecord_files[worker.id :: worker.num_workers]
             worker_seed = self.seed + worker.id
-
         if self.shuffle_files:
-            random.Random(worker_seed).shuffle(selected_files)
-        return selected_files
-
-    @staticmethod
-    def _extract_target(example: example_pb2.Example) -> int:
-        target_feature = example.features.feature.get("target")
-        if target_feature is None:
-            raise ValueError("Missing target feature in TFRecord example")
-
-        if target_feature.float_list.value:
-            return int(target_feature.float_list.value[0])
-        
-        raise ValueError("Target feature exists but has no values")
-
-    def _extract_field_values(self, example: example_pb2.Example, field_name: str) -> tuple[list[int], list[float]]:
-        features = example.features.feature
-        index_feature = features.get(f"{field_name}_index")
-        value_feature = features.get(f"{field_name}_value")
-
-        if index_feature is None or value_feature is None:
-            return [], []
-
-        index_feature = [int(value) for value in index_feature.int64_list.value]
-        value_feature = [float(value) for value in value_feature.float_list.value]
-        return index_feature, value_feature
+            random.Random(worker_seed).shuffle(selected)
+        return selected
 
     def __iter__(self):
         selected_files = self._select_files_for_worker()
+        buf: list[dict[str, Any]] = []
         for file_path in selected_files:
             iterator = tfrecord_iterator(data_path=file_path, index_path=None)
             for raw_record in iterator:
@@ -202,14 +203,23 @@ class GwENTFRecordDataset(IterableDataset):
                     field_indices[field_name] = indices
                     field_values[field_name] = values
 
-                yield {
-                    "targets": target,
-                    "field_indices": field_indices,
-                    "field_values": field_values,
-                }
+                sample = {"targets": target, "field_indices": field_indices, "field_values": field_values}
+
+                if self.shuffle_buffer > 0:
+                    buf.append(sample)
+                    if len(buf) >= self.shuffle_buffer:
+                        random.shuffle(buf)
+                        yield from buf
+                        buf = []
+                else:
+                    yield sample
+
+        if self.shuffle_buffer > 0 and buf:
+            random.shuffle(buf)
+            yield from buf
 
 
-class GwENBatchCollator:
+class BatchCollator:
     """Collate function that packs sparse per-field features for EmbeddingBag."""
 
     def __init__(self, field_names: Sequence[str]) -> None:

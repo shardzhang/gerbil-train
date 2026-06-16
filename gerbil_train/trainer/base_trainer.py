@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +69,45 @@ class BaseTrainer:
         self.max_epochs: int = 0
         self.global_step: int = 0
         self.writer = None
+        self.batch_inspector = None
+        self.total_train_samples: int = 0
+        self.steps_per_epoch: int = 0
+        self._profile_path: Path | None = None
+        self._epoch_start_time: float = 0.0
+
+    def set_batch_inspector(self, inspector: Any) -> None:
+        """Attach a batch inspector for debugging training data.
+
+        :param inspector: A callable ``(step, batch, epoch) -> None``,
+            or an object with a ``log_first`` attribute that resets on each epoch.
+        """
+        self.batch_inspector = inspector
+
+    def set_total_train_samples(self, total: int, batch_size: int) -> None:
+        """Set total training samples and compute steps per epoch."""
+        self.total_train_samples = total
+        self.steps_per_epoch = (total + batch_size - 1) // batch_size
+
+    def inspect_batch(self, step: int, batch: Any) -> None:
+        """Inspect a training batch if a batch inspector is attached.
+
+        Call this inside ``train_one_epoch`` at the desired step.
+        """
+        if self.batch_inspector is not None:
+            self.batch_inspector(step, batch, self.current_epoch)
+
+    def set_profile_path(self, run_dir: str | Path) -> None:
+        self._profile_path = Path(run_dir) / "profile.txt"
+
+    def finalize_epoch(self, epoch: int, metrics: dict[str, float], message: str) -> None:
+        elapsed = time.time() - self._epoch_start_time
+        steps_per_sec = self.steps_per_epoch / elapsed if elapsed > 0 and self.steps_per_epoch > 0 else 0.0
+        message += f" | steps: {self.steps_per_epoch} | steps/s: {steps_per_sec:.2f} | time: {elapsed:.1f}s"
+        self.log_message(message)
+        if self._profile_path is not None:
+            self._profile_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._profile_path, "a") as f:
+                f.write(message + "\n")
 
     def setup(self) -> None:
         """Prepare trainer state before training starts.
@@ -122,6 +162,9 @@ class BaseTrainer:
         self.setup()
         self.on_train_start()
 
+        if self.total_train_samples > 0:
+            print(f"Train samples: {self.total_train_samples} | Steps/epoch: {self.steps_per_epoch}")
+
         try:
             for epoch in range(epochs):
                 self.current_epoch = epoch
@@ -173,10 +216,7 @@ class BaseTrainer:
 
         :param epoch: Zero-based epoch index
         """
-
-    """
-    3.4 on-epoch-end hook
-    """
+        self._epoch_start_time = time.time()
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         """Hook called after each epoch ends.

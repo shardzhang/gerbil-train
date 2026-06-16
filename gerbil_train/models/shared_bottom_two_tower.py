@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
+from gerbil_train.config import SBTTConfig
 from gerbil_train.utils.nn import build_mlp
 
 __all__ = ["SBTTOutput", "SharedBottomTwoTower"]
@@ -47,21 +48,21 @@ class SharedBottomTwoTower(nn.Module):
       shared bottom -> explicit tower / implicit tower
     """
 
-    def __init__(self, config: Mapping[str, Any]) -> None:
+    def __init__(self, config: SBTTConfig) -> None:
         """Initialize the Shared-Bottom Two-Tower model.
 
-        :param config: Model configuration mapping matching the shared-bottom YAML structure
+        :param config: SBTT model configuration
         """
         super().__init__()
 
-        query_input_dim = int(config["query_input_dim"])
-        item_input_dim = int(config["item_input_dim"])
-        shared_bottom = self._get_tower_config(config, "shared_bottom")
-        explicit_tower = self._get_tower_config(config, "explicit_tower")
-        implicit_tower = self._get_tower_config(config, "implicit_tower")
-        embedding_dim = int(config["embedding_dim"])
-        normalize_embedding = bool(config.get("normalize_embedding", False))
-        temperature = float(config.get("temperature", 0.07))
+        query_input_dim = int(config.query_input_dim)
+        item_input_dim = int(config.item_input_dim)
+        shared_bottom = config.shared_bottom
+        explicit_tower = config.explicit_tower
+        implicit_tower = config.implicit_tower
+        embedding_dim = int(config.embedding_dim)
+        normalize_embedding = bool(config.normalize_embedding)
+        temperature = float(config.temperature)
 
         shared_hidden_dims = self._get_hidden_dims(shared_bottom, "shared_bottom")
         explicit_hidden_dims = self._get_hidden_dims(explicit_tower, "explicit_tower")

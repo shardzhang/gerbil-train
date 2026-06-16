@@ -6,6 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from gerbil_train.losses.classification import nce_loss, sampled_softmax_loss
+from gerbil_train.metrics.classification import auc
 
 
 class CrossEntropyLossTests(unittest.TestCase):
@@ -135,6 +136,36 @@ class SampledSoftmaxLossTests(unittest.TestCase):
         perfect_w[7] = hidden[1]
         loss_perfect = sampled_softmax_loss(hidden, perfect_w, targets, num_sampled=5)
         self.assertLess(loss_perfect.item(), loss_random.item())
+
+
+class AUCTests(unittest.TestCase):
+    """Tests for the AUC metric."""
+
+    def test_auc_perfect(self) -> None:
+        """AUC is 1.0 when all positive ranks are above all negatives."""
+        labels = torch.tensor([1, 1, 0, 0])
+        preds = torch.tensor([0.9, 0.8, 0.2, 0.1])
+        self.assertAlmostEqual(auc(labels, preds), 1.0, places=4)
+
+    def test_auc_mixed(self) -> None:
+        """AUC is computed correctly for mixed predictions."""
+        labels = torch.tensor([1, 0, 1, 0])
+        preds = torch.tensor([0.9, 0.8, 0.2, 0.1])
+        # Sorted: 0.9(1), 0.8(0), 0.2(1), 0.1(0) → ranks [4,3,2,1], sum_pos=4+2=6
+        # AUC = (6 - 3) / 4 = 0.75
+        self.assertAlmostEqual(auc(labels, preds), 0.75, places=4)
+
+    def test_auc_falling(self) -> None:
+        """AUC is 0.0 when all positive ranks are below all negatives."""
+        labels = torch.tensor([1, 1, 0, 0])
+        preds = torch.tensor([0.1, 0.2, 0.9, 0.8])
+        self.assertAlmostEqual(auc(labels, preds), 0.0, places=4)
+
+    def test_auc_single_class(self) -> None:
+        """AUC defaults to 0.5 when only one class is present."""
+        labels = torch.tensor([1, 1, 1])
+        preds = torch.tensor([0.9, 0.8, 0.7])
+        self.assertEqual(auc(labels, preds), 0.5)
 
 
 if __name__ == "__main__":

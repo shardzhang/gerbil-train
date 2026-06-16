@@ -4,4 +4,3 @@ description: Learning-to-rank experiment for MSLR-WEB10K.
 data: configs/data/learning_to_rank.yaml
 model: configs/model/learning_to_rank.yaml
 train: configs/train/learning_to_rank.yaml
-eval: configs/eval/ranking.yaml

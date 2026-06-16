@@ -12,14 +12,22 @@ __all__ = ["build_mlp", "get_activation"]
 def get_activation(name: str) -> nn.Module:
     """Get the activation function by name.
 
-    :param name: Name of the activation function ("relu", "gelu", "tanh")
+    :param name: Activation name (case-insensitive).
+        Supported: ``relu``, ``gelu``, ``silu`` / ``swish``,
+        ``leaky_relu``, ``prelu``, ``tanh``.
     :return: An nn.Module representing the activation function
     """
-    name = name.lower()
+    name = name.lower().replace("-", "_")
     if name == "relu":
         return nn.ReLU()
     if name == "gelu":
         return nn.GELU()
+    if name in ("silu", "swish"):
+        return nn.SiLU()
+    if name == "leaky_relu":
+        return nn.LeakyReLU(negative_slope=0.01)
+    if name == "prelu":
+        return nn.PReLU()
     if name == "tanh":
         return nn.Tanh()
     raise ValueError(f"Unsupported activation: {name}")

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -14,7 +13,9 @@ from tqdm.auto import tqdm
 
 from gerbil_train.config import GwENTrainConfig
 from gerbil_train.losses.classification import nce_loss, sampled_softmax_loss
+from gerbil_train.metrics.classification import hit_rate
 from gerbil_train.trainer.base_trainer import BaseTrainer
+from gerbil_train.utils import BatchInspector
 from gerbil_train.utils.plot import save_curve_values
 
 __all__ = ["GwENTrainer", "GwENTrainingResult"]
@@ -89,6 +90,11 @@ class GwENTrainer(BaseTrainer):
         self.train_loss_history: list[float] = []
         self.val_top1_history: list[float] = []
         self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
+        if config.inspector.enabled:
+            self.set_batch_inspector(BatchInspector(
+                log_first=config.inspector.log_first,
+                log_every=config.inspector.log_every,
+            ))
         self._single_class_mode = bool(getattr(self.model, "target_size", 0) <= 1)
         if self._single_class_mode:
             self.log_message(
@@ -118,15 +124,16 @@ class GwENTrainer(BaseTrainer):
         total_loss = 0.0
         total_steps = 0
         train_pbar = tqdm(
-            self.train_loader,
+            self.train_loader, total=self.steps_per_epoch or None,
             desc=f"Epoch {epoch + 1}/{self.max_epochs} [train]",
             leave=False,
         )
         for step, batch in enumerate(train_pbar, start=1):
             batch = self.move_batch_to_device(batch)
-
+            self.on_train_step_start(batch)
+            self.inspect_batch(step, batch)
             if self._use_sampled_loss:
-                hidden = self.model.forward_hidden(batch["feature_bags"])
+                hidden = self.model.encode(batch["feature_bags"])
                 if self.loss_cfg.type == "nce":
                     loss = nce_loss(
                         hidden, self.model.head.weight, batch["targets"].long(),
@@ -154,17 +161,6 @@ class GwENTrainer(BaseTrainer):
         avg_loss = total_loss / max(total_steps, 1)
         return {"loss": avg_loss}
 
-    @staticmethod
-    def _compute_topk_hit_rate(
-        logits: torch.Tensor, targets: torch.Tensor, k: int
-    ) -> float:
-        if logits.size(1) <= 1:
-            return 1.0
-        k = min(k, int(logits.size(1)))
-        topk_indices = torch.topk(logits, k=k, dim=1).indices
-        hits = (topk_indices == targets.unsqueeze(1)).any(dim=1).float()
-        return float(hits.mean().item())
-
     def validate(self, epoch: int | None = None) -> dict[str, float]:
         if self.validation_loader is None:
             return {}
@@ -183,8 +179,8 @@ class GwENTrainer(BaseTrainer):
 
                 if logits.size(1) > 1:
                     total_loss += float(F.cross_entropy(logits, targets).item())
-                total_top1 += self._compute_topk_hit_rate(logits, targets, k=1)
-                total_topk_hit += self._compute_topk_hit_rate(logits, targets, self.topk)
+                total_top1 += hit_rate(logits, targets, k=1)
+                total_topk_hit += hit_rate(logits, targets, self.topk)
                 total_steps += 1
 
         denominator = max(total_steps, 1)
@@ -208,10 +204,8 @@ class GwENTrainer(BaseTrainer):
                 logits = self.forward_step(batch)
                 targets = batch["targets"].long()
 
-                total_top1 += self._compute_topk_hit_rate(logits, targets, k=1)
-                total_topk_hit += self._compute_topk_hit_rate(
-                    logits, targets, self.topk
-                )
+                total_top1 += hit_rate(logits, targets, k=1)
+                total_topk_hit += hit_rate(logits, targets, self.topk)
                 total_steps += 1
 
         denominator = max(total_steps, 1)
@@ -234,9 +228,6 @@ class GwENTrainer(BaseTrainer):
         if monitored is not None:
             self.scheduler_step(monitored)
 
-    def on_epoch_start(self, epoch: int) -> None:
-        self._epoch_start_time = time.time()
-
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         train_loss = metrics.get("train_loss")
         val_hit1 = metrics.get("val_hit@1")
@@ -247,7 +238,6 @@ class GwENTrainer(BaseTrainer):
         if val_hit1 is not None:
             self.val_top1_history.append(float(val_hit1))
 
-        elapsed = time.time() - self._epoch_start_time
         message = (
             f"Epoch {epoch + 1} | loss: {train_loss:.4f}"
             if train_loss is not None
@@ -257,8 +247,7 @@ class GwENTrainer(BaseTrainer):
             message += f" | Hit@1 val: {val_hit1:.4f}"
         if val_hitk is not None:
             message += f" | Hit@{self.topk} val: {val_hitk:.4f}"
-        message += f" | time: {elapsed:.1f}s"
-        self.log_message(message)
+        self.finalize_epoch(epoch, metrics, message)
 
     def save_training_artifacts(self) -> None:
         if self.plot_path is None:

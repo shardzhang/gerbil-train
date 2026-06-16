@@ -96,7 +96,33 @@ This matches the observed initial loss values and confirms the implementation is
 
 Each field gets a learned `Linear(emb_dim, 1)` score. Scores are softmax-normalized across fields and used to reweight embeddings before concatenation. This lets the model dynamically emphasize informative fields and suppress noise – though in practice, with well-engineered features, uniform weighting often performs equally well.
 
-### 6. Clean Architecture Separation
+### 6. Sample-Level Shuffle
+
+`TFRecordDataset` is an `IterableDataset` — it streams records sequentially and cannot be randomly indexed. To still get sample-level shuffling, a **shuffle buffer** is used inside the dataset:
+
+```
+read records → fill buffer → shuffle buffer → yield batches → refill
+```
+
+The `shuffle_buffer` parameter controls how many records are buffered before each shuffle:
+
+| `shuffle_buffer` | `batch_size` | Effect |
+|------------------|:------------:|--------|
+| `0` (disabled) | 512 | No shuffle — samples arrive in file order |
+| `512` (= batch_size) | 512 | Each batch covers only a small file window; poor shuffle quality |
+| `8192` (≈ 16× batch) | 512 | Each batch samples from a wide file range; good global shuffle |
+
+**Rule of thumb**: `shuffle_buffer ≥ batch_size × 10` ensures each batch draws from a sufficiently large pool, avoiding local clustering.
+
+Configured in the training config:
+
+```yaml
+data:
+  batch_size: 512
+  shuffle_buffer: 8192
+```
+
+### 7. Clean Architecture Separation
 
 ```
 TFRecord → Dataset → Collator → Batch          [data pipeline]

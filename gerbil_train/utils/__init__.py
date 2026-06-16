@@ -1,11 +1,13 @@
 """Utility helpers for gerbil_train."""
 
 from .config import load_experiment_config, load_yaml
+from .inspect import BatchInspector
 from .nn import build_mlp, get_activation
 from .plot import load_curve_values, save_curve_values
 from .seed import set_seed
 
 __all__ = [
+    "BatchInspector",
     "build_mlp",
     "get_activation",
     "load_curve_values",

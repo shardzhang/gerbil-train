@@ -8,6 +8,7 @@ data:
   pin_memory: false
   drop_last: false
   prefetch_factor: 4
+  shuffle_buffer: 8192
 
 compile:
   enabled: true
@@ -19,23 +20,18 @@ optimizer:
   weight_decay: 0.0
 
 scheduler:
-  enabled: false
+  enabled: true
 
 checkpoint:
-  monitor: hit@1
+  monitor: val_auc
   mode: max
 
 early_stop:
-  enabled: false
+  enabled: true
 
-evaluation:
-  topk: 10
-
-loss:
-  type: ce                  # ce | nce | sampled_softmax
-  num_sampled: 100          # only used for nce / sampled_softmax
+evaluation: {}
 
 inspector:
-  enabled: true
+  enabled: false
   log_first: 3
   log_every: 0
