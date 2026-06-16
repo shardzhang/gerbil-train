@@ -2,7 +2,18 @@
 
 **Offline training and evaluation for GERBIL recommender systems.**
 
-`gerbil-train` is the offline training component of GERBIL. Its primary model is **GwEN (Group-wise Embedding Network)**, a multi-class classification architecture for item recommendation. The project is designed with production ML principles: config-driven, fully reproducible runs, pluggable losses, and first-class feature management.
+**gerbil-train** is the offline training and evaluation component of **GERBIL** (**G**eneral **E**fficient **R**ecommender for **B**enchmarking, **I**nference, and **L**earning). It focuses on efficient, modular training, evaluation, and export of recommendation models. The project is developed in Python and forms a complete pipeline together with:
+
+- **[gerbil-data](https://github.com/shardzhang/gerbil-data)** — Spark-based feature engineering and data processing
+- **[gerbil-serving](https://github.com/shardzhang/gerbil-serving)** — Online inference and model serving
+
+The primary model is **GwEN (Group-wise Embedding Network)**, a multi-class classification architecture for item recommendation. The project also provides infrastructure for CTR prediction, Top-K recommendation, ranking, retrieval pre-training, and sequential recommendation.
+
+**Supported capabilities:**
+
+- **Task types:** CTR prediction, Top-K recommendation, ranking, retrieval pre-training, sequential recommendation
+- **Model families:** MF, FM, DeepFM, Wide & Deep, DIN, SASRec, Two-Tower, GwEN, and more
+- **Evaluation metrics:** AUC, LogLoss, Recall@K, HitRate@K, NDCG@K, MRR
 
 ---
 

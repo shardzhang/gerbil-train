@@ -2,7 +2,18 @@
 
 **GERBIL 推荐系统的离线训练与评估组件。**
 
-`gerbil-train` 是 GERBIL 的离线训练组件。核心模型为 **GwEN（Group-wise Embedding Network，分组嵌入网络）**，一种用于物品推荐的多分类架构。项目遵循生产级 ML 工程原则：配置驱动、完全可复现、可插拔损失函数、一等公民的特征管理。
+**gerbil-train** 是 **GERBIL**（General Efficient Recommender for Benchmarking, Inference, and Learning）系统的离线训练与评估组件，专注于高效、模块化地训练、评估和导出推荐模型。项目采用 Python 开发，与以下组件形成完整链路：
+
+- **[gerbil-data](https://github.com/shardzhang/gerbil-data)** — 基于 Spark 的特征工程数据处理
+- **[gerbil-serving](https://github.com/shardzhang/gerbil-serving)** — 在线推理与模型服务
+
+核心模型为 **GwEN（Group-wise Embedding Network，分组嵌入网络）**，一种用于物品推荐的多分类架构。项目同时支持 CTR 预测、Top-K 推荐、排序、检索预训练、序列推荐等任务。
+
+**支持能力：**
+
+- **任务类型：** CTR 预测、Top-K 推荐、排序、检索预训练、序列推荐
+- **模型覆盖：** MF、FM、DeepFM、Wide & Deep、DIN、SASRec、双塔模型、GwEN 等
+- **评估指标：** AUC、LogLoss、Recall@K、HitRate@K、NDCG@K、MRR
 
 ---
 
