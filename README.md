@@ -192,6 +192,42 @@ configs/
 
 ---
 
+## Project Status & Quality
+
+gerbil-train is currently in **early prototype** stage (≈1 month of active development, 11+ commits, single contributor). An independent code review scored the project **3.2 / 5.0**, with the following breakdown:
+
+| Dimension | Score | Summary |
+|-----------|:-----:|---------|
+| Architecture | 4/5 | Clean layering, template method pattern, `@dataclass` config |
+| Type Annotations | 4/5 | Modern Python 3.10+ type hints throughout |
+| Code Complexity | 4/5 | Well-separated concerns, appropriate design patterns |
+| Documentation | 3/5 | Core modules documented, but API docs missing |
+| Error Handling | 3/5 | Input validation solid, but no custom exceptions or logging |
+| Testing | 2/5 | 41 GwEN-specific tests added; no CI/CD, no coverage tracking |
+| Engineering | 2/5 | CI/CD, code formatter config, issue/PR templates not yet set up |
+
+### What's solid
+
+- Modular, config-driven architecture with clean separation (data → model → loss → trainer)
+- Fully reproducible experiment runs with timestamped artifacts and config snapshots
+- Type-safe configuration via `@dataclass`
+- Feature-level enabled/disabled toggle for ablation studies
+- Pluggable loss functions (CE / NCE / Sampled Softmax) with documented mathematical derivation
+
+### What needs work
+
+- **Testing**: Unit tests for metrics, losses, and utility modules; CI/CD pipeline for automated test execution
+- **Documentation**: API reference, architecture overview, contributing guide (CONTRIBUTING.md)
+- **Dependency management**: Separate dev dependencies, lock version ranges
+- **Community infrastructure**: Issue/PR templates, GitHub Actions, semantic commit conventions
+
+### Related Projects (GERBIL Ecosystem)
+
+- [`gerbil-data`](https://github.com/shardzhang/gerbil-data) — Spark-based feature engineering and data processing
+- [`gerbil-serving`](https://github.com/shardzhang/gerbil-serving) — Online inference and model serving
+
+---
+
 ## Related Projects
 
 - `gerbil-data` — data processing and sample generation
