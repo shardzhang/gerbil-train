@@ -1,10 +1,9 @@
-"""Trainer for GwEN binary classification models."""
+"""Trainer for DIN (Deep Interest Network) binary classification models."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import torch
 from torch import nn, optim
@@ -14,17 +13,17 @@ from gerbil_train.config import GwENTrainConfig
 from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils import BatchInspector
 
-__all__ = ["GwENBinaryTrainer", "GwENBinaryTrainingResult"]
+__all__ = ["DINTrainer", "DINTrainingResult"]
 
 
 @dataclass
-class GwENBinaryTrainingResult:
+class DINTrainingResult:
     train_loss_history: list[float]
     val_auc_history: list[float]
     best_auc: float
 
 
-class GwENBinaryTrainer(BaseTrainer):
+class DINTrainer(BaseTrainer):
 
     def __init__(self, model: nn.Module, config: GwENTrainConfig) -> None:
         optimizer_cfg = config.optimizer
@@ -33,11 +32,7 @@ class GwENBinaryTrainer(BaseTrainer):
         early_stop_cfg = config.early_stop
         logging_cfg = config.logging
 
-        optimizer = optim.Adam(
-            model.parameters(),
-            lr=float(optimizer_cfg.lr or 1e-3),
-            weight_decay=float(optimizer_cfg.weight_decay or 0.0),
-        )
+        optimizer = optim.Adam(model.parameters(), lr=float(optimizer_cfg.lr or 1e-3), weight_decay=float(optimizer_cfg.weight_decay or 0.0))
         scheduler = (
             torch.optim.lr_scheduler.ReduceLROnPlateau(
                 optimizer, mode=str(scheduler_cfg.mode),
@@ -64,7 +59,7 @@ class GwENBinaryTrainer(BaseTrainer):
         self.train_loader: DataLoader | None = None
         self.validation_loader: DataLoader | None = None
         self.test_loader: DataLoader | None = None
-        self.model_name = "GwEN Binary"
+        self.model_name = "DIN"
         self.metric_name = "AUC"
         self.val_metric_history: list[float] = []
         self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
@@ -75,8 +70,8 @@ class GwENBinaryTrainer(BaseTrainer):
                 log_every=config.inspector.log_every,
             ))
 
-    def _build_result(self) -> GwENBinaryTrainingResult:
-        return GwENBinaryTrainingResult(
+    def _build_result(self) -> DINTrainingResult:
+        return DINTrainingResult(
             train_loss_history=list(self.train_loss_history),
             val_auc_history=list(self.val_metric_history),
             best_auc=self.best_metric or 0.0,

@@ -168,7 +168,16 @@ class LearningToRankTrainer(BaseTrainer):
 
     def train_one_step(self, batch: dict[str, Any]) -> dict[str, float]:
         """Run one optimization step on a single query group.
+            # 1. self.on_train_step_start hook
+            # 2. zero_grad
+            # 3. forward_step
+            # 4. compute_loss
+            # 5. backward_step
 
+            # 6. clip_gradients
+            # 7. optimizer_step
+            # 8. scheduler_step
+            # 9. self.on_train_step_end hook
         :param batch: Query-group batch with feature and label tensors
         :return: Step-level training metrics
         """

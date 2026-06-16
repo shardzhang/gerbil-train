@@ -11,6 +11,7 @@ from torch import nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
 
+from gerbil_train.metrics.classification import auc
 from gerbil_train.utils.seed import set_seed
 
 __all__ = ["BaseTrainer"]
@@ -67,6 +68,7 @@ class BaseTrainer:
 
         self.current_epoch: int = 0
         self.max_epochs: int = 0
+        self.epochs: int = 0
         self.global_step: int = 0
         self.writer = None
         self.batch_inspector = None
@@ -74,13 +76,31 @@ class BaseTrainer:
         self.steps_per_epoch: int = 0
         self._profile_path: Path | None = None
         self._epoch_start_time: float = 0.0
+        self.plot_path: Path | None = None
+        self.train_loss_history: list[float] = []
+        self.val_metric_history: list[float] = []
+        self.model_name: str = "Model"
+        self.metric_name: str = "Metric"
+        self._metric_key: str = "auc"
+        self._compute_metric = staticmethod(auc)
+
+    def _on_fit_start(self, train_loader: Any, val_loader: Any, test_loader: Any) -> None:
+        self.train_loader = train_loader
+        self.validation_loader = val_loader
+        self.test_loader = test_loader
+        self.train_loss_history.clear()
+        self.val_metric_history.clear()
+
+    def _build_result(self) -> Any:
+        return None
+
+    def fit(self, train_loader: Any, val_loader: Any = None, test_loader: Any = None) -> Any:
+        self._on_fit_start(train_loader, val_loader, test_loader)
+        self.max_epochs = self.epochs
+        self._fit_epochs()
+        return self._build_result()
 
     def set_batch_inspector(self, inspector: Any) -> None:
-        """Attach a batch inspector for debugging training data.
-
-        :param inspector: A callable ``(step, batch, epoch) -> None``,
-            or an object with a ``log_first`` attribute that resets on each epoch.
-        """
         self.batch_inspector = inspector
 
     def set_total_train_samples(self, total: int, batch_size: int) -> None:
@@ -129,36 +149,8 @@ class BaseTrainer:
         Subclasses can override this to close writers, files, or other handles.
         """
 
-    def fit(self, *, epochs: int) -> None:
-        """Run the full training lifecycle.
-
-        The method follows a template-method style structure:
-            1. setup
-            2. on-train-start hook
-            3. for each epoch:
-                3.1 on-epoch-start hook
-                3.2 train one epoch -> train one step
-                    - on-train-step-start hook
-                    - zero_grad
-                    - forward_step
-                    - compute_loss
-                    - backward_step
-                    - clip_gradients
-                    - optimizer_step
-                    - scheduler_step
-                    - on-train-step-end hook
-                3.3 validate
-                    - on-validation-start hook
-                    - forward
-                    - on-validation-end hook
-                3.4 on-epoch-end hook
-                3.5 early-stop check
-            4. on-train-end hook
-            5. cleanup
-
-        :param epochs: Number of epochs to train for
-        """
-        self.max_epochs = epochs
+    def _fit_epochs(self) -> None:
+        """Run the full training lifecycle."""
         self.setup()
         self.on_train_start()
 
@@ -180,6 +172,7 @@ class BaseTrainer:
                     {f"val_{key}": value for key, value in val_metrics.items()}
                 )
 
+                self.on_validation_end(metrics)
                 self.on_epoch_end(epoch, metrics)
 
                 if self.update_best_state(metrics):
@@ -218,93 +211,94 @@ class BaseTrainer:
         """
         self._epoch_start_time = time.time()
 
-    def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
-        """Hook called after each epoch ends.
-
-        Subclasses can use this hook to record aggregated metrics, write
-        summaries, or print epoch-level progress information.
-
-        :param epoch: Zero-based epoch index
-        :param metrics: Aggregated metrics for the epoch
-        """
-
-    """
-    3.2 train one epoch
-    """
-
     def train_one_epoch(self, epoch: int) -> dict[str, float]:
-        """Train for one epoch.
+        if self.train_loader is None:
+            return {"loss": 0.0}
+        self.model.train()
+        total_loss = 0.0
+        from tqdm.auto import tqdm
+        pbar = tqdm(self.train_loader, total=self.steps_per_epoch or None, desc=f"Epoch {epoch + 1}/{self.max_epochs} [train]", leave=False)
+        for step, batch in enumerate(pbar, start=1):
+            batch = self.move_batch_to_device(batch)
+            self.on_train_step_start(batch)
+            self.inspect_batch(step, batch)
+            self.zero_grad()
+            outputs = self.forward_step(batch)
+            loss = self.compute_loss(outputs, batch)
+            self.backward_step(loss)
+            self.clip_gradients()
+            self.optimizer_step()
+            total_loss += float(loss.item())
+            pbar.set_postfix(loss=f"{total_loss / step:.4f}")
+            self.global_step += 1
+        return {"loss": total_loss / max(step, 1)}
 
-        :param epoch: Zero-based epoch index
-        :return: Epoch-level metrics
-        """
-        # Typically loops over the training dataloader and calls ``self.train_one_step``.
-        raise NotImplementedError
+    def validate(self, epoch: int | None = None) -> dict[str, float]:
+        if self.validation_loader is None:
+            return {}
+        self.model.eval()
+        total_metric = 0.0
+        total_loss = 0.0
+        total_steps = 0
+        import torch.nn.functional as F
+        with torch.no_grad():
+            for batch in self.validation_loader:
+                batch = self.move_batch_to_device(batch)
+                outputs = self.forward_step(batch)
+                labels = batch["targets"].float()
+                total_loss += float(F.binary_cross_entropy(outputs, labels).item())
+                total_metric += self._compute_metric(labels, outputs)
+                total_steps += 1
+        d = max(total_steps, 1)
+        return {"loss": total_loss / d, self._metric_key: total_metric / d}
 
-    """
-    3.2 train one step
-    """
+    def evaluate(self, dataloader: DataLoader | None = None) -> dict[str, float]:
+        if dataloader is None:
+            return {}
+        self.model.eval()
+        total_metric = 0.0
+        total_steps = 0
+        with torch.no_grad():
+            for batch in dataloader:
+                batch = self.move_batch_to_device(batch)
+                outputs = self.forward_step(batch)
+                labels = batch["targets"].float()
+                total_metric += self._compute_metric(labels, outputs)
+                total_steps += 1
+        return {f"test_{self._metric_key}": total_metric / max(total_steps, 1)}
 
-    def train_one_step(self, batch: dict[str, Any]) -> dict[str, float]:
-        """Run one optimization step.
+    def on_validation_end(self, metrics: dict[str, float]) -> None:
+        v = metrics.get(self._metric_key)
+        if v is not None:
+            self.scheduler_step(v)
 
-        :param batch: Input batch for one training step
-        :return: Dictionary of step-level training metrics
-        """
-        # 1. self.on_train_step_start hook
-        # 2. zero_grad
-        # 3. forward_step
-        # 4. compute_loss
-        # 5. backward_step
-        # 6. clip_gradients
-        # 7. optimizer_step
-        # 8. scheduler_step
-        # 9. self.on_train_step_end hook
-        raise NotImplementedError
-
-    """
-    3.2 on train step start hooks
-    """
+    def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
+        train_loss = metrics.get("train_loss")
+        val_metric = metrics.get(f"val_{self._metric_key}")
+        if train_loss is not None:
+            self.train_loss_history.append(float(train_loss))
+        if val_metric is not None:
+            self.val_metric_history.append(float(val_metric))
+        msg = f"Epoch {epoch + 1} | loss: {train_loss:.4f}" if train_loss is not None else f"Epoch {epoch + 1}"
+        if val_metric is not None:
+            msg += f" | {self.metric_name} val: {val_metric:.4f}"
+        self.finalize_epoch(epoch, metrics, msg)
 
     def on_train_step_start(self, batch: Any) -> None:
-        """Hook called before each train step.
-
-        :param batch: Raw step batch
-        """
-
-    """
-    3.2 on train step end hook
-    """
+        pass
 
     def on_train_step_end(self, metrics: dict[str, float]) -> None:
-        """Hook called after each train step.
-
-        :param metrics: Step-level metrics
-        """
-
-    """
-    zero grad
-    """
+        pass
 
     def zero_grad(self) -> None:
-        """Clear accumulated gradients."""
         self.optimizer.zero_grad(set_to_none=True)
 
-    """
-    forward step
-    """
-
     def forward_step(self, batch: Any) -> Any:
-        """Run one model forward pass."""
-        raise NotImplementedError
-
-    """
-    compute loss
-    """
+        return self.model(batch["feature_bags"])
 
     def compute_loss(self, outputs: torch.Tensor, batch: Any) -> torch.Tensor:
-        """Compute one training loss value."""
-        raise NotImplementedError
+        import torch.nn.functional as F
+        return F.binary_cross_entropy(outputs, batch["targets"].float())
 
     """
     compute metrics
@@ -553,13 +547,37 @@ class BaseTrainer:
         self.plot_metric_curve()
 
     def save_loss_curve(self) -> None:
-        """Persist loss-curve values to disk."""
+        if self.plot_path is None or not self.train_loss_history:
+            return
+        from gerbil_train.utils.plot import save_curve_values
+        save_curve_values(self.train_loss_history, self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt"))
 
     def save_metric_curve(self) -> None:
-        """Persist metric-curve values to disk."""
+        if self.plot_path is None or not self.val_metric_history:
+            return
+        from gerbil_train.utils.plot import save_curve_values
+        save_curve_values(self.val_metric_history, self.plot_path.with_name(f"{self.plot_path.stem}_metric.txt"))
 
     def plot_loss_curve(self) -> None:
-        """Plot and save the training loss curve."""
+        if self.plot_path is None or not self.train_loss_history:
+            return
+        from matplotlib import pyplot as plt
+        plt.figure(figsize=(8, 4))
+        plt.plot(range(1, len(self.train_loss_history) + 1), self.train_loss_history, label="train_loss")
+        plt.xlabel("Epoch"); plt.ylabel("Loss"); plt.title(f"{self.model_name} Training Loss")
+        plt.grid(True, linestyle="--", alpha=0.3); plt.legend(); plt.tight_layout()
+        self.plot_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_loss.png"))
+        plt.close()
 
     def plot_metric_curve(self) -> None:
-        """Plot and save tracked metric curves."""
+        if self.plot_path is None or not self.val_metric_history:
+            return
+        from matplotlib import pyplot as plt
+        plt.figure(figsize=(8, 4))
+        plt.plot(range(1, len(self.val_metric_history) + 1), self.val_metric_history, label=f"val_{self.metric_name}")
+        plt.xlabel("Epoch"); plt.ylabel(self.metric_name); plt.title(f"{self.model_name} Validation {self.metric_name}")
+        plt.grid(True, linestyle="--", alpha=0.3); plt.legend(); plt.tight_layout()
+        self.plot_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_metric.png"))
+        plt.close()

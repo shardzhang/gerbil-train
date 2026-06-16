@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Mapping
 
 import torch
 from torch import Tensor, nn
 
 from gerbil_train.config import DeepFMConfig
+from gerbil_train.utils.embedding import embed_one_field
 from gerbil_train.utils.nn import build_mlp
 
 __all__ = ["DeepFM"]
@@ -70,19 +71,6 @@ class DeepFM(nn.Module):
         for emb in self.feature_embeddings.values():
             nn.init.xavier_uniform_(emb.weight)
 
-    @staticmethod
-    def _to_device(tensor: Tensor, device: torch.device) -> Tensor:
-        return tensor if tensor.device == device else tensor.to(device)
-
-    def _embed_one_field(
-        self, emb: nn.EmbeddingBag, indices: Tensor, offsets: Tensor,
-        weights: Tensor, device: torch.device,
-    ) -> Tensor:
-        indices = self._to_device(indices.long(), device)
-        offsets = self._to_device(offsets.long(), device)
-        weights = self._to_device(weights.float(), device)
-        return emb(indices, offsets, per_sample_weights=weights)
-
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
         first_offsets = feature_bags[self.field_names[0]]["offsets"]
         batch_size = int(first_offsets.size(0))
@@ -93,13 +81,13 @@ class DeepFM(nn.Module):
 
         for fn in self.field_names:
             bag = feature_bags[fn]
-            linear_emb = self._embed_one_field(
+            linear_emb = embed_one_field(
                 self.linear_embeddings[fn], bag["indices"], bag["offsets"],
                 bag["weights"], device=device,
             )
             logits = logits + linear_emb.squeeze(-1)
 
-            feature_emb = self._embed_one_field(
+            feature_emb = embed_one_field(
                 self.feature_embeddings[fn], bag["indices"], bag["offsets"],
                 bag["weights"], device=device,
             )

@@ -20,7 +20,7 @@ from gerbil_train.data.tfrecord_dataset import (
 )
 from gerbil_train.utils.config import load_experiment_config, parse_args
 from gerbil_train.utils.run import create_run_dir, filter_enabled_fields, save_run_configs
-from gerbil_train.models.gwen_multiclass_model import GwEN
+from gerbil_train.models.gwen import GwENMulticlass as GwEN
 from gerbil_train.trainer.gwen_multiclass_trainer import GwENTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
