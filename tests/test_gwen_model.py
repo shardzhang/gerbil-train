@@ -1,0 +1,101 @@
+from __future__ import annotations
+
+import unittest
+
+import torch
+
+from gerbil_train.config import GwENFieldEntry, GwENModelConfig
+from gerbil_train.models.gwen import GwEN
+
+
+class GwENModelTests(unittest.TestCase):
+    """Unit tests for the GwEN model."""
+
+    def _make_config(self) -> GwENModelConfig:
+        fields = {
+            "user_age": GwENFieldEntry(f_index=2, f_type=1, vocab_size=8, emb_dim=4),
+            "user_gender": GwENFieldEntry(f_index=3, f_type=1, vocab_size=3, emb_dim=2),
+            "movie_genres": GwENFieldEntry(f_index=103, f_type=1, vocab_size=19, emb_dim=4),
+        }
+        return GwENModelConfig(
+            target_size=10,
+            embedding_fields=fields,
+            mlp={"hidden_dims": [8, 4], "activation": "relu", "dropout": 0.0, "batch_norm": False},
+            attention={"enabled": False},
+        )
+
+    def _make_batch(self, batch_size: int = 2) -> dict:
+        if batch_size == 1:
+            return {
+                "feature_bags": {
+                    "user_age": {
+                        "indices": torch.tensor([0, 1], dtype=torch.long),
+                        "offsets": torch.tensor([0], dtype=torch.long),
+                        "weights": torch.tensor([1.0, 1.0], dtype=torch.float32),
+                    },
+                    "user_gender": {
+                        "indices": torch.tensor([1], dtype=torch.long),
+                        "offsets": torch.tensor([0], dtype=torch.long),
+                        "weights": torch.tensor([1.0], dtype=torch.float32),
+                    },
+                    "movie_genres": {
+                        "indices": torch.tensor([5, 12], dtype=torch.long),
+                        "offsets": torch.tensor([0], dtype=torch.long),
+                        "weights": torch.tensor([1.0, 1.0], dtype=torch.float32),
+                    },
+                }
+            }
+        return {
+            "feature_bags": {
+                "user_age": {
+                    "indices": torch.tensor([0, 1, 0], dtype=torch.long),
+                    "offsets": torch.tensor([0, 2], dtype=torch.long),
+                    "weights": torch.tensor([1.0, 1.0, 1.0], dtype=torch.float32),
+                },
+                "user_gender": {
+                    "indices": torch.tensor([1, 0], dtype=torch.long),
+                    "offsets": torch.tensor([0, 1], dtype=torch.long),
+                    "weights": torch.tensor([1.0, 1.0], dtype=torch.float32),
+                },
+                "movie_genres": {
+                    "indices": torch.tensor([5, 12, 3, 9], dtype=torch.long),
+                    "offsets": torch.tensor([0, 2], dtype=torch.long),
+                    "weights": torch.tensor([1.0, 1.0, 1.0, 1.0], dtype=torch.float32),
+                },
+            }
+        }
+
+    def test_forward_shape(self) -> None:
+        """Verify forward pass returns correct logits shape."""
+        model = GwEN(self._make_config())
+        batch = self._make_batch(batch_size=2)
+        logits = model(batch["feature_bags"])
+        self.assertEqual(tuple(logits.shape), (2, 10))
+
+    def test_forward_hidden_shape(self) -> None:
+        """Verify forward_hidden returns the MLP hidden state."""
+        model = GwEN(self._make_config())
+        batch = self._make_batch(batch_size=2)
+        hidden = model.forward_hidden(batch["feature_bags"])
+        # hidden_dim should be the last MLP layer output = 4
+        self.assertEqual(tuple(hidden.shape), (2, 4))
+
+    def test_forward_with_attention(self) -> None:
+        """Verify forward pass works with attention enabled."""
+        config = self._make_config()
+        config.attention = {"enabled": True}
+        model = GwEN(config)
+        batch = self._make_batch(batch_size=2)
+        logits = model(batch["feature_bags"])
+        self.assertEqual(tuple(logits.shape), (2, 10))
+
+    def test_batch_size_one(self) -> None:
+        """Verify forward pass works with batch size 1."""
+        model = GwEN(self._make_config())
+        batch = self._make_batch(batch_size=1)
+        logits = model(batch["feature_bags"])
+        self.assertEqual(tuple(logits.shape), (1, 10))
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -89,9 +89,6 @@ def collect_tfrecord_part_files(root_dir: str | Path) -> list[Path]:
         and not path.name.endswith(".crc")
     ]
     files = sorted(files)
-    # print(f"root_dir: {root_dir}")
-    # for i, file in enumerate(files):
-    #     print(f"{i}: {file}")
     if not files:
         raise FileNotFoundError(f"No TFRecord part files found in {root}")
     return files

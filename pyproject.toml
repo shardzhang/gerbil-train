@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "gerbil-train"
+version = "0.1.0"
+description = "Offline training and evaluation for GERBIL recommender systems"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Shard Zhang"},
+]
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.2",
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+    "tqdm>=4.66",
+    "matplotlib>=3.8",
+]
+
+[project.urls]
+Source = "https://github.com/anomalyco/gerbil-train"
+
+[tool.setuptools.packages.find]
+include = ["gerbil_train*"]

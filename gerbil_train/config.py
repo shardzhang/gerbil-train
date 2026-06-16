@@ -10,6 +10,7 @@ class GwENFieldEntry:
     f_type: int
     vocab_size: int
     emb_dim: int
+    enabled: bool = True
 
 
 @dataclass
@@ -35,6 +36,7 @@ class GwENDataConfig:
     num_workers: int = 0
     pin_memory: bool = False
     drop_last: bool = False
+    prefetch_factor: int = 2
 
 
 @dataclass
@@ -76,10 +78,23 @@ class GwENEvalConfig:
 
 
 @dataclass
+class GwENLossConfig:
+    type: str = "ce"           # "ce" (cross-entropy) or "nce" (sampled softmax)
+    num_sampled: int = 100     # negative samples per batch (only for nce)
+
+
+@dataclass
+class GwENCompileConfig:
+    enabled: bool = False
+    mode: str = "default"      # "default" | "reduce-overhead" | "max-autotune"
+
+
+@dataclass
 class GwENTrainConfig:
     seed: int = 42
     device: str = "cpu"
     epochs: int = 1
+    compile: GwENCompileConfig = field(default_factory=GwENCompileConfig)
     data: GwENDataConfig = field(default_factory=GwENDataConfig)
     optimizer: GwENOptimizerConfig = field(default_factory=GwENOptimizerConfig)
     scheduler: GwENSchedulerConfig = field(default_factory=GwENSchedulerConfig)
@@ -87,6 +102,7 @@ class GwENTrainConfig:
     early_stop: GwENEarlyStopConfig = field(default_factory=GwENEarlyStopConfig)
     logging: GwENLoggingConfig = field(default_factory=GwENLoggingConfig)
     evaluation: GwENEvalConfig = field(default_factory=GwENEvalConfig)
+    loss: GwENLossConfig = field(default_factory=GwENLossConfig)
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "GwENTrainConfig":
@@ -101,4 +117,6 @@ class GwENTrainConfig:
             early_stop=GwENEarlyStopConfig(**d.get("early_stop", {})),
             logging=GwENLoggingConfig(**d.get("logging", {})),
             evaluation=GwENEvalConfig(**d.get("evaluation", {})),
+            loss=GwENLossConfig(**d.get("loss", {})),
+            compile=GwENCompileConfig(**d.get("compile")) if isinstance(d.get("compile"), dict) else GwENCompileConfig(enabled=bool(d.get("compile", False))),
         )

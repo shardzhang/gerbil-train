@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from gerbil_train.config import GwENTrainConfig
+from gerbil_train.losses.classification import nce_loss, sampled_softmax_loss
 from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils.plot import save_curve_values
 
@@ -79,6 +81,8 @@ class GwENTrainer(BaseTrainer):
         self.config = config
         self.epochs = int(config.epochs)
         self.topk = int(evaluation_cfg.topk)
+        self.loss_cfg = config.loss
+        self._use_sampled_loss = self.loss_cfg.type in ("nce", "sampled_softmax")
         self.train_loader: DataLoader | None = None
         self.validation_loader: DataLoader | None = None
         self.test_loader: DataLoader | None = None
@@ -120,9 +124,25 @@ class GwENTrainer(BaseTrainer):
         )
         for step, batch in enumerate(train_pbar, start=1):
             batch = self.move_batch_to_device(batch)
+
+            if self._use_sampled_loss:
+                hidden = self.model.forward_hidden(batch["feature_bags"])
+                if self.loss_cfg.type == "nce":
+                    loss = nce_loss(
+                        hidden, self.model.head.weight, batch["targets"].long(),
+                        num_sampled=self.loss_cfg.num_sampled,
+                    )
+                else:
+                    loss = sampled_softmax_loss(
+                        hidden, self.model.head.weight, batch["targets"].long(),
+                        num_sampled=self.loss_cfg.num_sampled,
+                        class_bias=self.model.head.bias,
+                    )
+            else:
+                outputs = self.model(batch["feature_bags"])
+                loss = F.cross_entropy(outputs, batch["targets"].long())
+
             self.zero_grad()
-            outputs = self.forward_step(batch)
-            loss = self.compute_loss(outputs, batch)
             self.backward_step(loss)
             self.clip_gradients()
             self.optimizer_step()
@@ -196,8 +216,8 @@ class GwENTrainer(BaseTrainer):
 
         denominator = max(total_steps, 1)
         return {
-            "test_hit@1": total_top1 / denominator,
-            f"test_hit@{self.topk}": total_topk_hit / denominator,
+            "test_hit@1": round(total_top1 / denominator, 4),
+            f"test_hit@{self.topk}": round(total_topk_hit / denominator, 4),
         }
 
     def forward_step(self, batch: dict[str, Any]) -> torch.Tensor:
@@ -214,6 +234,9 @@ class GwENTrainer(BaseTrainer):
         if monitored is not None:
             self.scheduler_step(monitored)
 
+    def on_epoch_start(self, epoch: int) -> None:
+        self._epoch_start_time = time.time()
+
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         train_loss = metrics.get("train_loss")
         val_hit1 = metrics.get("val_hit@1")
@@ -224,6 +247,7 @@ class GwENTrainer(BaseTrainer):
         if val_hit1 is not None:
             self.val_top1_history.append(float(val_hit1))
 
+        elapsed = time.time() - self._epoch_start_time
         message = (
             f"Epoch {epoch + 1} | loss: {train_loss:.4f}"
             if train_loss is not None
@@ -233,6 +257,7 @@ class GwENTrainer(BaseTrainer):
             message += f" | Hit@1 val: {val_hit1:.4f}"
         if val_hitk is not None:
             message += f" | Hit@{self.topk} val: {val_hitk:.4f}"
+        message += f" | time: {elapsed:.1f}s"
         self.log_message(message)
 
     def save_training_artifacts(self) -> None:

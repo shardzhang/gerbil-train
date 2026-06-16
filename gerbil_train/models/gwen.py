@@ -201,3 +201,51 @@ class GwEN(nn.Module):
         hidden = self.mlp(concat_embedding)
         logits = self.head(hidden)
         return logits
+
+    def forward_hidden(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
+        """Forward pass returning the MLP hidden state before the classification head.
+
+        Useful for sampled softmax / NCE loss during training.
+
+        :param feature_bags: Per-field sparse bags with keys
+            ``indices``, ``offsets``, ``weights``.
+        :return: Hidden state tensor of shape ``[batch_size, final_hidden_dim]``
+        """
+        if not isinstance(feature_bags, Mapping) or not feature_bags:
+            raise ValueError("feature_bags must be a non-empty mapping")
+
+        first_field_name = self.field_names[0]
+        first_offsets = feature_bags[first_field_name]["offsets"]
+        batch_size = int(first_offsets.size(0))
+        device = next(self.parameters()).device
+
+        field_embeddings: dict[str, Tensor] = {}
+        for field_name in self.field_names:
+            if field_name not in feature_bags:
+                raise ValueError(f"Missing feature bag for field {field_name}")
+
+            bag = feature_bags[field_name]
+            if not isinstance(bag, Mapping):
+                raise ValueError(f"feature_bags[{field_name}] must be a mapping")
+
+            field_embeddings[field_name] = self._embed_one_field(
+                field_name, bag["indices"], bag["offsets"], bag["weights"],
+                batch_size=batch_size, device=device,
+            )
+
+        if self.enable_attention:
+            field_scores = torch.cat(
+                [self.field_attention[fn](field_embeddings[fn]) for fn in self.field_names], dim=-1,
+            )
+            field_weights = torch.softmax(field_scores, dim=-1)
+            weighted_embeddings = [
+                field_embeddings[fn] * field_weights[:, i].unsqueeze(-1) for i, fn in enumerate(self.field_names)
+            ]
+            concat_embedding = torch.cat(weighted_embeddings, dim=-1)
+        else:
+            concat_embedding = torch.cat([field_embeddings[fn] for fn in self.field_names], dim=-1)
+
+        if self.input_bn is not None:
+            concat_embedding = self.input_bn(concat_embedding)
+
+        return self.mlp(concat_embedding)

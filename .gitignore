@@ -3,6 +3,13 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Training artifacts
+checkpoints/
+*.pth
+
+# OS
+.DS_Store
+
 # C extensions
 *.so
 
