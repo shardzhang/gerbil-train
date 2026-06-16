@@ -6,6 +6,14 @@ from typing import Any
 
 @dataclass
 class GwENFieldEntry:
+    """One embedding field in the model config.
+
+    :param f_index:  Feature index matching ``nn_pos_map.txt``
+    :param f_type:   0 = continuous (bucketed), 1 = categorical
+    :param vocab_size:  Number of unique tokens / buckets for this field
+    :param emb_dim:  Embedding dimension for this field
+    :param enabled:  Whether to include this field in the model
+    """
     f_index: int
     f_type: int
     vocab_size: int

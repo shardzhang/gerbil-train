@@ -158,7 +158,7 @@ class BaseTrainer:
             print(f"Train samples: {self.total_train_samples} | Steps/epoch: {self.steps_per_epoch}")
 
         try:
-            for epoch in range(epochs):
+            for epoch in range(self.epochs):
                 self.current_epoch = epoch
                 self.on_epoch_start(epoch)
 
@@ -354,48 +354,6 @@ class BaseTrainer:
             self.scheduler.step(metric)
             return
         self.scheduler.step()
-
-    """
-    3.3 validate
-    """
-
-    def validate(self, epoch: int | None = None) -> dict[str, float]:
-        """Run validation.
-
-        :param epoch: Optional zero-based epoch index
-        :return: Validation metrics
-        """
-        # self.on_validation_start(epoch)
-        # val_metrics = self.validate(epoch)
-        # self.on_validation_end(val_metrics)
-        raise NotImplementedError
-
-    def on_validation_start(self, epoch: int) -> None:
-        """Hook called before validation starts.
-
-        This hook is called once per epoch before the validation routine runs,
-        even if the concrete ``validate`` implementation later returns an empty
-        metrics dictionary.
-
-        :param epoch: Zero-based epoch index
-        """
-
-    def on_validation_end(self, metrics: dict[str, float]) -> None:
-        """Hook called after validation ends.
-
-        :param metrics: Validation metrics for the current epoch
-        """
-
-    """
-    evaluate
-    """
-
-    def evaluate(self, *args: Any, **kwargs: Any) -> dict[str, float]:
-        """Run evaluation outside the training loop."""
-        # self.on_evaluate_start hook
-        # self.forward_step
-        # self.on_evaluate_end hook
-        raise NotImplementedError
 
     def on_evaluate_start(self) -> None:
         """Hook called before evaluation starts."""

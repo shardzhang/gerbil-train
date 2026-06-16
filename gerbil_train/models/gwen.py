@@ -132,7 +132,8 @@ class GwENBase(nn.Module):
         hidden = self.encode(feature_bags)
         if self.task == "binary":
             return torch.sigmoid(self.head(hidden)).squeeze(-1)
-        return self.head(hidden)
+        elif self.task == "multiclass":
+            return self.head(hidden)
 
 
 class GwENBinary(GwENBase):

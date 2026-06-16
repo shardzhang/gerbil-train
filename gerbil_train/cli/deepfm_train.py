@@ -17,7 +17,7 @@ from gerbil_train.data.tfrecord_dataset import (
 from gerbil_train.models.deepfm import DeepFM
 from gerbil_train.trainer.deepfm_trainer import DeepFMTrainer
 from gerbil_train.utils.config import load_experiment_config, parse_args
-from gerbil_train.utils.run import create_run_dir, filter_enabled_fields, save_run_configs
+from gerbil_train.utils.run import build_field_entries, create_run_dir, filter_enabled_fields, save_run_configs
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 CONFIG_PATH = PROJECT_ROOT / "configs/experiment/deepfm_ml1m.yaml"
@@ -55,35 +55,9 @@ def build_dataloaders(
 
 
 def build_model_config(raw: dict[str, Any], all_specs: list) -> DeepFMConfig:
-    import yaml
-
     cfg_path = (PROJECT_ROOT / "configs/model/deepfm.yaml").resolve()
-    raw_cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-
-    default_emb = int(raw_cfg.get("embedding", {}).get("default_emb_dim", 16))
-    existing = raw_cfg.get("embedding", {}).get("fields", {}) or {}
-
-    from gerbil_train.config import GwENFieldEntry
-
-    entries: dict[str, GwENFieldEntry] = {}
-    for spec in all_specs:
-        ex = existing.get(spec.name, {})
-        entries[spec.name] = GwENFieldEntry(
-            f_index=spec.index, f_type=spec.field_type, vocab_size=int(spec.dim),
-            emb_dim=int(ex.get("emb_dim", default_emb)),
-            enabled=bool(ex.get("enabled", True)),
-        )
-
-    raw_cfg["embedding"]["fields"] = {
-        n: {"f_index": e.f_index, "f_type": e.f_type, "vocab_size": e.vocab_size, "emb_dim": e.emb_dim, "enabled": e.enabled}
-        for n, e in sorted(entries.items(), key=lambda x: x[1].f_index)
-    }
-    with open(cfg_path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(raw_cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-    print(f"Config written to {cfg_path}")
-
-    enabled_entries = {n: e for n, e in entries.items() if e.enabled}
-    return DeepFMConfig.from_dict(raw, enabled_entries)
+    entries, _ = build_field_entries(cfg_path, all_specs)
+    return DeepFMConfig.from_dict({**raw, "embedding_fields": entries})
 
 
 def main() -> None:

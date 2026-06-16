@@ -3,12 +3,10 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
-import yaml
 import torch
 from torch.utils.data import DataLoader
 
 from gerbil_train.config import (
-    GwENFieldEntry,
     GwENModelConfig,
     GwENTrainConfig,
 )
@@ -19,7 +17,7 @@ from gerbil_train.data.tfrecord_dataset import (
     load_field_stats, load_target_size,
 )
 from gerbil_train.utils.config import load_experiment_config, parse_args
-from gerbil_train.utils.run import create_run_dir, filter_enabled_fields, save_run_configs
+from gerbil_train.utils.run import build_field_entries, create_run_dir, filter_enabled_fields, save_run_configs
 from gerbil_train.models.gwen import GwENMulticlass as GwEN
 from gerbil_train.trainer.gwen_multiclass_trainer import GwENTrainer
 
@@ -88,38 +86,9 @@ def build_dataloaders(cfg: dict[str, Any], all_field_specs: list[FieldSpec]) -> 
 
 
 def build_model_config(raw_model_cfg: dict[str, Any], target_size: int, field_specs: list) -> GwENModelConfig:
-    """Build the GwEN model config with auto-generated fields, then persist to YAML."""
     model_config_path = (PROJECT_ROOT / "configs/model/gwen_multiclass_model.yaml").resolve()
-    raw_cfg = yaml.safe_load(model_config_path.read_text(encoding="utf-8"))
-    default_emb_dim = int(raw_cfg.get("embedding", {}).get("default_emb_dim", 16))
-    existing_fields = raw_cfg.get("embedding", {}).get("fields", {}) or {}
-
-    all_entries: dict[str, GwENFieldEntry] = {}
-    for spec in field_specs:
-        existing = existing_fields.get(spec.name, {})
-        emb_dim = int(existing.get("emb_dim", default_emb_dim))
-        enabled = bool(existing.get("enabled", True))
-        all_entries[spec.name] = GwENFieldEntry(
-            f_index=spec.index,
-            f_type=spec.field_type,
-            vocab_size=int(spec.dim),
-            emb_dim=emb_dim,
-            enabled=enabled,
-        )
-
-    # Write YAML: all fields (including disabled)
-    raw_cfg["target_size"] = int(target_size)
-    raw_cfg["embedding"]["fields"] = {
-        name: {"f_index": e.f_index, "f_type": e.f_type, "vocab_size": e.vocab_size, "emb_dim": e.emb_dim, "enabled": e.enabled}
-        for name, e in sorted(all_entries.items(), key=lambda item: item[1].f_index)
-    }
-    with model_config_path.open("w", encoding="utf-8") as f:
-        yaml.safe_dump(raw_cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-    print(f"Config written to {model_config_path}")
-
-    # Return model config: only enabled fields
-    enabled_entries = {name: e for name, e in all_entries.items() if e.enabled}
-    model_cfg = GwENModelConfig.from_dict(raw_model_cfg, enabled_entries)
+    entries, _ = build_field_entries(model_config_path, field_specs, extra_keys={"target_size": int(target_size)})
+    model_cfg = GwENModelConfig.from_dict(raw_model_cfg, entries)
     model_cfg.target_size = int(target_size)
     return model_cfg
 

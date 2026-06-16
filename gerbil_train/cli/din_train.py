@@ -6,17 +6,16 @@ from typing import Any
 import torch
 from torch.utils.data import DataLoader
 
-from gerbil_train.config import GwENFieldEntry, GwENModelConfig, GwENTrainConfig
+from gerbil_train.config import GwENModelConfig, GwENTrainConfig
 from gerbil_train.data.binary_tfrecord_dataset import BinaryTFRecordDataset
 from gerbil_train.data.tfrecord_dataset import (
     BatchCollator, collect_tfrecord_part_files,
     count_tfrecord_records, load_field_specs,
 )
 from gerbil_train.utils.config import load_experiment_config, parse_args
-from gerbil_train.utils.run import create_run_dir, filter_enabled_fields, save_run_configs
+from gerbil_train.utils.run import build_field_entries, create_run_dir, filter_enabled_fields, save_run_configs
 from gerbil_train.models.din import DIN
 from gerbil_train.trainer.din_trainer import DINTrainer
-import yaml
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 CONFIG_PATH = PROJECT_ROOT / "configs/experiment/din_ml1m.yaml"
@@ -50,30 +49,10 @@ def build_dataloaders(cfg: dict[str, Any], field_names: list[str]) -> tuple[Data
 
 def build_model_config(raw: dict[str, Any], field_specs: list) -> tuple[GwENModelConfig, str]:
     cfg_path = (PROJECT_ROOT / "configs/model/din.yaml").resolve()
-    raw_cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-    default_emb = int(raw_cfg.get("embedding", {}).get("default_emb_dim", 16))
-    existing = raw_cfg.get("embedding", {}).get("fields", {}) or {}
-    behavior_field = str(raw_cfg.get("behavior_field", ""))
-
-    entries: dict[str, GwENFieldEntry] = {}
-    for spec in field_specs:
-        ex = existing.get(spec.name, {})
-        entries[spec.name] = GwENFieldEntry(
-            f_index=spec.index, f_type=spec.field_type, vocab_size=int(spec.dim),
-            emb_dim=int(ex.get("emb_dim", default_emb)),
-            enabled=bool(ex.get("enabled", True)),
-        )
-
-    raw_cfg["embedding"]["fields"] = {
-        n: {"f_index": e.f_index, "f_type": e.f_type, "vocab_size": e.vocab_size, "emb_dim": e.emb_dim, "enabled": e.enabled}
-        for n, e in sorted(entries.items(), key=lambda x: x[1].f_index)
-    }
-    with open(cfg_path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(raw_cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-    print(f"Config written to {cfg_path}")
-
-    enabled_entries = {n: e for n, e in entries.items() if e.enabled}
-    return GwENModelConfig.from_dict(raw, enabled_entries), behavior_field
+    entries, _ = build_field_entries(cfg_path, field_specs)
+    import yaml
+    behavior_field = str(yaml.safe_load(Path(cfg_path).read_text(encoding="utf-8")).get("behavior_field", ""))
+    return GwENModelConfig.from_dict(raw, entries), behavior_field
 
 
 def main() -> None:
