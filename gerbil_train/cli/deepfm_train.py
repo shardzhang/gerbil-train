@@ -8,11 +8,11 @@ from typing import Any
 import torch
 from torch.utils.data import DataLoader
 
-from gerbil_train.config import DeepFMConfig, DeepFMTrainConfig
-from gerbil_train.data.binary_tfrecord_dataset import BinaryTFRecordDataset
+from gerbil_train.config.train_config import DeepFMConfig, DeepFMTrainConfig
+from gerbil_train.data.tfrecord_binary_dataset import BinaryTFRecordDataset
 from gerbil_train.data.tfrecord_dataset import (
     BatchCollator, collect_tfrecord_part_files,
-    count_tfrecord_records, load_field_specs,
+    load_field_specs,
 )
 from gerbil_train.models.deepfm import DeepFM
 from gerbil_train.trainer.deepfm_trainer import DeepFMTrainer
@@ -73,7 +73,7 @@ def main() -> None:
     print(f"Run dir: {run_dir}")
 
     all_specs = load_field_specs(cfg["data"]["paths"]["nn_pos_map_txt"])
-    field_names = [s.name for s in all_specs]
+    field_names = [s.f_name for s in all_specs]
     train_loader, val_loader, test_loader = build_dataloaders(cfg, field_names)
 
     model_cfg = build_model_config(model_raw, all_specs)
@@ -83,9 +83,7 @@ def main() -> None:
         print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
     trainer = DeepFMTrainer(model, train_cfg)
     trainer.set_profile_path(run_dir)
-    root = Path(cfg["data"]["paths"]["tfrecord_root"])
-    train_files = collect_tfrecord_part_files(root / cfg["data"].get("split_subdirs", {}).get("train", "train") / "tfrecord")
-    trainer.set_total_train_samples(count_tfrecord_records(train_files), train_cfg.trainer.batch_size)
+    trainer.setup_total_train_samples(cfg["data"], train_cfg.trainer.batch_size)
     trainer.fit(train_loader, val_loader, test_loader)
 
     if test_loader is not None:

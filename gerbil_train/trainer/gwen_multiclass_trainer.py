@@ -6,114 +6,140 @@ from typing import Any
 
 import torch
 import torch.nn.functional as F
+from matplotlib import pyplot as plt
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
-from gerbil_train.config import GwENTrainConfig
+from gerbil_train.config.train_config import GwENTrainConfig
 from gerbil_train.losses.classification import nce_loss, sampled_softmax_loss
 from gerbil_train.metrics.classification import hit_rate
 from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils import BatchInspector
+from gerbil_train.utils.plot import save_curve_values
 
-__all__ = ["GwENTrainer", "GwENTrainingResult"]
+__all__ = ["GwENMultiTrainer", "GwENMultiTrainingResult"]
 
 
 @dataclass
-class GwENTrainingResult:
+class GwENMultiTrainingResult:
+    """Container for aggregated GwEN training results."""
     train_loss_history: list[float]
     val_top1_history: list[float]
+    val_top10_history: list[float]
     best_top1: float
 
 
-class GwENTrainer(BaseTrainer):
+class GwENMultiTrainer(BaseTrainer):
+    """Trainer for GwEN multi-class recommendation models."""
+    def __init__(self, model: nn.Module, train_cfg: GwENTrainConfig, data_cfg: dict[str, Any] | None = None) -> None:
+        optimizer_cfg = train_cfg.optimizer
+        scheduler_cfg = train_cfg.scheduler
+        checkpoint_cfg = train_cfg.checkpoint
+        early_stop_cfg = train_cfg.early_stop
+        logging_cfg = train_cfg.logging
+        evaluation_cfg = train_cfg.evaluation
 
-    def __init__(self, model: nn.Module, config: GwENTrainConfig) -> None:
-        optimizer_cfg = config.optimizer
-        scheduler_cfg = config.scheduler
-        checkpoint_cfg = config.checkpoint
-        early_stop_cfg = config.early_stop
-        logging_cfg = config.logging
-        evaluation_cfg = config.evaluation
-
-        optimizer_type = str(optimizer_cfg.type or "adam").lower()
-        if optimizer_type == "adam":
-            optimizer = optim.Adam(model.parameters(), lr=float(optimizer_cfg.lr or 1e-3), weight_decay=float(optimizer_cfg.weight_decay or 0.0))
-        else:
-            raise ValueError(f"Unsupported optimizer type: {optimizer_type}")
-
-        scheduler = (
-            torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode=str(scheduler_cfg.mode),
-                factor=float(scheduler_cfg.factor), patience=int(scheduler_cfg.patience),
-            )
-            if scheduler_cfg.enabled else None
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=optimizer_cfg.lr,
+            weight_decay=optimizer_cfg.weight_decay
         )
 
-        device = config.device or ("cuda" if torch.cuda.is_available() else "cpu")
-        if device == "cuda" and not torch.cuda.is_available():
-            device = "cpu"
+        scheduler = None
+        if scheduler_cfg.enabled:
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode=scheduler_cfg.mode,
+                factor=scheduler_cfg.factor,
+                patience=scheduler_cfg.patience,
+            )
 
+        device = train_cfg.device or ("cuda" if torch.cuda.is_available() else "cpu")
         super().__init__(
-            model=model, optimizer=optimizer, scheduler=scheduler, device=device,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            device=device,
             gradient_clip_norm=None,
-            monitor=str(checkpoint_cfg.monitor or "val_top1"),
-            monitor_mode=str(checkpoint_cfg.mode or "max"),
+            monitor=checkpoint_cfg.monitor,
+            monitor_mode=checkpoint_cfg.mode,
             patience=0 if not early_stop_cfg.enabled else int(early_stop_cfg.patience),
             best_checkpoint_path=checkpoint_cfg.path,
-            best_metric=None, wait=0, seed=config.seed,
+            best_metric=None,
+            wait=0,
+            seed=train_cfg.seed,
         )
 
-        self.config = config
-        self.epochs = int(config.epochs)
+        self.config = train_cfg
+        self.epochs = int(train_cfg.epochs)
         self.topk = int(evaluation_cfg.topk)
-        self.loss_cfg = config.loss
+        self.loss_cfg = train_cfg.loss
         self._use_sampled_loss = self.loss_cfg.type in ("nce", "sampled_softmax")
         self.train_loader: DataLoader | None = None
         self.validation_loader: DataLoader | None = None
         self.test_loader: DataLoader | None = None
+        
+        self.plot_path = Path(logging_cfg.plot_path)
+        self.train_loss_history: list[float] = []
         self.val_top1_history: list[float] = []
-        self.model_name = "GwEN"
-        self.metric_name = "Hit@1"
-        self.val_metric_history = self.val_top1_history
-        self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
-        self._single_class_mode = bool(getattr(self.model, "target_size", 0) <= 1)
-        if self._single_class_mode:
-            self.log_message("GwEN single-class smoke mode enabled: only one target class found. Loss is set to 0 and metrics are reported as 1.0 for pipeline validation.")
-
-        if config.inspector.enabled:
+        self.val_topk_history: list[float] = []
+        self.val_loss_history: list[float] = []
+        self.val_top10_history: list[float] = []
+        
+        if train_cfg.checkpoint.path is not None:
+            self._profile_path = Path(train_cfg.checkpoint.path).parent / "profile.txt"
+        
+        if data_cfg is not None:
+            self.setup_total_train_samples(data_cfg, train_cfg.data.batch_size)
+        
+        if train_cfg.inspector.enabled:
             self.set_batch_inspector(BatchInspector(
-                log_first=config.inspector.log_first,
-                log_every=config.inspector.log_every,
+                log_first=train_cfg.inspector.log_first,
+                log_every=train_cfg.inspector.log_every,
             ))
 
-    def _build_result(self) -> GwENTrainingResult:
-        return GwENTrainingResult(
+
+    def fit(self, train_loader: DataLoader, validation_loader: DataLoader | None, test_loader: DataLoader | None = None) -> GwENMultiTrainingResult:
+        """Fit the model using the provided data loaders and return training results."""
+        self.train_loader = train_loader
+        self.validation_loader = validation_loader
+        self.test_loader = test_loader
+        self.train_loss_history.clear()
+        self.val_top1_history.clear()
+        self.val_top10_history.clear()
+
+        super().fit_epochs()
+        return GwENMultiTrainingResult(
             train_loss_history=list(self.train_loss_history),
             val_top1_history=list(self.val_top1_history),
-            best_top1=self.best_metric or 0.0,
+            val_top10_history=list(self.val_top10_history),
+            best_top1=self.best_metric,
         )
 
+
     def train_one_epoch(self, epoch: int) -> dict[str, float]:
+        """ Train the model for one epoch and return average training loss."""
         if self.train_loader is None:
             return {"loss": 0.0}
+
         self.model.train()
-        total_loss = 0.0
-        total_steps = 0
-        train_pbar = tqdm(self.train_loader, total=self.steps_per_epoch or None, desc=f"Epoch {epoch + 1}/{self.max_epochs} [train]", leave=False)
+        total_loss: float = 0.0
+        total_steps: int = 0
+        train_pbar = tqdm(self.train_loader, desc=f"Epoch {epoch + 1}/{self.epochs} [train]", leave=False,)
         for step, batch in enumerate(train_pbar, start=1):
             batch = self.move_batch_to_device(batch)
-            self.on_train_step_start(batch)
             self.inspect_batch(step, batch)
             if self._use_sampled_loss:
                 hidden = self.model.encode(batch["feature_bags"])
                 if self.loss_cfg.type == "nce":
-                    loss = nce_loss(hidden, self.model.head.weight, batch["targets"].long(), num_sampled=self.loss_cfg.num_sampled, class_bias=self.model.head.bias)
+                    loss = nce_loss(hidden, self.model.head.weight, batch["targets"].long(), num_sampled=self.loss_cfg.num_sampled)
                 else:
-                    loss = sampled_softmax_loss(hidden, self.model.head.weight, batch["targets"].long(), num_sampled=self.loss_cfg.num_sampled, class_bias=self.model.head.bias)
+                    loss = sampled_softmax_loss(hidden,  self.model.head.weight,  batch["targets"].long(), num_sampled=self.loss_cfg.num_sampled, class_bias=self.model.head.bias)
             else:
                 outputs = self.model(batch["feature_bags"])
                 loss = F.cross_entropy(outputs, batch["targets"].long())
+
             self.zero_grad()
             self.backward_step(loss)
             self.clip_gradients()
@@ -125,64 +151,141 @@ class GwENTrainer(BaseTrainer):
         avg_loss = total_loss / max(total_steps, 1)
         return {"loss": avg_loss}
 
-    def validate(self, epoch: int | None = None) -> dict[str, float]:
-        if self.validation_loader is None:
-            return {}
-        self.model.eval()
-        total_hit1 = 0.0
-        total_hitk = 0.0
-        total_steps = 0
-        with torch.no_grad():
-            for batch in self.validation_loader:
-                batch = self.move_batch_to_device(batch)
-                logits = self.model(batch["feature_bags"])
-                targets = batch["targets"].long()
-                total_hit1 += hit_rate(logits, targets, k=1)
-                total_hitk += hit_rate(logits, targets, k=self.topk)
-                total_steps += 1
-        d = max(total_steps, 1)
-        return {f"hit@{1}": total_hit1 / d, f"hit@{self.topk}": total_hitk / d}
-
-    def evaluate(self, dataloader: DataLoader | None = None) -> dict[str, float]:
-        if dataloader is None:
-            return {}
-        self.model.eval()
-        total_hit1 = 0.0
-        total_hitk = 0.0
-        total_steps = 0
-        with torch.no_grad():
-            for batch in dataloader:
-                batch = self.move_batch_to_device(batch)
-                logits = self.model(batch["feature_bags"])
-                targets = batch["targets"].long()
-                total_hit1 += hit_rate(logits, targets, k=1)
-                total_hitk += hit_rate(logits, targets, k=self.topk)
-                total_steps += 1
-        d = max(total_steps, 1)
-        return {"test_hit@1": total_hit1 / d, f"test_hit@{self.topk}": total_hitk / d}
-
-    def forward_step(self, batch: dict[str, Any]) -> torch.Tensor:
-        return self.model(batch["feature_bags"])
-
-    def compute_loss(self, outputs: torch.Tensor, batch: dict[str, Any]) -> torch.Tensor:
-        return F.cross_entropy(outputs, batch["targets"].long())
-
-    def on_validation_end(self, metrics: dict[str, float]) -> None:
-        v = metrics.get("hit@1")
-        if v is not None:
-            self.scheduler_step(v)
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
+        """Hook called after each epoch ends to log metrics."""
         train_loss = metrics.get("train_loss")
+        val_loss = metrics.get("val_loss")
         val_hit1 = metrics.get("val_hit@1")
         val_hitk = metrics.get(f"val_hit@{self.topk}")
+
         if train_loss is not None:
             self.train_loss_history.append(float(train_loss))
+        if val_loss is not None:
+            self.val_loss_history.append(float(val_loss))
         if val_hit1 is not None:
             self.val_top1_history.append(float(val_hit1))
+        if val_hitk is not None:
+            self.val_topk_history.append(float(val_hitk))
+
         message = f"Epoch {epoch + 1} | loss: {train_loss:.4f}" if train_loss is not None else f"Epoch {epoch + 1}"
+        if val_loss is not None:
+            message += f" | val_loss: {val_loss:.4f}"
         if val_hit1 is not None:
             message += f" | Hit@1 val: {val_hit1:.4f}"
         if val_hitk is not None:
             message += f" | Hit@{self.topk} val: {val_hitk:.4f}"
         self.finalize_epoch(epoch, metrics, message)
+
+
+    def validate(self, epoch: int | None = None) -> dict[str, float]:
+        """ Evaluate the model on the validation set and return metrics. """
+        if self.validation_loader is None:
+            return {}
+
+        self.model.eval()
+        total_top1 = 0.0
+        total_topk_hit = 0.0
+        total_loss = 0.0
+        total_steps = 0
+        with torch.no_grad():
+            for batch in self.validation_loader:
+                batch = self.move_batch_to_device(batch)
+                logits = self.forward_step(batch)
+                targets = batch["targets"].long()
+                total_loss += self.compute_loss(logits, targets).item()
+                total_top1 += hit_rate(logits, targets, k=1)
+                total_topk_hit += hit_rate(logits, targets, self.topk)
+                total_steps += 1
+
+        denominator = max(total_steps, 1)
+        return {
+            "loss": total_loss / denominator,
+            "hit@1": total_top1 / denominator,
+            f"hit@{self.topk}": total_topk_hit / denominator,
+        }
+
+
+    def evaluate(self, dataloader: DataLoader | None = None) -> dict[str, float]:
+        """ Evaluate the model on the test set and return metrics. """
+        if dataloader is None:
+            return {}
+
+        self.model.eval()
+        total_top1_hit = 0.0
+        total_topk_hit = 0.0
+        total_steps = 0
+        with torch.no_grad():
+            for batch in dataloader:
+                batch = self.move_batch_to_device(batch)
+                logits = self.forward_step(batch)
+                targets = batch["targets"].long()
+                total_top1_hit += hit_rate(logits, targets, k=1)
+                total_topk_hit += hit_rate(logits, targets, self.topk)
+                total_steps += 1
+        denominator = max(total_steps, 1)
+        return {
+            "test_hit@1": round(total_top1_hit / denominator, 4),
+            f"test_hit@{self.topk}": round(total_topk_hit / denominator, 4),
+        }
+
+
+    def forward_step(self, batch: dict[str, Any]) -> torch.Tensor:
+        """ Forward pass to compute model outputs for a batch. """
+        return self.model(batch["feature_bags"])
+
+
+    def compute_loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """ Compute the loss for a batch of outputs and targets. Uses cross-entropy for multi-class classification. """
+
+        if logits.size(1) <= 1:
+            return logits.sum() * 0.0
+        return F.cross_entropy(logits, targets)
+
+
+    def on_validation_end(self, metrics: dict[str, float]) -> None:
+        """ Hook called after validation ends to step the scheduler based on monitored metric. """
+        monitored = metrics.get("hit@1")
+        if monitored is not None:
+            self.scheduler_step(monitored)
+
+
+    def save_training_artifacts(self) -> None:
+        """ Save training artifacts such as loss and metric curves after training completes. """
+        if self.plot_path is None:
+            return
+        save_curve_values(self.train_loss_history, self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt"),)
+        save_curve_values(self.val_top1_history, self.plot_path.with_name(f"{self.plot_path.stem}_metric.txt"))
+        self.plot_loss_curve()
+        self.plot_metric_curve()
+
+
+    def plot_loss_curve(self) -> None:
+        if self.plot_path is None or not self.train_loss_history:
+            return
+        from matplotlib import pyplot as plt
+        plt.figure(figsize=(8, 4))
+        epochs = range(1, len(self.train_loss_history) + 1)
+        plt.plot(epochs, self.train_loss_history, label="train_loss")
+        if self.val_loss_history:
+            plt.plot(epochs, self.val_loss_history, label="val_loss")
+        plt.xlabel("Epoch"); plt.ylabel("Loss"); plt.title("GwEN Training & Validation Loss")
+        plt.grid(True, linestyle="--", alpha=0.3); plt.legend(); plt.tight_layout()
+        self.plot_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_loss.png"))
+        plt.close()
+
+    def plot_metric_curve(self) -> None:
+        if self.plot_path is None or not self.val_top1_history:
+            return
+        from matplotlib import pyplot as plt
+        plt.figure(figsize=(8, 4))
+        epochs = range(1, len(self.val_top1_history) + 1)
+        plt.plot(epochs, self.val_top1_history, label=f"Hit@{1}")
+        if self.val_topk_history:
+            plt.plot(epochs, self.val_topk_history, label=f"Hit@{self.topk}")
+        plt.xlabel("Epoch"); plt.ylabel("Hit Rate"); plt.title("GwEN Validation Hit Rate")
+        plt.grid(True, linestyle="--", alpha=0.3); plt.legend(); plt.tight_layout()
+        self.plot_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_metric.png"))
+        plt.close()

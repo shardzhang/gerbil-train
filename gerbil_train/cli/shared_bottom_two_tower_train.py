@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader
 
-from gerbil_train.config import SBTTConfig
+from gerbil_train.config.train_config import SBTTConfig
 from gerbil_train.data.shared_bottom_two_tower_dataset import (
     ExplicitDataset,
     ImplicitDataset,

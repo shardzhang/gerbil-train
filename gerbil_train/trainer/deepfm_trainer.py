@@ -7,7 +7,7 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 
-from gerbil_train.config import DeepFMTrainConfig
+from gerbil_train.config.train_config import GwENTrainConfig as DeepFMTrainConfig
 from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils import BatchInspector
 
@@ -68,9 +68,13 @@ class DeepFMTrainer(BaseTrainer):
                 log_every=config.inspector.log_every,
             ))
 
-    def _build_result(self) -> DeepFMTrainingResult:
+    def build_result(self) -> DeepFMTrainingResult:
         return DeepFMTrainingResult(
             train_loss_history=list(self.train_loss_history),
             val_auc_history=list(self.val_metric_history),
             best_auc=self.best_metric or 0.0,
         )
+
+    def compute_loss(self, outputs: torch.Tensor, batch: Any) -> torch.Tensor:
+        import torch.nn.functional as F
+        return F.binary_cross_entropy(outputs, batch["targets"].float())

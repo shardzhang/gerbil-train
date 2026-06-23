@@ -220,9 +220,9 @@ for i in range(batch_size):
 
 | 维度 | GwEN | DIN |
 |------|-------|-----|
-| 行为序列 | `EmbeddingBag` 直接求和 | `nn.Embedding` + attention pooling |
+| 行为序列 | `EmbeddingBag` 直接求和 | `nn.Embedding` + attention pooling（支持多序列） |
 | 输出 | `all_emb → MLP` | `concat(all_emb + interest_emb) → MLP` |
-| 核心参数 | 无 | `behavior_field` 指定序列字段名 |
+| 核心参数 | 无 | `behavior_fields` 指定序列字段列表 |
 | 计算量 | O(B×F) | O(B×F + total_items×d) |
 
 ## 配置文件
@@ -230,10 +230,12 @@ for i in range(batch_size):
 ```yaml
 # configs/model/din.yaml
 task: binary
-behavior_field: user_history     # 行为序列字段名
+behavior_fields:
+  - click_history
+  - view_history
 
 embedding:
-  default_emb_dim: 16
+  default_emb_size: 16
   fields: {}
 
 mlp:
@@ -252,4 +254,4 @@ python3 -m gerbil_train.cli.din_train --config configs/experiment/din_ml1m.yaml
 
 ## 前提条件
 
-数据中必须包含 `behavior_field` 指定的字段（默认 `user_history`），且该字段为多值格式（行为序列）。如果数据中没有该字段，模型会报错。
+数据中必须包含 `behavior_fields` 中指定的所有字段，且这些字段为多值格式（行为序列）。每个字段独立做 attention 后拼接。如果数据中缺少任一字段，模型会报错。

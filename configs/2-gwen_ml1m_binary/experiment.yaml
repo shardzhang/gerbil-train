@@ -1,0 +1,6 @@
+name: gwen_ml1m_binary
+description: GwEN rank model on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/2-gwen_ml1m_binary/model.yaml
+train: configs/2-gwen_ml1m_binary/trainer.yaml

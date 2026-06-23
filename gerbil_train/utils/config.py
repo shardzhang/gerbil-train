@@ -37,18 +37,27 @@ def load_experiment_config(experiment_path: str | Path) -> dict[str, Any]:
     :param experiment_path: Path to the experiment YAML file
     :return: Dictionary containing the resolved config sections
     """
-    exp = load_yaml(experiment_path)
-    data = load_yaml(exp["data"])
-    model = load_yaml(exp["model"])
-    train = load_yaml(exp["train"])
+    experiment_path = Path(experiment_path)
+    experiment = load_yaml(experiment_path)
+
+    project_root = experiment_path.parent.parent
+    if project_root.name == "configs":
+        project_root = project_root.parent
+
+    def _resolve(p: str) -> Path:
+        return (project_root / p).resolve()
+
+    data = load_yaml(_resolve(experiment["data"]))
+    model = load_yaml(_resolve(experiment["model"]))
+    train = load_yaml(_resolve(experiment["train"]))
     
     config: dict[str, Any] = {
-        "experiment": exp,
+        "experiment": experiment,
         "data": data,
         "model": model,
         "train": train,
     }
     for key in ("eval", "export"):
-        if key in exp:
-            config[key] = load_yaml(exp[key])
+        if key in experiment:
+            config[key] = load_yaml(_resolve(experiment[key]))
     return config

@@ -29,7 +29,6 @@ def save_curve_values(values: Sequence[float], path: str | Path) -> None:
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-
     with path.open("w", encoding="utf-8") as f:
         for epoch_index, value in enumerate(values, start=1):
             f.write(f"{epoch_index}\t{value:.10f}\n")
@@ -46,7 +45,6 @@ def load_curve_values(path: str | Path) -> list[float]:
     """
     path = Path(path)
     values: list[float] = []
-
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             stripped = line.strip()
@@ -57,7 +55,6 @@ def load_curve_values(path: str | Path) -> list[float]:
                 values.append(float(value))
             else:
                 values.append(float(stripped))
-
     return values
 
 

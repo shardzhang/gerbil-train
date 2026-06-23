@@ -13,13 +13,20 @@ compile:
   enabled: true
   mode: default
 
+loss:
+  type: sampled_softmax
+  num_sampled: 500
+
 optimizer:
   type: adam
   lr: 0.001
-  weight_decay: 0.0
+  weight_decay: 0.00001
 
 scheduler:
-  enabled: false
+  enabled: true
+  mode: max
+  factor: 0.5
+  patience: 2
 
 checkpoint:
   monitor: hit@1
@@ -31,11 +38,7 @@ early_stop:
 evaluation:
   topk: 10
 
-loss:
-  type: ce                  # ce | nce | sampled_softmax
-  num_sampled: 100          # only used for nce / sampled_softmax
-
 inspector:
-  enabled: true
+  enabled: false
   log_first: 3
   log_every: 0

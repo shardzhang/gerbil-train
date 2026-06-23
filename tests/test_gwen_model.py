@@ -4,8 +4,8 @@ import unittest
 
 import torch
 
-from gerbil_train.config import GwENFieldEntry, GwENModelConfig
-from gerbil_train.models.gwen_multiclass_model import GwEN
+from gerbil_train.config.train_config import FieldEntry, GwENModelConfig
+from gerbil_train.models.gwen import GwENMulticlassModel as GwEN
 
 
 class GwENModelTests(unittest.TestCase):
@@ -13,15 +13,15 @@ class GwENModelTests(unittest.TestCase):
 
     def _make_config(self) -> GwENModelConfig:
         fields = {
-            "user_age": GwENFieldEntry(f_index=2, f_type=1, vocab_size=8, emb_dim=4),
-            "user_gender": GwENFieldEntry(f_index=3, f_type=1, vocab_size=3, emb_dim=2),
-            "movie_genres": GwENFieldEntry(f_index=103, f_type=1, vocab_size=19, emb_dim=4),
+            "user_age": FieldEntry(f_index=2, f_type=1, vocab_size=8, emb_dim=4),
+            "user_gender": FieldEntry(f_index=3, f_type=1, vocab_size=3, emb_dim=2),
+            "movie_genres": FieldEntry(f_index=103, f_type=1, vocab_size=19, emb_dim=4),
         }
         return GwENModelConfig(
             target_size=10,
             embedding_fields=fields,
             mlp={"hidden_dims": [8, 4], "activation": "relu", "dropout": 0.0, "batch_norm": False},
-            attention={"enabled": False},
+            field_attention={"enabled": False},
         )
 
     def _make_batch(self, batch_size: int = 2) -> dict:
@@ -83,7 +83,7 @@ class GwENModelTests(unittest.TestCase):
     def test_forward_with_attention(self) -> None:
         """Verify forward pass works with attention enabled."""
         config = self._make_config()
-        config.attention = {"enabled": True}
+        config.field_attention = {"enabled": True}
         model = GwEN(config)
         batch = self._make_batch(batch_size=2)
         logits = model(batch["feature_bags"])

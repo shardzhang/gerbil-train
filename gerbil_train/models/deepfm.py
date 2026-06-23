@@ -7,9 +7,9 @@ from typing import Mapping
 import torch
 from torch import Tensor, nn
 
-from gerbil_train.config import DeepFMConfig
+from gerbil_train.config.model_config import GwENModelConfig as DeepFMConfig
 from gerbil_train.utils.embedding import embed_one_field
-from gerbil_train.utils.nn import build_mlp
+from gerbil_train.utils.nn import FullyConnectedLayer
 
 __all__ = ["DeepFM"]
 
@@ -49,9 +49,10 @@ class DeepFM(nn.Module):
         deep_cfg = config.deep
         self.deep_hidden_dims = list(deep_cfg.get("hidden_dims", [128, 64]))
         self.embedding_sum_dim = len(self.field_names) * self.embedding_dim
-        self.deep_network = build_mlp(
+        self.deep_network = FullyConnectedLayer(
             input_dim=self.embedding_sum_dim,
             hidden_dims=self.deep_hidden_dims,
+            bias=[True] * len(self.deep_hidden_dims),
             batch_norm=bool(deep_cfg.get("batch_norm", False)),
             activation=str(deep_cfg.get("activation", "relu")),
             dropout=float(deep_cfg.get("dropout", 0.0)),

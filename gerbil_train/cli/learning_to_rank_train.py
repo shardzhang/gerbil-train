@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import torch
-from gerbil_train.config import DeepFMTrainConfig, LTRConfig
+from gerbil_train.config.train_config import DeepFMTrainConfig, LTRConfig
 from gerbil_train.data.learning_to_rank_dataset import build_ltr_dataloaders
 from gerbil_train.models.learning_to_rank import DeepRankNet
 from gerbil_train.trainer.learning_to_rank_trainer import LearningToRankTrainer

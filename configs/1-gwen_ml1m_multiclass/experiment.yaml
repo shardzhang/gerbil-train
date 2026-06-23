@@ -1,0 +1,6 @@
+name: gwen_ml1m_multiclass
+description: GwEN multi-class classification on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_multiclass_tfrecord.yaml
+model: configs/1-gwen_ml1m_multiclass/model.yaml
+train: configs/1-gwen_ml1m_multiclass/trainer.yaml

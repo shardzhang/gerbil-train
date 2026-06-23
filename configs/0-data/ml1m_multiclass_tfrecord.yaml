@@ -1,0 +1,14 @@
+name: ml1m_multiclass_tfrecord
+description: MovieLens 1M pre-split TFRecord samples for GwEN multi-class training.
+
+format: tfrecord
+
+paths:
+  tfrecord_root: /Users/dazhang/PycharmProject/data/ml-1m/train_sample/multi/20260623
+  nn_pos_map_txt: /Users/dazhang/PycharmProject/data/ml-1m/train_sample/multi/20260623/pos_map.txt
+  nn_pos_map_json: /Users/dazhang/PycharmProject/data/ml-1m/train_sample/multi/20260623/pos_map.json
+
+split_subdirs:
+  train: train
+  val: val
+  test: test

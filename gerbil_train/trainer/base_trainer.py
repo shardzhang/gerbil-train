@@ -10,7 +10,8 @@ import torch
 from torch import nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
-
+from torch.utils.data import DataLoader
+from gerbil_train.data.tfrecord_dataset import collect_tfrecord_part_files, count_tfrecord_records
 from gerbil_train.metrics.classification import auc
 from gerbil_train.utils.seed import set_seed
 
@@ -59,15 +60,12 @@ class BaseTrainer:
         self.monitor: str = monitor
         self.monitor_mode: str = monitor_mode
         self.patience: int = patience
-        self.best_checkpoint_path: Path | None = (
-            Path(best_checkpoint_path) if best_checkpoint_path is not None else None
-        )
+        self.best_checkpoint_path: Path | None = Path(best_checkpoint_path)
         self.best_metric: float | None = best_metric
         self.wait: int = wait
         self.seed: int | None = seed
 
         self.current_epoch: int = 0
-        self.max_epochs: int = 0
         self.epochs: int = 0
         self.global_step: int = 0
         self.writer = None
@@ -77,6 +75,7 @@ class BaseTrainer:
         self._profile_path: Path | None = None
         self._epoch_start_time: float = 0.0
         self.plot_path: Path | None = None
+
         self.train_loss_history: list[float] = []
         self.val_metric_history: list[float] = []
         self.model_name: str = "Model"
@@ -84,42 +83,34 @@ class BaseTrainer:
         self._metric_key: str = "auc"
         self._compute_metric = staticmethod(auc)
 
-    def _on_fit_start(self, train_loader: Any, val_loader: Any, test_loader: Any) -> None:
-        self.train_loader = train_loader
-        self.validation_loader = val_loader
-        self.test_loader = test_loader
-        self.train_loss_history.clear()
-        self.val_metric_history.clear()
-
-    def _build_result(self) -> Any:
-        return None
-
-    def fit(self, train_loader: Any, val_loader: Any = None, test_loader: Any = None) -> Any:
-        self._on_fit_start(train_loader, val_loader, test_loader)
-        self.max_epochs = self.epochs
-        self._fit_epochs()
-        return self._build_result()
-
     def set_batch_inspector(self, inspector: Any) -> None:
+        """Attach a batch inspector for logging training batches."""
         self.batch_inspector = inspector
 
-    def set_total_train_samples(self, total: int, batch_size: int) -> None:
-        """Set total training samples and compute steps per epoch."""
-        self.total_train_samples = total
-        self.steps_per_epoch = (total + batch_size - 1) // batch_size
+
+    def setup_total_train_samples(self, data_cfg: dict, batch_size: int, split: str = "train") -> None:
+        """Compute total training samples from data config and set on trainer."""
+        root_dir = Path(data_cfg["paths"]["tfrecord_root"]) / data_cfg.get("split_subdirs", {}).get(split, split) / "tfrecord"
+        train_files = collect_tfrecord_part_files(root_dir)
+        self.total_train_samples = count_tfrecord_records(train_files)
+        self.steps_per_epoch = (self.total_train_samples + batch_size - 1) // batch_size
+
 
     def inspect_batch(self, step: int, batch: Any) -> None:
         """Inspect a training batch if a batch inspector is attached.
-
         Call this inside ``train_one_epoch`` at the desired step.
         """
         if self.batch_inspector is not None:
             self.batch_inspector(step, batch, self.current_epoch)
 
+
     def set_profile_path(self, run_dir: str | Path) -> None:
+        """Set the path for saving training profile logs."""
         self._profile_path = Path(run_dir) / "profile.txt"
 
+
     def finalize_epoch(self, epoch: int, metrics: dict[str, float], message: str) -> None:
+        """Finalize epoch by logging a message with elapsed time and steps per second."""
         elapsed = time.time() - self._epoch_start_time
         steps_per_sec = self.steps_per_epoch / elapsed if elapsed > 0 and self.steps_per_epoch > 0 else 0.0
         message += f" | steps: {self.steps_per_epoch} | steps/s: {steps_per_sec:.2f} | time: {elapsed:.1f}s"
@@ -128,6 +119,61 @@ class BaseTrainer:
             self._profile_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._profile_path, "a") as f:
                 f.write(message + "\n")
+
+
+    def on_fit_start(self, train_loader: Any, val_loader: Any, test_loader: Any) -> None:
+        """Hook called at the start of fit() with the prepared dataloaders."""
+        self.train_loader = train_loader
+        self.validation_loader = val_loader
+        self.test_loader = test_loader
+        self.train_loss_history.clear()
+        self.val_metric_history.clear()
+
+
+    def build_result(self) -> Any:
+        """Construct a training result object from the collected training state."""
+        raise NotImplementedError
+
+
+    def fit(self, train_loader: Any, val_loader: Any = None, test_loader: Any = None) -> Any:
+        """Run the full training lifecycle with the given dataloaders."""
+        self.on_fit_start(train_loader, val_loader, test_loader)
+        self.fit_epochs()
+        return self.build_result()
+    
+
+    def fit_epochs(self) -> None:
+        """Run the full training lifecycle."""
+        self.setup()
+        self.on_train_start()
+
+        if self.total_train_samples > 0:
+            print(f"Train samples: {self.total_train_samples} | Steps/epoch: {self.steps_per_epoch}")
+
+        try:
+            for epoch in range(self.epochs):
+                self.current_epoch = epoch
+                self.on_epoch_start(epoch)
+
+                train_metrics = self.train_one_epoch(epoch)
+                metrics = {
+                    f"train_{key}": value 
+                    for key, value in train_metrics.items()
+                }
+
+                val_metrics = self.validate(epoch)
+                metrics.update(
+                    {f"val_{key}": value 
+                    for key, value in val_metrics.items()}
+                )
+                self.on_validation_end(metrics)
+                self.on_epoch_end(epoch, metrics)
+                if self.update_best_state(metrics):
+                    break
+        finally:
+            self.on_train_end()
+            self.cleanup()
+
 
     def setup(self) -> None:
         """Prepare trainer state before training starts.
@@ -143,54 +189,52 @@ class BaseTrainer:
         if self.best_checkpoint_path is not None:
             self.best_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
+
     def cleanup(self) -> None:
         """Release resources after training completes.
 
         Subclasses can override this to close writers, files, or other handles.
         """
+        pass
 
-    def _fit_epochs(self) -> None:
-        """Run the full training lifecycle."""
-        self.setup()
-        self.on_train_start()
-
-        if self.total_train_samples > 0:
-            print(f"Train samples: {self.total_train_samples} | Steps/epoch: {self.steps_per_epoch}")
-
-        try:
-            for epoch in range(self.epochs):
-                self.current_epoch = epoch
-                self.on_epoch_start(epoch)
-
-                train_metrics = self.train_one_epoch(epoch)
-                metrics = {
-                    f"train_{key}": value for key, value in train_metrics.items()
-                }
-
-                val_metrics = self.validate(epoch)
-                metrics.update(
-                    {f"val_{key}": value for key, value in val_metrics.items()}
-                )
-
-                self.on_validation_end(metrics)
-                self.on_epoch_end(epoch, metrics)
-
-                if self.update_best_state(metrics):
-                    break
-        finally:
-            self.on_train_end()
-            self.cleanup()
-
-    """
-    2. on-train-start hook
-    """
 
     def on_train_start(self) -> None:
         """Hook called before the first training epoch."""
+        pass
 
-    """
-    4. on-train-end hook
-    """
+
+    def on_epoch_start(self, epoch: int) -> None:
+        """Hook called before each epoch starts.
+
+        :param epoch: Zero-based epoch index
+        """
+        self._epoch_start_time = time.time()
+
+
+    def train_one_epoch(self, epoch: int) -> dict[str, float]:
+        """ Run one epoch of training and return aggregated metrics."""
+        raise NotImplementedError
+
+
+    def validate(self, epoch: int | None = None) -> dict[str, float]:
+        """Run validation and return aggregated metrics."""
+        raise NotImplementedError
+
+
+    def on_validation_end(self, metrics: dict[str, float]) -> None:
+        """ Hook called after validation ends."""
+        v = metrics.get(self._metric_key)
+        if v is not None:
+            self.scheduler_step(v)
+
+
+    def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
+        """ Hook called after each epoch ends.
+        :param epoch: Zero-based epoch index
+        :param metrics: Aggregated metrics for the current epoch
+        """
+        raise NotImplementedError
+
 
     def on_train_end(self) -> None:
         """Hook called once after the training loop ends.
@@ -200,125 +244,49 @@ class BaseTrainer:
         """
         self.save_training_artifacts()
 
-    """
-    3.1 on-epoch-start hook
-    """
 
-    def on_epoch_start(self, epoch: int) -> None:
-        """Hook called before each epoch starts.
-
-        :param epoch: Zero-based epoch index
-        """
-        self._epoch_start_time = time.time()
-
-    def train_one_epoch(self, epoch: int) -> dict[str, float]:
-        if self.train_loader is None:
-            return {"loss": 0.0}
-        self.model.train()
-        total_loss = 0.0
-        from tqdm.auto import tqdm
-        pbar = tqdm(self.train_loader, total=self.steps_per_epoch or None, desc=f"Epoch {epoch + 1}/{self.max_epochs} [train]", leave=False)
-        for step, batch in enumerate(pbar, start=1):
-            batch = self.move_batch_to_device(batch)
-            self.on_train_step_start(batch)
-            self.inspect_batch(step, batch)
-            self.zero_grad()
-            outputs = self.forward_step(batch)
-            loss = self.compute_loss(outputs, batch)
-            self.backward_step(loss)
-            self.clip_gradients()
-            self.optimizer_step()
-            total_loss += float(loss.item())
-            pbar.set_postfix(loss=f"{total_loss / step:.4f}")
-            self.global_step += 1
-        return {"loss": total_loss / max(step, 1)}
-
-    def validate(self, epoch: int | None = None) -> dict[str, float]:
-        if self.validation_loader is None:
-            return {}
-        self.model.eval()
-        total_metric = 0.0
-        total_loss = 0.0
-        total_steps = 0
-        import torch.nn.functional as F
-        with torch.no_grad():
-            for batch in self.validation_loader:
-                batch = self.move_batch_to_device(batch)
-                outputs = self.forward_step(batch)
-                labels = batch["targets"].float()
-                total_loss += float(F.binary_cross_entropy(outputs, labels).item())
-                total_metric += self._compute_metric(labels, outputs)
-                total_steps += 1
-        d = max(total_steps, 1)
-        return {"loss": total_loss / d, self._metric_key: total_metric / d}
+    def save_training_artifacts(self) -> None:
+        pass
 
     def evaluate(self, dataloader: DataLoader | None = None) -> dict[str, float]:
-        if dataloader is None:
-            return {}
-        self.model.eval()
-        total_metric = 0.0
-        total_steps = 0
-        with torch.no_grad():
-            for batch in dataloader:
-                batch = self.move_batch_to_device(batch)
-                outputs = self.forward_step(batch)
-                labels = batch["targets"].float()
-                total_metric += self._compute_metric(labels, outputs)
-                total_steps += 1
-        return {f"test_{self._metric_key}": total_metric / max(total_steps, 1)}
+        """ Run evaluation on the given dataloader and return metrics."""
+        raise NotImplementedError
 
-    def on_validation_end(self, metrics: dict[str, float]) -> None:
-        v = metrics.get(self._metric_key)
-        if v is not None:
-            self.scheduler_step(v)
-
-    def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
-        train_loss = metrics.get("train_loss")
-        val_metric = metrics.get(f"val_{self._metric_key}")
-        if train_loss is not None:
-            self.train_loss_history.append(float(train_loss))
-        if val_metric is not None:
-            self.val_metric_history.append(float(val_metric))
-        msg = f"Epoch {epoch + 1} | loss: {train_loss:.4f}" if train_loss is not None else f"Epoch {epoch + 1}"
-        if val_metric is not None:
-            msg += f" | {self.metric_name} val: {val_metric:.4f}"
-        self.finalize_epoch(epoch, metrics, msg)
 
     def on_train_step_start(self, batch: Any) -> None:
+        """Hook called before each training step."""
         pass
+
 
     def on_train_step_end(self, metrics: dict[str, float]) -> None:
+        """Hook called after each training step."""
         pass
 
+
     def zero_grad(self) -> None:
+        """Reset gradients for all model parameters."""
         self.optimizer.zero_grad(set_to_none=True)
 
+
     def forward_step(self, batch: Any) -> Any:
-        return self.model(batch["feature_bags"])
+        """Run a forward pass of the model for one training step."""
+        raise NotImplementedError
 
-    def compute_loss(self, outputs: torch.Tensor, batch: Any) -> torch.Tensor:
-        import torch.nn.functional as F
-        return F.binary_cross_entropy(outputs, batch["targets"].float())
 
-    """
-    compute metrics
-    """
+    def compute_loss(self, logits: torch.Tensor, targets: Any) -> torch.Tensor:
+        """Compute the loss value for a training step."""
+        raise NotImplementedError
+
 
     def compute_metrics(self, outputs: torch.Tensor, batch: Any) -> dict[str, float]:
         """Compute metrics from model outputs and label tensors."""
         raise NotImplementedError
 
-    """
-    backward step
-    """
 
     def backward_step(self, loss: torch.Tensor) -> None:
         """Run backpropagation for one loss value."""
         loss.backward()
 
-    """
-    clip gradients
-    """
 
     def clip_gradients(self) -> None:
         """Clip gradients when a max norm is configured."""
@@ -329,17 +297,11 @@ class BaseTrainer:
             max_norm=self.gradient_clip_norm,
         )
 
-    """
-    optimizer step
-    """
 
     def optimizer_step(self) -> None:
         """Apply one optimizer update."""
         self.optimizer.step()
 
-    """
-    scheduler step
-    """
 
     def scheduler_step(self, metric: float | None = None) -> None:
         """Advance the learning rate scheduler.
@@ -351,22 +313,24 @@ class BaseTrainer:
         if isinstance(self.scheduler, ReduceLROnPlateau):
             if metric is None:
                 raise ValueError("metric is required for ReduceLROnPlateau")
-            self.scheduler.step(metric)
+            self.scheduler.step(metric) # loss 不降时衰减 LR
             return
-        self.scheduler.step()
+        # StepLR, CosineAnnealingLR, etc. do not require a metric
+        self.scheduler.step() # 按固定 epoch 步长衰减 LR
+
 
     def on_evaluate_start(self) -> None:
         """Hook called before evaluation starts."""
+        pass
+
 
     def on_evaluate_end(self, metrics: dict[str, float]) -> None:
         """Hook called after evaluation ends.
 
         :param metrics: Evaluation metrics
         """
+        pass
 
-    """
-    predict
-    """
 
     def predict(self, *args: Any, **kwargs: Any) -> dict[str, float]:
         """Run prediction outside the training loop."""
@@ -375,13 +339,16 @@ class BaseTrainer:
         # self.on_predict_end hook
         raise NotImplementedError
 
+
     def on_predict_start(self) -> None:
         """Hook called before prediction starts."""
         pass
 
+
     def on_predict_end(self) -> None:
         """Hook called after prediction ends."""
         pass
+
 
     def save_checkpoint(self, path: str | Path) -> None:
         """Save model, optimizer, and trainer state.
@@ -402,6 +369,7 @@ class BaseTrainer:
         if self.scheduler is not None:
             checkpoint["scheduler_state_dict"] = self.scheduler.state_dict()
         torch.save(checkpoint, checkpoint_path)
+
 
     def load_checkpoint(self, path: str | Path) -> None:
         """Load model, optimizer, and trainer state.
@@ -425,6 +393,7 @@ class BaseTrainer:
             return
 
         self.model.load_state_dict(checkpoint)
+
 
     def update_best_state(self, metrics: dict[str, float]) -> bool:
         """Check whether the monitored metric improved.
@@ -458,6 +427,7 @@ class BaseTrainer:
             return True
         return False
 
+
     def is_better(self, value: float) -> bool:
         """Compare a scalar metric using the configured monitor mode.
 
@@ -471,6 +441,7 @@ class BaseTrainer:
             return value < self.best_metric
         return value > self.best_metric
 
+
     def move_batch_to_device(self, batch: Any) -> Any:
         """Move tensors in a batch structure to the trainer device.
 
@@ -482,7 +453,8 @@ class BaseTrainer:
 
         if isinstance(batch, dict):
             return {
-                key: self.move_batch_to_device(value) for key, value in batch.items()
+                key: self.move_batch_to_device(value) 
+                for key, value in batch.items()
             }
 
         if isinstance(batch, list):
@@ -497,45 +469,3 @@ class BaseTrainer:
         """Emit a trainer log message."""
         print(message)
 
-    def save_training_artifacts(self) -> None:
-        """Persist all training artifacts collected by the trainer."""
-        self.save_loss_curve()
-        self.save_metric_curve()
-        self.plot_loss_curve()
-        self.plot_metric_curve()
-
-    def save_loss_curve(self) -> None:
-        if self.plot_path is None or not self.train_loss_history:
-            return
-        from gerbil_train.utils.plot import save_curve_values
-        save_curve_values(self.train_loss_history, self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt"))
-
-    def save_metric_curve(self) -> None:
-        if self.plot_path is None or not self.val_metric_history:
-            return
-        from gerbil_train.utils.plot import save_curve_values
-        save_curve_values(self.val_metric_history, self.plot_path.with_name(f"{self.plot_path.stem}_metric.txt"))
-
-    def plot_loss_curve(self) -> None:
-        if self.plot_path is None or not self.train_loss_history:
-            return
-        from matplotlib import pyplot as plt
-        plt.figure(figsize=(8, 4))
-        plt.plot(range(1, len(self.train_loss_history) + 1), self.train_loss_history, label="train_loss")
-        plt.xlabel("Epoch"); plt.ylabel("Loss"); plt.title(f"{self.model_name} Training Loss")
-        plt.grid(True, linestyle="--", alpha=0.3); plt.legend(); plt.tight_layout()
-        self.plot_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_loss.png"))
-        plt.close()
-
-    def plot_metric_curve(self) -> None:
-        if self.plot_path is None or not self.val_metric_history:
-            return
-        from matplotlib import pyplot as plt
-        plt.figure(figsize=(8, 4))
-        plt.plot(range(1, len(self.val_metric_history) + 1), self.val_metric_history, label=f"val_{self.metric_name}")
-        plt.xlabel("Epoch"); plt.ylabel(self.metric_name); plt.title(f"{self.model_name} Validation {self.metric_name}")
-        plt.grid(True, linestyle="--", alpha=0.3); plt.legend(); plt.tight_layout()
-        self.plot_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_metric.png"))
-        plt.close()

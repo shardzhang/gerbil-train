@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from matplotlib import pyplot as plt
 
-from gerbil_train.config import DeepFMTrainConfig
+from gerbil_train.config.train_config import DeepFMTrainConfig
 from gerbil_train.losses.ranking import compute_loss as compute_ranking_loss
 from gerbil_train.metrics.ranking import ndcg_score
 from gerbil_train.trainer.base_trainer import BaseTrainer
@@ -157,7 +157,7 @@ class LearningToRankTrainer(BaseTrainer):
         total_loss = 0.0
         train_pbar = tqdm(
             self.train_loader, total=self.steps_per_epoch or None,
-            desc=f"Epoch {epoch_display}/{self.max_epochs} [train]",
+            desc=f"Epoch {epoch_display}/{self.epochs} [train]",
             leave=False,
         )
         for step, batch in enumerate(train_pbar, start=1):
@@ -215,7 +215,7 @@ class LearningToRankTrainer(BaseTrainer):
         with torch.no_grad():
             val_pbar = tqdm(
                 self.val_loader,
-                desc=f"Epoch {epoch_display}/{self.max_epochs} [val]",
+                desc=f"Epoch {epoch_display}/{self.epochs} [val]",
                 leave=False,
             )
             for step, batch in enumerate(val_pbar, start=1):

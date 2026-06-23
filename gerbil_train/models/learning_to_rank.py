@@ -13,7 +13,7 @@ from typing import Sequence
 
 import torch.nn as nn
 
-from gerbil_train.config import LTRConfig
+from gerbil_train.config.train_config import LTRConfig
 from gerbil_train.utils.nn import get_activation
 
 __all__ = ["DeepRankNet"]

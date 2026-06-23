@@ -258,78 +258,16 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
 
     def save_loss_curve(self) -> None:
         """Persist shared-bottom stage loss histories to text files."""
-        implicit_loss_path, explicit_loss_path, _ = self._curve_paths()
-        if implicit_loss_path is None or explicit_loss_path is None:
-            return
-        save_curve_values(self.implicit_loss_history, implicit_loss_path)
-        save_curve_values(self.explicit_loss_history, explicit_loss_path)
+        pass
 
     def save_metric_curve(self) -> None:
         """Persist shared-bottom validation metric history to a text file."""
-        if self.checkpoint_dir is None:
-            return
-        metric_path = self.checkpoint_dir / f"validation_ndcg@{self.validation_k}.txt"
-        save_curve_values(self.validation_history, metric_path)
+        pass
 
     def plot_loss_curve(self) -> None:
-        """Render a combined shared-bottom loss curve figure."""
-        _, _, loss_plot_path = self._curve_paths()
-        if loss_plot_path is None:
-            return
+        pass
 
-        plt.figure(figsize=(10, 5))
-        if self.implicit_loss_history:
-            implicit_epochs = range(1, len(self.implicit_loss_history) + 1)
-            plt.plot(
-                implicit_epochs,
-                self.implicit_loss_history,
-                linewidth=2,
-                label="implicit",
-            )
-        if self.explicit_loss_history:
-            explicit_epochs = range(1, len(self.explicit_loss_history) + 1)
-            plt.plot(
-                explicit_epochs,
-                self.explicit_loss_history,
-                linewidth=2,
-                label="explicit",
-            )
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.title("Shared-Bottom Training Loss")
-        plt.grid(True, linestyle="--", alpha=0.3)
-        plt.legend()
-        plt.tight_layout()
-        loss_plot_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(loss_plot_path)
-        plt.close()
-
-    def plot_metric_curve(self) -> None:
-        """Render a validation metric figure when validation history exists."""
-        if self.checkpoint_dir is None or not self.validation_history:
-            return
-
-        metric_plot_path = (
-            self.checkpoint_dir / f"validation_ndcg@{self.validation_k}.png"
-        )
-        epochs = range(1, len(self.validation_history) + 1)
-        plt.figure(figsize=(10, 5))
-        plt.plot(
-            epochs,
-            self.validation_history,
-            linewidth=2,
-            label=f"ndcg@{self.validation_k}",
-        )
-        plt.xlabel("Epoch")
-        plt.ylabel("NDCG")
-        plt.title("Shared-Bottom Validation NDCG")
-        plt.grid(True, linestyle="--", alpha=0.3)
-        plt.legend()
-        plt.tight_layout()
-        metric_plot_path.parent.mkdir(parents=True, exist_ok=True)
-        plt.savefig(metric_plot_path)
-        plt.close()
-
+    
     def train_one_epoch(self, epoch: int) -> dict[str, float]:
         """Train one epoch for the current stage.
 

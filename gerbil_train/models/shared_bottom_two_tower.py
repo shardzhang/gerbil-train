@@ -20,8 +20,8 @@ from dataclasses import dataclass
 import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
-from gerbil_train.config import SBTTConfig
-from gerbil_train.utils.nn import build_mlp
+from gerbil_train.config.train_config import SBTTConfig
+from gerbil_train.utils.nn import FullyConnectedLayer
 
 __all__ = ["SBTTOutput", "SharedBottomTwoTower"]
 
@@ -84,55 +84,43 @@ class SharedBottomTwoTower(nn.Module):
         self.temperature = temperature
 
         # query side
-        self.query_shared_bottom = build_mlp(
-            input_dim=query_input_dim,
-            hidden_dims=shared_hidden_dims,
-            batch_norm=shared_batch_norm,
-            activation=shared_activation,
-            dropout=shared_dropout,
+        self.query_shared_bottom = FullyConnectedLayer(
+            input_dim=query_input_dim, hidden_dims=shared_hidden_dims,
+            bias=[True] * len(shared_hidden_dims),
+            batch_norm=shared_batch_norm, activation=shared_activation, dropout=shared_dropout,
         )
         query_shared_dim = shared_hidden_dims[-1]
 
-        self.query_explicit_tower = build_mlp(
-            input_dim=query_shared_dim,
-            hidden_dims=explicit_hidden_dims,
-            batch_norm=explicit_batch_norm,
-            activation=explicit_activation,
-            dropout=explicit_dropout,
+        self.query_explicit_tower = FullyConnectedLayer(
+            input_dim=query_shared_dim, hidden_dims=explicit_hidden_dims,
+            bias=[True] * len(explicit_hidden_dims),
+            batch_norm=explicit_batch_norm, activation=explicit_activation, dropout=explicit_dropout,
         )
-        self.query_implicit_tower = build_mlp(
-            input_dim=query_shared_dim,
-            hidden_dims=implicit_hidden_dims,
-            batch_norm=implicit_batch_norm,
-            activation=implicit_activation,
-            dropout=implicit_dropout,
+        self.query_implicit_tower = FullyConnectedLayer(
+            input_dim=query_shared_dim, hidden_dims=implicit_hidden_dims,
+            bias=[True] * len(implicit_hidden_dims),
+            batch_norm=implicit_batch_norm, activation=implicit_activation, dropout=implicit_dropout,
         )
         self.query_explicit_head = nn.Linear(explicit_hidden_dims[-1], embedding_dim)
         self.query_implicit_head = nn.Linear(implicit_hidden_dims[-1], embedding_dim)
 
         # item side
-        self.item_shared_bottom = build_mlp(
-            input_dim=item_input_dim,
-            hidden_dims=shared_hidden_dims,
-            batch_norm=shared_batch_norm,
-            activation=shared_activation,
-            dropout=shared_dropout,
+        self.item_shared_bottom = FullyConnectedLayer(
+            input_dim=item_input_dim, hidden_dims=shared_hidden_dims,
+            bias=[True] * len(shared_hidden_dims),
+            batch_norm=shared_batch_norm, activation=shared_activation, dropout=shared_dropout,
         )
         item_shared_dim = shared_hidden_dims[-1]
 
-        self.item_explicit_tower = build_mlp(
-            input_dim=item_shared_dim,
-            hidden_dims=explicit_hidden_dims,
-            batch_norm=explicit_batch_norm,
-            activation=explicit_activation,
-            dropout=explicit_dropout,
+        self.item_explicit_tower = FullyConnectedLayer(
+            input_dim=item_shared_dim, hidden_dims=explicit_hidden_dims,
+            bias=[True] * len(explicit_hidden_dims),
+            batch_norm=explicit_batch_norm, activation=explicit_activation, dropout=explicit_dropout,
         )
-        self.item_implicit_tower = build_mlp(
-            input_dim=item_shared_dim,
-            hidden_dims=implicit_hidden_dims,
-            batch_norm=implicit_batch_norm,
-            activation=implicit_activation,
-            dropout=implicit_dropout,
+        self.item_implicit_tower = FullyConnectedLayer(
+            input_dim=item_shared_dim, hidden_dims=implicit_hidden_dims,
+            bias=[True] * len(implicit_hidden_dims),
+            batch_norm=implicit_batch_norm, activation=implicit_activation, dropout=implicit_dropout,
         )
         self.item_explicit_head = nn.Linear(explicit_hidden_dims[-1], embedding_dim)
         self.item_implicit_head = nn.Linear(implicit_hidden_dims[-1], embedding_dim)

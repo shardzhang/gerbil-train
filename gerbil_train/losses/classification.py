@@ -13,6 +13,8 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor
 
+__all__ = ["nce_loss", "sampled_softmax_loss"]
+
 
 def nce_loss(
     hidden: Tensor,
@@ -106,4 +108,3 @@ def sampled_softmax_loss(
     return F.cross_entropy(all_scores, labels)
 
 
-__all__ = ["nce_loss", "sampled_softmax_loss"]

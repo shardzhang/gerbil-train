@@ -3,124 +3,114 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Any
+
 import torch
 from torch.utils.data import DataLoader
 
-from gerbil_train.config import (
-    GwENModelConfig,
-    GwENTrainConfig,
-)
-from gerbil_train.data.multi_tfrecord_dataset import MultiTFRecordDataset
-from gerbil_train.data.tfrecord_dataset import (
-    BatchCollator, FieldSpec, collect_tfrecord_part_files,
-    count_tfrecord_records, load_field_specs,
-    load_field_stats, load_target_size,
-)
 from gerbil_train.utils.config import load_experiment_config, parse_args
-from gerbil_train.utils.run import build_field_entries, create_run_dir, filter_enabled_fields, save_run_configs
-from gerbil_train.models.gwen import GwENMulticlass as GwEN
-from gerbil_train.trainer.gwen_multiclass_trainer import GwENTrainer
+from gerbil_train.utils.run import create_run_dir, save_run_configs
+from gerbil_train.data.tfrecord_dataset import BatchCollator, MultiTFRecordDataset, load_target_size, load_field_stats, FieldEntry, collect_tfrecord_part_files
+from gerbil_train.config.model_config import GwENModelConfig, load_enabled_field_entries
+from gerbil_train.config.train_config import GwENTrainConfig
+from gerbil_train.models.gwen import GwENMulticlassModel
+from gerbil_train.trainer.gwen_multiclass_trainer import GwENMultiTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs/experiment/gwen_ml1m_multiclass.yaml"
+CONFIG_PATH: Path = PROJECT_ROOT / "configs/1-gwen_ml1m_multiclass/experiment.yaml"
 
 
-def build_dataloaders(cfg: dict[str, Any], all_field_specs: list[FieldSpec]) -> tuple[DataLoader, DataLoader | None, DataLoader | None, int]:
-    data_cfg = cfg["data"]
-    train_cfg = cfg["train"]
-    data_loader_cfg = train_cfg.get("data", {})
-    model_cfg_raw = cfg["model"]
-
-    field_enabled = {
-        name: bool(entry.get("enabled", True))
-        for name, entry in model_cfg_raw.get("embedding", {}).get("fields", {}).items()
-    }
-    enabled_specs = filter_enabled_fields(all_field_specs, field_enabled)
-    field_names = [spec.name for spec in enabled_specs]
-
-    root = Path(data_cfg["paths"]["tfrecord_root"])
-    pos_map_json = Path(data_cfg["paths"]["nn_pos_map_json"])
-    subs = data_cfg.get("split_subdirs", {"train": "train", "val": "val", "test": "test"})
-
-    target_size = load_target_size(pos_map_json)
-    field_stats = load_field_stats(pos_map_json)
-    seed = int(train_cfg.get("seed", 42))
-
-    train_files = collect_tfrecord_part_files(root / subs["train"] / "tfrecord")
-    val_files = collect_tfrecord_part_files(root / subs["val"] / "tfrecord")
-    test_files = collect_tfrecord_part_files(root / subs["test"] / "tfrecord")
-
-    if not train_files:
-        raise ValueError("No TFRecord files found for training split")
-
-    collate_fn = BatchCollator(field_names)
-    batch_size = int(data_loader_cfg.get("batch_size", 1024))
-    num_workers = int(data_loader_cfg.get("num_workers", 0))
-    pin_memory = bool(data_loader_cfg.get("pin_memory", False))
-    drop_last = bool(data_loader_cfg.get("drop_last", False))
-    prefetch_factor = int(data_loader_cfg.get("prefetch_factor", 2)) if num_workers > 0 else None
-
-    loader_kwargs = dict(
-        batch_size=batch_size, shuffle=False, num_workers=num_workers,
-        pin_memory=pin_memory, collate_fn=collate_fn, drop_last=drop_last,
+def _build_loader(
+    files: list[Path],
+    field_entries: list[FieldEntry],
+    *,
+    batch_size: int,
+    shuffle_files: bool,
+    shuffle_buffer: int | None = None,
+    num_workers: int = 0,
+    pin_memory: bool = False,
+    drop_last: bool = False,
+    seed: int = 42,
+    field_stats: dict[str, Any] | None = None,
+) -> DataLoader:
+    """Build dataloader for a given set of files and field entries."""
+    dataset = MultiTFRecordDataset(
+        files, 
+        field_entries,
+        field_stats=field_stats,
+        shuffle_files=shuffle_files,
+        shuffle_buffer=shuffle_buffer,
+        seed=seed,
     )
-    if prefetch_factor is not None:
-        loader_kwargs["prefetch_factor"] = prefetch_factor
-
-    shuffle_buffer = int(data_loader_cfg.get("shuffle_buffer", 0))
-
-    def make_loader(files, shuffle_files, extra_seed=0):
-        return DataLoader(
-            MultiTFRecordDataset(
-                files, field_names, field_stats=field_stats,
-                shuffle_files=shuffle_files, shuffle_buffer=shuffle_buffer,
-                seed=seed + extra_seed,
-            ),
-            **loader_kwargs,
-        )
-
-    train_loader = make_loader(train_files, shuffle_files=bool(data_cfg.get("shuffle_train_files", True)))
-    validation_loader = make_loader(val_files, shuffle_files=False, extra_seed=101) if val_files else None
-    test_loader = make_loader(test_files, shuffle_files=False, extra_seed=202) if test_files else None
-    return train_loader, validation_loader, test_loader, target_size
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        collate_fn=BatchCollator([e.field_name for e in field_entries]),
+        drop_last=drop_last,
+    )
 
 
-def build_model_config(raw_model_cfg: dict[str, Any], target_size: int, field_specs: list) -> GwENModelConfig:
-    model_config_path = (PROJECT_ROOT / "configs/model/gwen_multiclass_model.yaml").resolve()
-    entries, _ = build_field_entries(model_config_path, field_specs, extra_keys={"target_size": int(target_size)})
-    model_cfg = GwENModelConfig.from_dict(raw_model_cfg, entries)
-    model_cfg.target_size = int(target_size)
+def build_dataloaders(data_cfg: dict[str, Any], model_cfg: GwENModelConfig, train_cfg: GwENTrainConfig) -> tuple[DataLoader, DataLoader | None, DataLoader | None]:
+    """Build dataloaders for training, validation, and test sets."""
+    root: Path = Path(data_cfg["paths"]["tfrecord_root"])
+    subs: dict[str, str] = data_cfg["split_subdirs"]
+    train_files: list[Path] = collect_tfrecord_part_files(root / subs["train"] / "tfrecord")
+    val_files: list[Path] = collect_tfrecord_part_files(root / subs["val"] / "tfrecord")
+    test_files: list[Path] = collect_tfrecord_part_files(root / subs["test"] / "tfrecord")
+    
+    field_entries = list(model_cfg.embedding_fields.values())
+    seed = train_cfg.seed
+    loader_kw = dict(
+        field_stats=model_cfg.field_stats,
+        batch_size=train_cfg.data.batch_size,
+        num_workers=train_cfg.data.num_workers,
+        pin_memory=train_cfg.data.pin_memory,
+        shuffle_buffer=train_cfg.data.shuffle_buffer,
+        drop_last=train_cfg.data.drop_last
+    )
+    train_loader: DataLoader = _build_loader(train_files, field_entries, shuffle_files=data_cfg.get("shuffle_train_files", True), seed=seed, **loader_kw)
+    validation_loader: DataLoader | None = _build_loader(val_files, field_entries, shuffle_files=False, seed=seed + 101, **loader_kw) if val_files else None
+    test_loader: DataLoader | None = _build_loader(test_files, field_entries, shuffle_files=False, seed=seed + 202, **loader_kw) if test_files else None  
+    return train_loader, validation_loader, test_loader
+
+
+def build_model_config(model_cfg: dict[str, Any], data_cfg: dict[str, Any]) -> GwENModelConfig:
+    """Build model config with enabled fields and field stats."""
+    enabled_field_entries, disabled_field_names = load_enabled_field_entries(model_cfg)
+    print(f"Disabled fields: {disabled_field_names}")
+    
+    model_cfg = GwENModelConfig.from_dict(model_cfg, enabled_field_entries)
+    pos_map_json = Path(data_cfg["paths"]["nn_pos_map_json"])
+    field_stats = load_field_stats(pos_map_json)
+    target_size = load_target_size(pos_map_json)
+    model_cfg.field_stats = field_stats
+    model_cfg.target_size = target_size
+    print(f"Target size: {target_size}")
     return model_cfg
 
 
 def main() -> None:
     args = parse_args(CONFIG_PATH)
-    run_dir, checkpoint_path, plot_path = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_ml1m_tfrecord")
-
-    cfg = load_experiment_config(args.config)
-    data_cfg = cfg["data"]
-    model_cfg_raw = cfg["model"]
-    train_cfg = GwENTrainConfig.from_dict(cfg["train"])
+    exp_cfg: dict[str, Any] = load_experiment_config(args.config)
+    data_cfg: dict[str, Any] = exp_cfg["data"]
+    model_cfg: GwENModelConfig = build_model_config(exp_cfg["model"], data_cfg)
+    
+    run_dir, checkpoint_path, plot_path = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_ml1m_multiclass")
+    train_cfg: GwENTrainConfig = GwENTrainConfig.from_dict(exp_cfg["train"])
     train_cfg.checkpoint.path = str(checkpoint_path)
     train_cfg.logging.plot_path = str(plot_path)
     print(f"Training config | seed={train_cfg.seed} | epochs={train_cfg.epochs} | batch_size={train_cfg.data.batch_size}")
     print(f"Run dir: {run_dir}")
     print(f"Loading GwEN TFRecords from {data_cfg['paths']['tfrecord_root']}")
 
-    all_field_specs = load_field_specs(data_cfg["paths"]["nn_pos_map_txt"])
-    train_loader, validation_loader, test_loader, target_size = build_dataloaders(cfg, all_field_specs)
-
-    model_cfg = build_model_config(model_cfg_raw, target_size, all_field_specs)
-    model = GwEN(model_cfg)
+    train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg)
+    model = GwENMulticlassModel(model_cfg)
     if train_cfg.compile.enabled:
         model = torch.compile(model, mode=train_cfg.compile.mode)
         print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
-    trainer = GwENTrainer(model, train_cfg)
-    trainer.set_profile_path(run_dir)
-    root = Path(data_cfg["paths"]["tfrecord_root"])
-    subs = data_cfg.get("split_subdirs", {"train": "train", "val": "val", "test": "test"})
-    train_files = collect_tfrecord_part_files(root / subs["train"] / "tfrecord")
-    trainer.set_total_train_samples(count_tfrecord_records(train_files), train_cfg.data.batch_size)
+    trainer = GwENMultiTrainer(model, train_cfg, data_cfg)
     trainer.fit(train_loader, validation_loader, test_loader)
 
     if test_loader is not None:
@@ -132,4 +122,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# python3 -m gerbil_train.cli.gwen_multiclass_train --config configs/experiment/gwen_ml1m_multiclass.yaml
+# python3 -m gerbil_train.cli.gwen_multiclass_train --config configs/1-gwen_ml1m_multiclass/experiment.yaml

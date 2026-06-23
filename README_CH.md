@@ -44,10 +44,10 @@ checkpoints/gwen_ml1m_tfrecord/20260615220526/
 ```yaml
 fields:
   user_movie_rate:
-    f_index: 301
-    f_type: 1
-    vocab_size: 3569
-    emb_dim: 16
+    field_index: 301
+    field_type: 1
+    dim: 3569
+    emb_size: 16
     enabled: false   # ← 关闭以验证特征重要性
 ```
 
@@ -60,7 +60,7 @@ fields:
 - **分类特征**（`field_type=1`）：token ID → embedding 查表，权重=1.0
 - **连续特征**（`field_type=0`）：桶 ID → embedding 查表，权重 = `(raw - mean) / std`（z-score 标准化）
 
-标准化使用的 `mean`/`std` 来自 `pos_map.json` 中每个桶的统计量。这使得连续特征嵌入等价于 `Linear(1, emb_dim)` 投影 + 可学习缩放。
+标准化使用的 `mean`/`std` 来自 `pos_map.json` 中每个桶的统计量。这使得连续特征嵌入等价于 `Linear(1, emb_size)` 投影 + 可学习缩放。
 
 ### 4. 可插拔损失函数
 

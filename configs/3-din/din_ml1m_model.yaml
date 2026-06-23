@@ -1,0 +1,29 @@
+task: binary
+behavior_fields:
+- user_movie_rate
+- user_movie_rate_1day
+- user_movie_rate_3day
+- user_movie_rate_7day
+- user_movie_rate_15day
+- user_genres_rate
+- user_genres_rate_1day
+- user_genres_rate_3day
+- user_genres_rate_7day
+- user_genres_rate_15day
+target_fields:
+- movie_id
+- genres
+embedding:
+  default_emb_size: 16
+  fields:
+    
+mlp:
+  hidden_dims:
+  - 256
+  - 128
+  activation: relu
+  dropout: 0.1
+  batch_norm: false
+  input_batch_norm: false
+field_attention:
+  enabled: false

@@ -245,7 +245,7 @@ loss = sampled_softmax_loss(hidden, model.head.weight, targets, ...)
 # configs/model/gwen_binary_model.yaml
 task: binary
 embedding:
-  default_emb_dim: 16
+  default_emb_size: 16
   fields:
     user_id:
       f_index: 1

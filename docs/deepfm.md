@@ -209,7 +209,7 @@ return sigmoid(logits)
 # configs/model/deepfm.yaml
 task: binary
 embedding:
-  default_emb_dim: 16
+  default_emb_size: 16
   fields: {}
 
 deep:

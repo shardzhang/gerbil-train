@@ -1,6 +1,6 @@
 name: deepfm_ml1m
 description: DeepFM model for MovieLens 1M TFRecord samples.
 
-data: configs/data/ml1m_binary_tfrecord.yaml
+data: configs/0-data/ml1m_binary_tfrecord.yaml
 model: configs/model/deepfm.yaml
 train: configs/train/deepfm.yaml
