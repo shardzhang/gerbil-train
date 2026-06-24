@@ -222,7 +222,9 @@ class GwENBinaryTrainer(BaseTrainer):
                 uid_bag = batch["feature_bags"].get("user_id")
                 if uid_bag is None:
                     raise ValueError("GAUC requires 'user_id' in feature_bags")
-                all_uids.append(uid_bag["indices"][uid_bag["offsets"]])
+                offsets = uid_bag["offsets"]
+                ends = torch.cat([offsets[1:], offsets.new_tensor([len(uid_bag["indices"])])])
+                all_uids.append(uid_bag["indices"][ends - 1])
                 all_labels.append(targets)
                 all_scores.append(sigmoids)
                 total_steps += 1
@@ -236,6 +238,8 @@ class GwENBinaryTrainer(BaseTrainer):
         }
         if all_uids:
             cat_uids: torch.Tensor = torch.cat(all_uids)
+            n_unique = cat_uids.unique().shape[0]
+            print(f"[DEBUG] uids: unique={n_unique}, total={cat_uids.shape[0]}, first_20={cat_uids[:20].tolist()}")
             result["gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
             result["map"] = round(map_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
             result["mrr"] = round(mrr_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
@@ -260,7 +264,9 @@ class GwENBinaryTrainer(BaseTrainer):
                 uid_bag = batch["feature_bags"].get("user_id")
                 if uid_bag is None:
                     raise ValueError("GAUC requires 'user_id' in feature_bags")
-                all_uids.append(uid_bag["indices"][uid_bag["offsets"]])
+                offsets = uid_bag["offsets"]
+                ends = torch.cat([offsets[1:], offsets.new_tensor([len(uid_bag["indices"])])])
+                all_uids.append(uid_bag["indices"][ends - 1])
                 all_labels.append(targets)
                 all_scores.append(sigmoids)
                 total_steps += 1
@@ -273,6 +279,8 @@ class GwENBinaryTrainer(BaseTrainer):
         }
         if all_uids:
             cat_uids: torch.Tensor = torch.cat(all_uids)
+            n_unique = cat_uids.unique().shape[0]
+            print(f"[DEBUG] test uids: unique={n_unique}, total={cat_uids.shape[0]}, first_20={cat_uids[:20].tolist()}")
             result["test_gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
             result["test_map"] = round(map_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
             result["test_mrr"] = round(mrr_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)

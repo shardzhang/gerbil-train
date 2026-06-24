@@ -7,7 +7,7 @@ from typing import Mapping
 import torch
 from torch import Tensor, nn
 
-from gerbil_train.config.model_config import GwENModelConfig
+from gerbil_train.config.model_config import DINModelConfig
 from gerbil_train.utils.embedding import bag_to_padded, embed_one_field, to_device
 from gerbil_train.utils.nn import FullyConnectedLayer
 
@@ -17,7 +17,7 @@ __all__ = ["DIN"]
 class DIN(nn.Module):
     """DIN (Deep Interest Network) for binary classification with behavior-sequence attention."""
 
-    def __init__(self, config: GwENModelConfig, behavior_fields: list[str], target_fields: list[str], softmax_attn=False, target_merge: str = "mean") -> None:
+    def __init__(self, model_cfg: DINModelConfig, softmax_attn=False, target_merge: str = "mean") -> None:
         """
         :param softmax_attn: If True, apply softmax normalization to attention scores;
             otherwise use raw scores (original DIN style).
@@ -26,8 +26,11 @@ class DIN(nn.Module):
             "proj" — concat then linearly project to behavior embedding dim.
         """
         super().__init__()
+
+        behavior_fields = model_cfg.behavior_fields
+        target_fields = model_cfg.target_fields
         
-        fields_cfg = config.embedding_fields
+        fields_cfg = model_cfg.embedding_fields
         if not fields_cfg:
             raise ValueError("embedding_fields must be a non-empty mapping")
         for bf in behavior_fields:
@@ -37,7 +40,7 @@ class DIN(nn.Module):
             if tf not in fields_cfg:
                 raise ValueError(f"target_field '{tf}' not found in embedding_fields")
 
-        self.item_num = config.target_size
+        self.item_num = model_cfg.target_size
         self.softmax_attn = softmax_attn
         self.behavior_fields = behavior_fields
         self.target_fields = target_fields
@@ -50,19 +53,13 @@ class DIN(nn.Module):
         self.target_embeddings = nn.ModuleDict()
         for tf in target_fields:
             entry = fields_cfg[tf]
-            self.target_embedding_dims[tf] = int(entry.emb_dim)
+            self.target_embedding_dims[tf] = int(entry.emb_size)
             self.target_embeddings[tf] = nn.EmbeddingBag(
-                num_embeddings=int(entry.vocab_size),
-                embedding_dim=int(entry.emb_dim),
+                num_embeddings=int(entry.dim),
+                embedding_dim=int(entry.emb_size),
                 mode="sum", 
                 include_last_offset=False,
             )
-
-        # When target_merge="proj": concat targets → Linear project to behavior emb_dim
-        if target_merge == "proj" and target_fields and behavior_fields:
-            total_target_dim = sum(self.target_embedding_dims.values())
-            proj_dim = self.behavior_emb_dims[behavior_fields[0]]
-            self.target_projection = nn.Linear(total_target_dim, proj_dim)
 
         # Behavior field (user history sequence) embeddings
         self.behavior_emb_dims: dict[str, int] = {}
@@ -70,33 +67,39 @@ class DIN(nn.Module):
         self.attention_units = nn.ModuleDict()
         for bf in behavior_fields:
             entry = fields_cfg[bf]
-            self.behavior_emb_dims[bf] = int(entry.emb_dim)
+            self.behavior_emb_dims[bf] = int(entry.emb_size)
             self.behavior_embeddings[bf] = EmbeddingLayer(
-                item_num=int(entry.vocab_size), 
-                embedding_dim=int(entry.emb_dim),
+                item_num=int(entry.dim), 
+                embedding_dim=int(entry.emb_size),
             )
             self.attention_units[bf] = LocalActivationUnit(
                 hidden_dims=[80, 40], 
                 bias=[True, True],
-                embedding_dim=int(entry.emb_dim), 
+                embedding_dim=int(entry.emb_size), 
                 batch_norm=False,
             )
+
+        # When target_merge="proj": concat targets → Linear project to behavior emb_dim
+        if target_merge == "proj" and target_fields and behavior_fields:
+            total_target_dim = sum(self.target_embedding_dims.values())
+            proj_dim = int(fields_cfg[behavior_fields[0]].emb_size)
+            self.target_projection = nn.Linear(total_target_dim, proj_dim)
 
         # Plain feature (non-behavior, non-target) field embeddings
         self.field_embedding_dims: dict[str, int] = {}
         self.field_embeddings = nn.ModuleDict()
         for field_name in self.field_names:
             entry = fields_cfg[field_name]
-            self.field_embedding_dims[field_name] = int(entry.emb_dim)
+            self.field_embedding_dims[field_name] = int(entry.emb_size)
             self.field_embeddings[field_name] = nn.EmbeddingBag(
-                num_embeddings=int(entry.vocab_size),
-                embedding_dim=int(entry.emb_dim),
+                num_embeddings=int(entry.dim),
+                embedding_dim=int(entry.emb_size),
                 mode="sum", 
                 include_last_offset=False,
             )
 
         self.embedding_sum_dim = sum(self.field_embedding_dims.values()) + sum(self.behavior_emb_dims.values()) + sum(self.target_embedding_dims.values())
-        mlp_cfg = config.mlp
+        mlp_cfg = model_cfg.mlp
         hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
         self.input_bn = nn.BatchNorm1d(self.embedding_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
         self.mlp = FullyConnectedLayer(

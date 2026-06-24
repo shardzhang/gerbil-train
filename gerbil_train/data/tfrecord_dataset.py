@@ -118,7 +118,6 @@ def count_tfrecord_records(files: Sequence[str | Path]) -> int:
 
 class BatchCollator:
     """Collate function that packs sparse per-field features for EmbeddingBag."""
-
     def __init__(self, field_names: Sequence[str]) -> None:
         self.field_names = list(field_names)
 
