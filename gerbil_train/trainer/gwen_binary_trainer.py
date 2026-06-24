@@ -15,7 +15,7 @@ from gerbil_train.config.train_config import GwENTrainConfig
 from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils import BatchInspector
 from gerbil_train.utils.plot import save_curve_values
-from gerbil_train.metrics.classification import auc, average_precision, gauc, map_score
+from gerbil_train.metrics.classification import auc, average_precision, gauc, map_score, mrr_score
 
 __all__ = ["GwENBinaryTrainer", "GwENBinaryTrainingResult"]
 
@@ -27,6 +27,7 @@ class GwENBinaryTrainingResult:
     val_ap_history: list[float]
     val_gauc_history: list[float]
     val_map_history: list[float]
+    val_mrr_history: list[float]
     best_metric: float
 
 
@@ -81,6 +82,7 @@ class GwENBinaryTrainer(BaseTrainer):
         self.val_ap_history: list[float] = []
         self.val_gauc_history: list[float] = []
         self.val_map_history: list[float] = []
+        self.val_mrr_history: list[float] = []
         self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
 
         if data_cfg is not None:
@@ -105,6 +107,7 @@ class GwENBinaryTrainer(BaseTrainer):
         self.val_ap_history.clear()
         self.val_gauc_history.clear()
         self.val_map_history.clear()
+        self.val_mrr_history.clear()
 
         super().fit_epochs()
         
@@ -114,6 +117,7 @@ class GwENBinaryTrainer(BaseTrainer):
             val_ap_history=list(self.val_ap_history),
             val_gauc_history=list(self.val_gauc_history),
             val_map_history=list(self.val_map_history),
+            val_mrr_history=list(self.val_mrr_history),
             best_metric=self.best_metric,
         )
     
@@ -163,6 +167,7 @@ class GwENBinaryTrainer(BaseTrainer):
         val_ap = metrics.get("val_ap")
         val_gauc = metrics.get("val_gauc")
         val_map = metrics.get("val_map")
+        val_mrr = metrics.get("val_mrr")
 
         if train_loss is not None:
             self.train_loss_history.append(float(train_loss))
@@ -176,18 +181,22 @@ class GwENBinaryTrainer(BaseTrainer):
             self.val_gauc_history.append(float(val_gauc))
         if val_map is not None:
             self.val_map_history.append(float(val_map))
+        if val_mrr is not None:
+            self.val_mrr_history.append(float(val_mrr))
 
         message = f"Epoch {epoch + 1} | loss: {train_loss:.4f}" if train_loss is not None else f"Epoch {epoch + 1}"
         if val_loss is not None:
             message += f" | val_loss: {val_loss:.4f}"
         if val_auc is not None:
             message += f" | auc: {val_auc:.4f}"
-        if val_ap is not None:
-            message += f" | ap: {val_ap:.4f}"
         if val_gauc is not None:
             message += f" | gauc: {val_gauc:.4f}"
+        if val_ap is not None:
+            message += f" | ap: {val_ap:.4f}"
         if val_map is not None:
             message += f" | map: {val_map:.4f}"
+        if val_mrr is not None:
+            message += f" | mrr: {val_mrr:.4f}"
         self.finalize_epoch(epoch, metrics, message)
 
 
@@ -227,6 +236,7 @@ class GwENBinaryTrainer(BaseTrainer):
             cat_uids: torch.Tensor = torch.cat(all_uids)
             result["gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
             result["map"] = round(map_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
+            result["mrr"] = round(mrr_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
         return result
 
 
@@ -263,6 +273,7 @@ class GwENBinaryTrainer(BaseTrainer):
             cat_uids: torch.Tensor = torch.cat(all_uids)
             result["test_gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
             result["test_map"] = round(map_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
+            result["test_mrr"] = round(mrr_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
         return result
 
     

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import torch
 
-__all__ = ["auc", "average_precision", "gauc", "map_score", "hit_rate"]
+__all__ = ["auc", "average_precision", "gauc", "map_score", "mrr_score", "hit_rate"]
 
 
 def hit_rate(
@@ -137,5 +137,42 @@ def map_score(
             ap = average_precision(g_labels, g_scores)
             w = int(mask.sum().item())
             total += ap * (w if weighted else 1)
+            total_weight += w if weighted else 1
+    return total / max(total_weight, 1)
+
+
+def mrr_score(
+    user_ids: torch.Tensor,
+    labels: torch.Tensor,
+    predictions: torch.Tensor,
+    weighted: bool = True,
+) -> float:
+    """Mean Reciprocal Rank (MRR), grouped by user_id.
+
+    For each user (group), finds the first positive sample sorted by
+    score descending, computes its reciprocal rank (1 / rank).
+    Users with no positive sample contribute 0.
+
+    :param user_ids: ``[total_samples]`` user/query IDs
+    :param labels: ``[total_samples]`` binary labels
+    :param predictions: ``[total_samples]`` predicted scores
+    :param weighted: ``True`` = weighted by group size, ``False`` = equal weight per group
+    :return: MRR score as a float
+    """
+    total = 0.0
+    total_weight = 0
+    for uid in user_ids.unique():
+        mask = user_ids == uid
+        g_labels = labels[mask]
+        g_scores = predictions[mask]
+        if g_labels.sum() == 0:
+            continue
+        sorted_idx = g_scores.argsort(descending=True)
+        sorted_labels = g_labels[sorted_idx]
+        first_pos = (sorted_labels == 1).nonzero(as_tuple=True)[0]
+        if first_pos.numel() > 0:
+            rr = 1.0 / (first_pos[0].item() + 1)
+            w = int(mask.sum().item())
+            total += rr * (w if weighted else 1)
             total_weight += w if weighted else 1
     return total / max(total_weight, 1)
