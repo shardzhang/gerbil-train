@@ -6,12 +6,12 @@ from typing import Any
 import torch
 from torch.utils.data import DataLoader
 
-from gerbil_train.config.model_config import DINModelConfig, FieldEntry, load_enabled_field_entries
+from gerbil_train.config.model_config import DINModelConfig, load_enabled_field_entries
 from gerbil_train.config.train_config import GwENTrainConfig
 from gerbil_train.data.tfrecord_dataset import BinaryTFRecordDataset
 from gerbil_train.data.tfrecord_dataset import (
     BatchCollator, collect_tfrecord_part_files,
-    load_field_specs,
+    load_field_specs, load_target_size, load_field_stats,
 )
 from gerbil_train.utils.config import load_experiment_config, parse_args
 from gerbil_train.utils.run import create_run_dir, save_run_configs
@@ -48,23 +48,18 @@ def build_dataloaders(cfg: dict[str, Any], field_names: list[str]) -> tuple[Data
     return dl(train_files, True), dl(val_files, False, 101) if val_files else None, dl(test_files, False, 202) if test_files else None
 
 
-def build_model_config(raw: dict[str, Any], field_specs: list[FieldEntry]) -> DINModelConfig:
-    entries, disabled_field_names = load_enabled_field_entries(raw)
-    if not entries:
-        default_emb_size = int(raw.get("embedding", {}).get("default_emb_size", 16))
-        entries = [
-            FieldEntry(
-                field_index=s.field_index,
-                field_type=s.field_type,
-                field_name=s.field_name,
-                dim=int(s.dim),
-                emb_size=default_emb_size,
-            )
-            for s in field_specs
-        ]
-    if disabled_field_names:
-        print(f"Disabled fields: {disabled_field_names}")
-    return DINModelConfig.from_dict(raw, entries)
+def build_model_config(exp_cfg: dict[str, Any]) -> DINModelConfig:
+    model_raw: dict[str, Any] = exp_cfg["model"]
+    data_cfg: dict[str, Any] = exp_cfg["data"]
+    entries, disabled_field_names = load_enabled_field_entries(model_raw)
+    print(f"Disabled fields: {disabled_field_names}")
+
+    cfg = DINModelConfig.from_dict(model_raw, entries)
+    pos_map_json = Path(data_cfg["paths"]["nn_pos_map_json"])
+    cfg.field_stats = load_field_stats(pos_map_json)
+    cfg.target_size = load_target_size(pos_map_json)
+    print(f"Target size: {cfg.target_size}")
+    return cfg
 
 
 def main() -> None:
@@ -72,7 +67,6 @@ def main() -> None:
     run_dir, ckpt_path, plot_path = create_run_dir(PROJECT_ROOT / "checkpoints" / "din_ml1m")
 
     cfg = load_experiment_config(args.config)
-    model_raw = cfg["model"]
     train_cfg = GwENTrainConfig.from_dict(cfg["train"])
     train_cfg.checkpoint.path = str(ckpt_path)
     train_cfg.logging.plot_path = str(plot_path)
@@ -84,13 +78,12 @@ def main() -> None:
     field_names = [s.field_name for s in all_specs]
     train_loader, val_loader, test_loader = build_dataloaders(cfg, field_names)
 
-    model_cfg = build_model_config(model_raw, all_specs)
+    model_cfg = build_model_config(cfg)
     model = DIN(model_cfg)
     if train_cfg.compile.enabled:
         model = torch.compile(model, mode=train_cfg.compile.mode)
         print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
-    trainer = DINTrainer(model, train_cfg)
-    trainer.setup_total_train_samples(cfg["data"], train_cfg.data.batch_size)
+    trainer = DINTrainer(model, train_cfg, cfg["data"])
     trainer.fit(train_loader, val_loader, test_loader)
 
     if test_loader is not None:

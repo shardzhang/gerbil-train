@@ -87,9 +87,6 @@ class GwENMultiTrainer(BaseTrainer):
         self.val_hit1_history: list[float] = []
         self.val_hit10_history: list[float] = []
         
-        if train_cfg.checkpoint.path is not None:
-            self.set_profile_path(Path(train_cfg.checkpoint.path))
-        
         if data_cfg is not None:
             self.setup_total_train_samples(data_cfg, train_cfg.data.batch_size)
         

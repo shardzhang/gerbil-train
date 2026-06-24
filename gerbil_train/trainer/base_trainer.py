@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -76,6 +77,8 @@ class BaseTrainer:
         self.current_epoch: int = 0
         self.epochs: int = 0
         self.global_step: int = 0
+        self._file_logger: logging.Logger | None = None
+        self._log_path: Path | None = None
         self.plot_path: Path | None = None
         self.train_loss_history: list[float] = []
         self.val_loss_history: list[float] = []
@@ -85,6 +88,9 @@ class BaseTrainer:
         self._steps_per_epoch: int = 0
         self._profile_path: Path | None = None
         self._epoch_start_time: float = 0.0
+
+        if self.best_checkpoint_path is not None:
+            self.set_profile_path(self.best_checkpoint_path)
 
 
     def set_batch_inspector(self, inspector: Any) -> None:
@@ -111,6 +117,14 @@ class BaseTrainer:
     def set_profile_path(self, run_dir: Path) -> None:
         """Set the path for saving training profile logs."""
         self._profile_path = run_dir / "profile.txt"
+        self._log_path = self._profile_path.parent / "exp.log"
+        self._file_logger = logging.getLogger(f"trainer.{id(self)}")
+        self._file_logger.setLevel(logging.INFO)
+        self._file_logger.propagate = False
+        self._log_path.parent.mkdir(parents=True, exist_ok=True)
+        handler = logging.FileHandler(str(self._log_path), encoding="utf-8")
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        self._file_logger.addHandler(handler)
 
 
     def finalize_epoch(self, epoch: int, metrics: dict[str, float], message: str) -> None:
@@ -153,7 +167,7 @@ class BaseTrainer:
         self.on_train_start()
 
         if self._total_train_samples > 0:
-            print(f"Train samples: {self._total_train_samples} | Steps/epoch: {self._steps_per_epoch}")
+            self.log_message(f"Train samples: {self._total_train_samples} | Steps/epoch: {self._steps_per_epoch}")
 
         try:
             for epoch in range(self.epochs):
@@ -403,6 +417,7 @@ class BaseTrainer:
 
     def update_best_state(self, metrics: dict[str, float]) -> bool:
         """Check whether the monitored metric improved.
+
         The default logic compares the current monitored metric with the best
         value seen so far, saves the best checkpoint when the metric improves,
         and stops training when the metric fails to improve for ``patience``
@@ -420,7 +435,7 @@ class BaseTrainer:
             self.wait = 0
             if self.best_checkpoint_path is not None:
                 self.save_checkpoint(self.best_checkpoint_path)
-                print(f"Saved best model to {self.best_checkpoint_path.resolve()}")
+                self.log_message(f"Saved best model to {self.best_checkpoint_path.resolve()}")
             return False
 
         self.wait += 1
@@ -472,5 +487,7 @@ class BaseTrainer:
 
 
     def log_message(self, message: str) -> None:
-        """Emit a trainer log message."""
+        """Emit a trainer log message to stdout and exp.log."""
         print(message)
+        if self._file_logger is not None:
+            self._file_logger.info(message)

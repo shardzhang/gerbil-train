@@ -77,12 +77,14 @@ def build_dataloaders(data_cfg: dict[str, Any], model_cfg: GwENModelConfig, trai
     return train_loader, validation_loader, test_loader
 
 
-def build_model_config(model_cfg: dict[str, Any], data_cfg: dict[str, Any]) -> GwENModelConfig:
+def build_model_config(exp_cfg: dict[str, Any]) -> GwENModelConfig:
     """Build model config with enabled fields and field stats."""
-    enabled_field_entries, disabled_field_names = load_enabled_field_entries(model_cfg)
+    model_raw: dict[str, Any] = exp_cfg["model"]
+    data_cfg: dict[str, Any] = exp_cfg["data"]
+    enabled_field_entries, disabled_field_names = load_enabled_field_entries(model_raw)
     print(f"Disabled fields: {disabled_field_names}")
     
-    model_cfg = GwENModelConfig.from_dict(model_cfg, enabled_field_entries)
+    model_cfg = GwENModelConfig.from_dict(model_raw, enabled_field_entries)
     pos_map_json = Path(data_cfg["paths"]["nn_pos_map_json"])
     field_stats = load_field_stats(pos_map_json)
     target_size = load_target_size(pos_map_json)
@@ -96,7 +98,7 @@ def main() -> None:
     args = parse_args(CONFIG_PATH)
     exp_cfg: dict[str, Any] = load_experiment_config(args.config)
     data_cfg: dict[str, Any] = exp_cfg["data"]
-    model_cfg: GwENModelConfig = build_model_config(exp_cfg["model"], data_cfg)
+    model_cfg: GwENModelConfig = build_model_config(exp_cfg)
     
     run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_ml1m_multiclass")
     train_cfg: GwENTrainConfig = GwENTrainConfig.from_dict(exp_cfg["train"])

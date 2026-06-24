@@ -35,15 +35,20 @@ class Predictor:
         self.device = torch.device(device)
         self.model.eval()
 
+
     def load_checkpoint(self, ckpt_path: str | Path) -> None:
         """Load model weights from a saved checkpoint."""
         state = torch.load(ckpt_path, map_location=self.device, weights_only=False)
         if isinstance(state, dict) and "model_state_dict" in state:
-            self.model.load_state_dict(state["model_state_dict"])
+            state_dict = state["model_state_dict"]
         else:
-            self.model.load_state_dict(state)
+            state_dict = state
+        if any(k.startswith("_orig_mod.") for k in state_dict):
+            state_dict = {k.removeprefix("_orig_mod."): v for k, v in state_dict.items()}
+        self.model.load_state_dict(state_dict)
         self.model.eval()
         print(f"Loaded checkpoint from {ckpt_path}")
+
 
     @torch.no_grad()
     def predict(self, dataloader: DataLoader) -> list[dict[str, Any]]:
@@ -108,6 +113,12 @@ class Predictor:
         scores = torch.tensor([r["score"] for r in results], dtype=torch.float32)
         labels = torch.tensor([r["label"] for r in results], dtype=torch.float32)
         user_ids = torch.tensor([r["user_id"] for r in results], dtype=torch.long)
+
+        if user_ids.numel() > 0:
+            unique = user_ids.unique()
+            print(f"[Diagnostic] user_ids: {len(user_ids)} total, {len(unique)} unique, "
+                  f"min={user_ids.min().item()}, max={user_ids.max().item()}, "
+                  f"first_10={user_ids[:10].tolist()}")
 
         return {
             "auc": round(auc(labels, scores), 4),

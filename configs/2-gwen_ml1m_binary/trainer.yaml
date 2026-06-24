@@ -1,6 +1,6 @@
 seed: 42
 device: cpu
-epochs: 1
+epochs: 5
 
 data:
   batch_size: 512

@@ -21,18 +21,19 @@ __all__ = ["DINTrainer", "DINTrainingResult"]
 @dataclass
 class DINTrainingResult:
     train_loss_history: list[float]
+    val_loss_history: list[float]
     val_auc_history: list[float]
-    best_auc: float
+    val_gauc_history: list[float]
+    best_metric: float
 
 
 class DINTrainer(BaseTrainer):
-    def __init__(self, model: nn.Module, config: GwENTrainConfig) -> None:
-        
+    """Trainer for DIN (Deep Interest Network) binary classification models."""
+    def __init__(self, model: nn.Module, config: GwENTrainConfig, data_cfg: dict[str, Any] | None = None) -> None:
         optimizer_cfg = config.optimizer
         scheduler_cfg = config.scheduler
         checkpoint_cfg = config.checkpoint
         early_stop_cfg = config.early_stop
-        logging_cfg = config.logging
 
         optimizer = optim.Adam(
             model.parameters(), 
@@ -47,17 +48,13 @@ class DINTrainer(BaseTrainer):
                 patience=int(scheduler_cfg.patience),
             ) if scheduler_cfg.enabled else None
         
-        device = config.device or ("cuda" if torch.cuda.is_available() else "cpu")
-        if device == "cuda" and not torch.cuda.is_available():
-            device = "cpu"
-
         super().__init__(
             model=model, 
             optimizer=optimizer, 
             scheduler=scheduler, 
-            device=device,
+            device=config.device or ("cuda" if torch.cuda.is_available() else "cpu"),
             gradient_clip_norm=None,
-            monitor=str(checkpoint_cfg.monitor or "val_auc"),
+            monitor=str(checkpoint_cfg.monitor or "val_gauc"),
             monitor_mode=str(checkpoint_cfg.mode or "max"),
             patience=0 if not early_stop_cfg.enabled else int(early_stop_cfg.patience),
             best_checkpoint_path=checkpoint_cfg.path,
@@ -65,14 +62,20 @@ class DINTrainer(BaseTrainer):
             wait=0, 
             seed=config.seed,
         )
+        self.model_name = "DIN"
         self.config = config
         self.epochs = int(config.epochs)
         self.train_loader: DataLoader | None = None
         self.validation_loader: DataLoader | None = None
         self.test_loader: DataLoader | None = None
-        self.model_name = "DIN"
-        self.val_metric_history: list[float] = []
-        self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
+
+        self.train_loss_history: list[float] = []
+        self.val_loss_history: list[float] = []
+        self.val_auc_history: list[float] = []
+        self.val_gauc_history: list[float] = []
+
+        if data_cfg is not None:
+            self.setup_total_train_samples(data_cfg, config.data.batch_size)
 
         if config.inspector.enabled:
             self.set_batch_inspector(BatchInspector(
@@ -83,8 +86,10 @@ class DINTrainer(BaseTrainer):
     def build_result(self) -> DINTrainingResult:
         return DINTrainingResult(
             train_loss_history=list(self.train_loss_history),
-            val_auc_history=list(self.val_metric_history),
-            best_auc=self.best_metric or 0.0,
+            val_loss_history=list(self.val_loss_history),
+            val_gauc_history=list(self.val_gauc_history),
+            val_auc_history=list(self.val_auc_history),
+            best_metric=self.best_metric or 0.0,
         )
     
     def compute_loss(self, outputs: torch.Tensor, batch: Any) -> torch.Tensor:
