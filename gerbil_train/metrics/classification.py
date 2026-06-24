@@ -6,11 +6,12 @@ Typical examples include:
     - GAUC: 对每个用户，随机抽一个正样本、一个负样本，模型把正样本排在前面的概率的期望值的期望值
     - AP: 平均精度
     - MAP: 平均平均精度，即对每个用户，取平均精度的期望值
-    - accuracy
-    - precision
-    - recall
-    - F1
-    - log loss
+    - accuracy: 正确率(需要阈值)
+    - precision: 精确率(需要阈值)
+    - recall: 召回率(需要阈值)
+    - F1: F1值(需要阈值)
+    - log loss: $$ \text{LogLoss} = -\frac{1}{N}\sum [y \log(\hat{y}) + (1-y) \log(1-\hat{y})] $$
+    - NDCG@K:（对排名位置做折损，比 MRR 更精细），但它需要 relevance score，当前 0/1 标签下 NDCG 退化成 MRR 的近似，信息量不大。
 
 These metrics are suitable for CTR prediction, binary scoring tasks, and
 implicit-feedback classification evaluation.

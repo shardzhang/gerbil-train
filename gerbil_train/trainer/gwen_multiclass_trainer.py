@@ -1,3 +1,7 @@
+"""Trainer for GwEN multi-class recommendation models.
+prediction next movie which user could like.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

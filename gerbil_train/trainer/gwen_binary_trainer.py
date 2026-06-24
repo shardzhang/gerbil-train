@@ -1,4 +1,6 @@
-"""Trainer for GwEN binary classification models."""
+"""Trainer for GwEN binary classification models.
+predict the movie watch score of a movie to a user.
+"""
 
 from __future__ import annotations
 
