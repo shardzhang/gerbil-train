@@ -80,4 +80,32 @@ def average_precision(labels: torch.Tensor, predictions: torch.Tensor) -> float:
     return float((precisions * sorted_labels).sum() / pos_count)
 
 
-__all__ = ["auc", "average_precision", "hit_rate"]
+def gauc(user_ids: torch.Tensor, labels: torch.Tensor, predictions: torch.Tensor) -> float:
+    """Compute Group AUC (GAUC) weighted by group size.
+
+    For each user (group), computes AUC only if the group has both
+    positive and negative samples. The final GAUC is the weighted
+    average across groups, weighted by the number of samples in each group.
+
+    :param user_ids: ``[total_samples]`` user/query IDs
+    :param labels: ``[total_samples]`` binary labels
+    :param predictions: ``[total_samples]`` predicted scores
+    :return: GAUC score as a float
+    """
+    labels = labels.flatten()
+    predictions = predictions.flatten()
+    user_ids = user_ids.flatten()
+    total_weight = 0
+    total_gauc = 0.0
+    for uid in user_ids.unique():
+        mask = user_ids == uid
+        g_labels = labels[mask]
+        g_scores = predictions[mask]
+        if g_labels.float().sum() > 0 and (g_labels == 0).sum() > 0:
+            w = int(mask.sum().item())
+            total_weight += w
+            total_gauc += w * auc(g_labels, g_scores)
+    return total_gauc / max(total_weight, 1)
+
+
+__all__ = ["auc", "average_precision", "gauc", "hit_rate"]

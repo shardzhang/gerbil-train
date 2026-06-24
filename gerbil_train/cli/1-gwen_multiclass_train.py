@@ -98,10 +98,10 @@ def main() -> None:
     data_cfg: dict[str, Any] = exp_cfg["data"]
     model_cfg: GwENModelConfig = build_model_config(exp_cfg["model"], data_cfg)
     
-    run_dir, checkpoint_path, plot_path = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_ml1m_multiclass")
+    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_ml1m_multiclass")
     train_cfg: GwENTrainConfig = GwENTrainConfig.from_dict(exp_cfg["train"])
-    train_cfg.checkpoint.path = str(checkpoint_path)
-    train_cfg.logging.plot_path = str(plot_path)
+    train_cfg.checkpoint.path = str(run_dir)
+    train_cfg.logging.plot_path = str(run_dir)
     print(f"Training config | seed={train_cfg.seed} | epochs={train_cfg.epochs} | batch_size={train_cfg.data.batch_size}")
     print(f"Run dir: {run_dir}")
     print(f"Loading GwEN TFRecords from {data_cfg['paths']['tfrecord_root']}")

@@ -31,9 +31,9 @@ class TrainSchedulerConfig:
 
 @dataclass
 class TrainCheckpointConfig:
+    monitor: str
+    mode: str
     path: str | None = None
-    monitor: str = "hit@1"
-    mode: str = "max"
 
 
 @dataclass

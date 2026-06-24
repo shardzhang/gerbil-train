@@ -29,7 +29,7 @@ scheduler:
   patience: 2
 
 checkpoint:
-  monitor: hit@1
+  monitor: val_hit@1
   mode: max
 
 early_stop:
@@ -38,9 +38,7 @@ early_stop:
 logging:
   verbose: true
 
-evaluation:
-  topk: 10
-
+evaluation: {}
 inspector:
   enabled: false
   log_first: 3

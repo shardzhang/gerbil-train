@@ -15,7 +15,7 @@ from gerbil_train.config.train_config import GwENTrainConfig
 from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils import BatchInspector
 from gerbil_train.utils.plot import save_curve_values
-from gerbil_train.metrics.classification import auc, average_precision
+from gerbil_train.metrics.classification import auc, average_precision, gauc
 
 __all__ = ["GwENBinaryTrainer", "GwENBinaryTrainingResult"]
 
@@ -25,7 +25,8 @@ class GwENBinaryTrainingResult:
     train_loss_history: list[float]
     val_auc_history: list[float]
     val_ap_history: list[float]
-    best_auc: float
+    val_gauc_history: list[float]
+    best_metric: float              # gauc值
 
 
 class GwENBinaryTrainer(BaseTrainer):
@@ -43,20 +44,19 @@ class GwENBinaryTrainer(BaseTrainer):
         )
 
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode=str(scheduler_cfg.mode),
-                factor=float(scheduler_cfg.factor), patience=int(scheduler_cfg.patience),
-            ) if scheduler_cfg.enabled else None
+            optimizer, 
+            mode=str(scheduler_cfg.mode),
+            factor=float(scheduler_cfg.factor), 
+            patience=int(scheduler_cfg.patience),
+        ) if scheduler_cfg.enabled else None
         
-        device = train_cfg.device or ("cuda" if torch.cuda.is_available() else "cpu")
-        if device == "cuda" and not torch.cuda.is_available():
-            device = "cpu"
-
         super().__init__(
             model=model, 
             optimizer=optimizer, 
-            scheduler=scheduler, device=device,
+            scheduler=scheduler, 
+            device=train_cfg.device or ("cuda" if torch.cuda.is_available() else "cpu"),
             gradient_clip_norm=None,
-            monitor=str(checkpoint_cfg.monitor or "val_auc"),
+            monitor=str(checkpoint_cfg.monitor or "val_gauc"),
             monitor_mode=str(checkpoint_cfg.mode or "max"),
             patience=0 if not early_stop_cfg.enabled else int(early_stop_cfg.patience),
             best_checkpoint_path=checkpoint_cfg.path,
@@ -67,7 +67,6 @@ class GwENBinaryTrainer(BaseTrainer):
         )
 
         self.model_name = "GwEN Binary"
-        self.metric_name = "AUC"
         self.config = train_cfg
         self.epochs = int(train_cfg.epochs)
 
@@ -75,10 +74,11 @@ class GwENBinaryTrainer(BaseTrainer):
         self.validation_loader: DataLoader | None = None
         self.test_loader: DataLoader | None = None
         
-        self.val_auc_history: list[float] = []
-        self.val_ap_history: list[float] = []
         self.train_loss_history: list[float] = []
         self.val_loss_history: list[float] = []
+        self.val_auc_history: list[float] = []
+        self.val_ap_history: list[float] = []
+        self.val_gauc_history: list[float] = []
         self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
 
         if data_cfg is not None:
@@ -96,10 +96,12 @@ class GwENBinaryTrainer(BaseTrainer):
         self.train_loader = train_loader
         self.validation_loader = validation_loader
         self.test_loader = test_loader
+        
         self.train_loss_history.clear()
         self.val_loss_history.clear()
         self.val_auc_history.clear()
         self.val_ap_history.clear()
+        self.val_gauc_history.clear()
 
         super().fit_epochs()
         
@@ -107,7 +109,8 @@ class GwENBinaryTrainer(BaseTrainer):
             train_loss_history=list(self.train_loss_history),
             val_auc_history=list(self.val_auc_history),
             val_ap_history=list(self.val_ap_history),
-            best_auc=self.best_metric or 0.0,
+            val_gauc_history=list(self.val_gauc_history),
+            best_metric=self.best_metric,
         )
     
 
@@ -138,7 +141,7 @@ class GwENBinaryTrainer(BaseTrainer):
 
 
     def forward_step(self, batch: dict[str, Any]) -> torch.Tensor:
-        """ Forward pass to compute model outputs for a batch. """
+        """Forward pass to compute model outputs for a batch. """
         return self.model(batch["feature_bags"])
 
 
@@ -154,6 +157,7 @@ class GwENBinaryTrainer(BaseTrainer):
         val_loss = metrics.get("val_loss")
         val_auc = metrics.get("val_auc")
         val_ap = metrics.get("val_ap")
+        val_gauc = metrics.get("val_gauc")
 
         if train_loss is not None:
             self.train_loss_history.append(float(train_loss))
@@ -163,6 +167,8 @@ class GwENBinaryTrainer(BaseTrainer):
             self.val_auc_history.append(float(val_auc))
         if val_ap is not None:
             self.val_ap_history.append(float(val_ap))
+        if val_gauc is not None:
+            self.val_gauc_history.append(float(val_gauc))
 
         message = f"Epoch {epoch + 1} | loss: {train_loss:.4f}" if train_loss is not None else f"Epoch {epoch + 1}"
         if val_loss is not None:
@@ -171,6 +177,8 @@ class GwENBinaryTrainer(BaseTrainer):
             message += f" | auc: {val_auc:.4f}"
         if val_ap is not None:
             message += f" | ap: {val_ap:.4f}"
+        if val_gauc is not None:
+            message += f" | gauc: {val_gauc:.4f}"
         self.finalize_epoch(epoch, metrics, message)
 
 
@@ -180,8 +188,9 @@ class GwENBinaryTrainer(BaseTrainer):
             return {}
 
         self.model.eval()
-        total_auc = 0.0
-        total_ap = 0.0
+        all_uids: list[torch.Tensor] = []
+        all_labels: list[torch.Tensor] = []
+        all_scores: list[torch.Tensor] = []
         total_loss = 0.0
         total_steps = 0
         with torch.no_grad():
@@ -190,16 +199,27 @@ class GwENBinaryTrainer(BaseTrainer):
                 sigmoids = self.forward_step(batch)
                 targets = batch["targets"].float()
                 total_loss += self.compute_loss(sigmoids, targets).item()
-                total_auc += auc(targets, sigmoids)
-                total_ap += average_precision(targets, sigmoids)
+                uid_bag = batch["feature_bags"].get("user_id")
+                if uid_bag is not None:
+                    all_uids.append(uid_bag["indices"][uid_bag["offsets"]])
+                all_labels.append(targets)
+                all_scores.append(sigmoids)
                 total_steps += 1
 
-        denominator = max(total_steps, 1)
-        return {
-            "loss": total_loss / denominator,
-            "auc": total_auc / denominator,
-            "ap": total_ap / denominator,
+        cat_labels = torch.cat(all_labels)
+        cat_scores = torch.cat(all_scores)
+
+        result = {
+            "loss": total_loss / max(total_steps, 1),
+            "auc": auc(cat_labels, cat_scores),
+            "ap": average_precision(cat_labels, cat_scores),
         }
+
+        if all_uids:
+            cat_uids = torch.cat(all_uids)
+            result["gauc"] = gauc(cat_uids, cat_labels, cat_scores)
+
+        return result
 
 
     def evaluate(self, dataloader: DataLoader | None = None) -> dict[str, float]:
@@ -208,28 +228,35 @@ class GwENBinaryTrainer(BaseTrainer):
             return {}
 
         self.model.eval()
-        total_auc = 0.0
-        total_ap = 0.0
+        all_uids: list[torch.Tensor] = []
+        all_labels: list[torch.Tensor] = []
+        all_scores: list[torch.Tensor] = []
         total_steps = 0
         with torch.no_grad():
             for batch in dataloader:
                 batch = self.move_batch_to_device(batch)
                 sigmoids = self.forward_step(batch)
                 targets = batch["targets"].float()
-                total_auc += auc(targets, sigmoids)
-                total_ap += average_precision(targets, sigmoids)
+                uid_bag = batch["feature_bags"].get("user_id")
+                if uid_bag is not None:
+                    all_uids.append(uid_bag["indices"][uid_bag["offsets"]])
+                all_labels.append(targets)
+                all_scores.append(sigmoids)
                 total_steps += 1
-        denominator = max(total_steps, 1)
-        return {
-            "test_auc": round(total_auc / denominator, 4),
-            "test_ap": round(total_ap / denominator, 4),
+
+        cat_labels = torch.cat(all_labels)
+        cat_scores = torch.cat(all_scores)
+
+        result = {
+            "test_auc": round(auc(cat_labels, cat_scores), 4),
+            "test_ap": round(average_precision(cat_labels, cat_scores), 4),
         }
 
+        if all_uids:
+            cat_uids = torch.cat(all_uids)
+            result["test_gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
 
-    def on_validation_end(self, metrics: dict[str, float]) -> None:
-        monitored = metrics.get("auc")
-        if monitored is not None:
-            self.scheduler_step(monitored)
+        return result
 
     
     def save_training_artifacts(self) -> None:

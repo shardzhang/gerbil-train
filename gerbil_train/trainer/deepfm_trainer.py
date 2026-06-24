@@ -58,7 +58,6 @@ class DeepFMTrainer(BaseTrainer):
         self.validation_loader: DataLoader | None = None
         self.test_loader: DataLoader | None = None
         self.model_name = "DeepFM"
-        self.metric_name = "AUC"
         self.val_metric_history: list[float] = []
         self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
 

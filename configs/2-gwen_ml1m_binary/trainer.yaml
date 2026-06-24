@@ -23,7 +23,7 @@ scheduler:
   enabled: true
 
 checkpoint:
-  monitor: val_auc
+  monitor: val_gauc
   mode: max
 
 logging:

@@ -82,7 +82,6 @@ def main() -> None:
         model = torch.compile(model, mode=train_cfg.compile.mode)
         print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
     trainer = DeepFMTrainer(model, train_cfg)
-    trainer.set_profile_path(run_dir)
     trainer.setup_total_train_samples(cfg["data"], train_cfg.trainer.batch_size)
     trainer.fit(train_loader, val_loader, test_loader)
 

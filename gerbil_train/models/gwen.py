@@ -8,8 +8,8 @@ import torch
 from torch import Tensor, nn
 
 from gerbil_train.config.model_config import GwENModelConfig
-from gerbil_train.utils.embedding import embed_one_field, to_device
-from gerbil_train.utils.nn import FullyConnectedLayer, get_activation
+from gerbil_train.utils.embedding import embed_one_field
+from gerbil_train.models.layers import FullyConnectedLayer
 from gerbil_train.config.model_config import FieldEntry
 
 __all__ = ["GwENBaseModel", "GwENBinaryModel", "GwENMulticlassModel"]

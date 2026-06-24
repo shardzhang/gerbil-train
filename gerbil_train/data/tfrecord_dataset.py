@@ -180,19 +180,15 @@ class TFRecordDataset(IterableDataset):
             raise ValueError("field_specs must not be empty")
 
 
-    @staticmethod
-    def _extract_target(example: example_pb2.Example) -> int | float:
+    def _extract_target(self, example: example_pb2.Example) -> int | float:
         """Extract the target label from a TFRecord ``Example``.
-
         Subclasses must override this method.
         """
         raise NotImplementedError
 
 
-    @staticmethod
-    def _extract_field_values(features: dict[str, example_pb2.Feature], field_name: str) -> tuple[list[int], list[float]]:
+    def _extract_field_values(self, features: dict[str, example_pb2.Feature], field_name: str) -> tuple[list[int], list[float]]:
         """Extract indices and values for a named field from a TFRecord example.
-
         :return: Tuple of ``(indices, values)``.
         """
         idx_feat = features.get(f"{field_name}_index")
@@ -229,7 +225,6 @@ class TFRecordDataset(IterableDataset):
             for raw_record in iterator:
                 example: example_pb2.Example = example_pb2.Example()
                 example.ParseFromString(raw_record)
-
                 target = self._extract_target(example)
                 features: dict[str, example_pb2.Feature] = example.features.feature
                 field_indices: dict[str, list[int]] = {}
@@ -267,7 +262,7 @@ class TFRecordDataset(IterableDataset):
 
 class BinaryTFRecordDataset(TFRecordDataset):
     """TFRecord dataset for binary CTR classification."""
-    def _extract_target(example: example_pb2.Example) -> float:
+    def _extract_target(self, example: example_pb2.Example) -> float:
         target_feature = example.features.feature.get("target")
         if target_feature is None:
             raise ValueError("Missing target feature in TFRecord example")
@@ -279,7 +274,7 @@ class BinaryTFRecordDataset(TFRecordDataset):
 
 class MultiTFRecordDataset(TFRecordDataset):
     """TFRecord dataset for multi-class classification."""
-    def _extract_target(example: example_pb2.Example) -> int:
+    def _extract_target(self, example: example_pb2.Example) -> int:
         target_feature: example_pb2.Feature | None = example.features.feature.get("target")
         if target_feature is None:
             raise ValueError("Missing target feature in TFRecord example")

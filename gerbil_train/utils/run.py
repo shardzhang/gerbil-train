@@ -8,15 +8,14 @@ from pathlib import Path
 import yaml
 
 
-def create_run_dir(base_dir: str | Path) -> tuple[Path, Path, Path]:
+def create_run_dir(base_dir: str | Path) -> Path:
     """Create a timestamped run directory.
-    Returns ``(run_dir, checkpoint_path, plot_path)`` where
-    ``checkpoint_path`` and ``plot_path`` are derived paths inside the run dir.
+    Returns the run_dir.
     """
     run_id = datetime.now().strftime("%Y%m%d%H%M%S")
     run_dir = Path(base_dir) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir, run_dir / "best_model.pth", run_dir / "training_curves.png"
+    return run_dir
 
 
 def save_run_configs(experiment_path: str | Path, run_dir: Path, project_root: str | Path | None = None) -> None:

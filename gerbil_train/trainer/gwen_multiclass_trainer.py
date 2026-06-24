@@ -3,20 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from tqdm.auto import tqdm
 
 import torch
 import torch.nn.functional as F
-from matplotlib import pyplot as plt
 from torch import nn, optim
 from torch.utils.data import DataLoader
-from tqdm.auto import tqdm
 
+from gerbil_train.utils import BatchInspector
+from gerbil_train.utils.plot import save_curve_values
 from gerbil_train.config.train_config import GwENTrainConfig
 from gerbil_train.losses.classification import nce_loss, sampled_softmax_loss
 from gerbil_train.metrics.classification import hit_rate
 from gerbil_train.trainer.base_trainer import BaseTrainer
-from gerbil_train.utils import BatchInspector
-from gerbil_train.utils.plot import save_curve_values
 
 __all__ = ["GwENMultiTrainer", "GwENMultiTrainingResult"]
 
@@ -25,9 +24,9 @@ __all__ = ["GwENMultiTrainer", "GwENMultiTrainingResult"]
 class GwENMultiTrainingResult:
     """Container for aggregated GwEN training results."""
     train_loss_history: list[float]
-    val_top1_history: list[float]
-    val_top10_history: list[float]
-    best_top1: float
+    val_hit1_history: list[float]
+    val_hit10_history: list[float]
+    best_metric: float
 
 
 class GwENMultiTrainer(BaseTrainer):
@@ -38,7 +37,6 @@ class GwENMultiTrainer(BaseTrainer):
         checkpoint_cfg = train_cfg.checkpoint
         early_stop_cfg = train_cfg.early_stop
         logging_cfg = train_cfg.logging
-        evaluation_cfg = train_cfg.evaluation
 
         optimizer = optim.Adam(
             model.parameters(),
@@ -55,15 +53,14 @@ class GwENMultiTrainer(BaseTrainer):
                 patience=scheduler_cfg.patience,
             )
 
-        device = train_cfg.device or ("cuda" if torch.cuda.is_available() else "cpu")
         super().__init__(
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
-            device=device,
+            device=train_cfg.device or ("cuda" if torch.cuda.is_available() else "cpu"),
             gradient_clip_norm=None,
-            monitor=checkpoint_cfg.monitor,
-            monitor_mode=checkpoint_cfg.mode,
+            monitor=checkpoint_cfg.monitor or f"val_hit@1",
+            monitor_mode=checkpoint_cfg.mode or "max",
             patience=0 if not early_stop_cfg.enabled else int(early_stop_cfg.patience),
             best_checkpoint_path=checkpoint_cfg.path,
             best_metric=None,
@@ -74,7 +71,6 @@ class GwENMultiTrainer(BaseTrainer):
 
         self.config = train_cfg
         self.epochs = int(train_cfg.epochs)
-        self.topk = int(evaluation_cfg.topk)
         self.loss_cfg = train_cfg.loss
         self._use_sampled_loss = self.loss_cfg.type in ("nce", "sampled_softmax")
         self.train_loader: DataLoader | None = None
@@ -83,13 +79,12 @@ class GwENMultiTrainer(BaseTrainer):
         
         self.plot_path = Path(logging_cfg.plot_path)
         self.train_loss_history: list[float] = []
-        self.val_top1_history: list[float] = []
-        self.val_topk_history: list[float] = []
         self.val_loss_history: list[float] = []
-        self.val_top10_history: list[float] = []
+        self.val_hit1_history: list[float] = []
+        self.val_hit10_history: list[float] = []
         
         if train_cfg.checkpoint.path is not None:
-            self._profile_path = Path(train_cfg.checkpoint.path).parent / "profile.txt"
+            self.set_profile_path(Path(train_cfg.checkpoint.path))
         
         if data_cfg is not None:
             self.setup_total_train_samples(data_cfg, train_cfg.data.batch_size)
@@ -106,17 +101,19 @@ class GwENMultiTrainer(BaseTrainer):
         self.train_loader = train_loader
         self.validation_loader = validation_loader
         self.test_loader = test_loader
+
         self.train_loss_history.clear()
-        self.val_top1_history.clear()
-        self.val_top10_history.clear()
+        self.val_loss_history.clear()
+        self.val_hit1_history.clear()
+        self.val_hit10_history.clear()
 
         super().fit_epochs()
         
         return GwENMultiTrainingResult(
             train_loss_history=list(self.train_loss_history),
-            val_top1_history=list(self.val_top1_history),
-            val_top10_history=list(self.val_top10_history),
-            best_top1=self.best_metric,
+            val_hit1_history=list(self.val_hit1_history),
+            val_hit10_history=list(self.val_hit10_history),
+            best_metric=self.best_metric,
         )
 
 
@@ -159,24 +156,24 @@ class GwENMultiTrainer(BaseTrainer):
         train_loss = metrics.get("train_loss")
         val_loss = metrics.get("val_loss")
         val_hit1 = metrics.get("val_hit@1")
-        val_hitk = metrics.get(f"val_hit@{self.topk}")
+        val_hit10 = metrics.get(f"val_hit@10")
 
         if train_loss is not None:
             self.train_loss_history.append(float(train_loss))
         if val_loss is not None:
             self.val_loss_history.append(float(val_loss))
         if val_hit1 is not None:
-            self.val_top1_history.append(float(val_hit1))
-        if val_hitk is not None:
-            self.val_topk_history.append(float(val_hitk))
+            self.val_hit1_history.append(float(val_hit1))
+        if val_hit10 is not None:
+            self.val_hitk_history.append(float(val_hit10))
 
         message = f"Epoch {epoch + 1} | loss: {train_loss:.4f}" if train_loss is not None else f"Epoch {epoch + 1}"
         if val_loss is not None:
             message += f" | val_loss: {val_loss:.4f}"
         if val_hit1 is not None:
             message += f" | Hit@1 val: {val_hit1:.4f}"
-        if val_hitk is not None:
-            message += f" | Hit@{self.topk} val: {val_hitk:.4f}"
+        if val_hit10 is not None:
+            message += f" | Hit@10 val: {val_hit10:.4f}"
         self.finalize_epoch(epoch, metrics, message)
 
 
@@ -186,8 +183,8 @@ class GwENMultiTrainer(BaseTrainer):
             return {}
 
         self.model.eval()
-        total_top1 = 0.0
-        total_topk_hit = 0.0
+        total_hit1 = 0.0
+        total_hit10 = 0.0
         total_loss = 0.0
         total_steps = 0
         with torch.no_grad():
@@ -196,15 +193,15 @@ class GwENMultiTrainer(BaseTrainer):
                 logits = self.forward_step(batch)
                 targets = batch["targets"].long()
                 total_loss += self.compute_loss(logits, targets).item()
-                total_top1 += hit_rate(logits, targets, k=1)
-                total_topk_hit += hit_rate(logits, targets, self.topk)
+                total_hit1 += hit_rate(logits, targets, k=1)
+                total_hit10 += hit_rate(logits, targets, k=10)
                 total_steps += 1
 
         denominator = max(total_steps, 1)
         return {
             "loss": total_loss / denominator,
-            "hit@1": total_top1 / denominator,
-            f"hit@{self.topk}": total_topk_hit / denominator,
+            "hit@1": round(total_hit1 / denominator, 4),
+            f"hit@10": round(total_hit10 / denominator, 4),
         }
 
 
@@ -214,50 +211,42 @@ class GwENMultiTrainer(BaseTrainer):
             return {}
 
         self.model.eval()
-        total_top1_hit = 0.0
-        total_topk_hit = 0.0
+        total_hit1 = 0.0
+        total_hit10 = 0.0
         total_steps = 0
         with torch.no_grad():
             for batch in dataloader:
                 batch = self.move_batch_to_device(batch)
                 logits = self.forward_step(batch)
                 targets = batch["targets"].long()
-                total_top1_hit += hit_rate(logits, targets, k=1)
-                total_topk_hit += hit_rate(logits, targets, self.topk)
+                total_hit1 += hit_rate(logits, targets, k=1)
+                total_hit10 += hit_rate(logits, targets, k=10)
                 total_steps += 1
         denominator = max(total_steps, 1)
         return {
-            "test_hit@1": round(total_top1_hit / denominator, 4),
-            f"test_hit@{self.topk}": round(total_topk_hit / denominator, 4),
+            "test_hit@1": round(total_hit1 / denominator, 4),
+            f"test_hit@10": round(total_hit10 / denominator, 4),
         }
 
 
     def forward_step(self, batch: dict[str, Any]) -> torch.Tensor:
-        """ Forward pass to compute model outputs for a batch. """
+        """Forward pass to compute model outputs for a batch. """
         return self.model(batch["feature_bags"])
 
 
     def compute_loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """Compute the loss for a batch of outputs and targets. Uses cross-entropy for multi-class classification. """
-
         if logits.size(1) <= 1:
             return logits.sum() * 0.0
         return F.cross_entropy(logits, targets)
-
-
-    def on_validation_end(self, metrics: dict[str, float]) -> None:
-        """Hook called after validation ends to step the scheduler based on monitored metric. """
-        monitored = metrics.get("hit@1")
-        if monitored is not None:
-            self.scheduler_step(monitored)
 
 
     def save_training_artifacts(self) -> None:
         """Save training artifacts such as loss and metric curves after training completes. """
         if self.plot_path is None:
             return
-        save_curve_values(self.train_loss_history, self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt"))
-        save_curve_values(self.val_top1_history, self.plot_path.with_name(f"{self.plot_path.stem}_metric.txt"))
+        save_curve_values(self.train_loss_history, self.plot_path + "/training_curves_loss.txt")
+        save_curve_values(self.val_hit1_history, self.plot_path + "/training_curves_metric.txt")
         self.plot_loss_curve()
         self.plot_metric_curve()
 
@@ -290,22 +279,22 @@ class GwENMultiTrainer(BaseTrainer):
 
 
     def plot_metric_curve(self) -> None:
-        if self.plot_path is None or not self.val_top1_history:
+        if self.plot_path is None or not self.val_hit1_history:
             return
         from matplotlib import pyplot as plt
         fig, ax1 = plt.subplots(figsize=(8, 4))
-        epochs = range(1, len(self.val_top1_history) + 1)
+        epochs = range(1, len(self.val_hit1_history) + 1)
 
         ax1.set_xlabel("Epoch")
         ax1.set_ylabel("Hit@1", color="tab:orange")
-        ax1.plot(epochs, self.val_top1_history, color="tab:orange", linestyle="-", label=f"Hit@{1}")
+        ax1.plot(epochs, self.val_hit1_history, color="tab:orange", linestyle="-", label=f"Hit@{1}")
         ax1.tick_params(axis="y", labelcolor="tab:orange")
         ax1.legend(loc="upper left")
 
-        if self.val_topk_history:
+        if self.val_hit10_history:
             ax2 = ax1.twinx()
-            ax2.set_ylabel(f"Hit@{self.topk}", color="tab:green")
-            ax2.plot(epochs, self.val_topk_history, color="tab:green", linestyle="--", label=f"Hit@{self.topk}")
+            ax2.set_ylabel(f"Hit@10", color="tab:green")
+            ax2.plot(epochs, self.val_hit10_history, color="tab:green", linestyle="--", label=f"Hit@10")
             ax2.tick_params(axis="y", labelcolor="tab:green")
             ax2.legend(loc="upper right")
 

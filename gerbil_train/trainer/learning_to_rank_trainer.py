@@ -156,7 +156,7 @@ class LearningToRankTrainer(BaseTrainer):
 
         total_loss = 0.0
         train_pbar = tqdm(
-            self.train_loader, total=self.steps_per_epoch or None,
+            self.train_loader, total=self._steps_per_epoch or None,
             desc=f"Epoch {epoch_display}/{self.epochs} [train]",
             leave=False,
         )
