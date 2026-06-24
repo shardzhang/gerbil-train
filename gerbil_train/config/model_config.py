@@ -72,6 +72,8 @@ class GwENModelConfig:
 class DINModelConfig(GwENModelConfig):
     behavior_fields: list[str] = field(default_factory=list)
     target_fields: list[str] = field(default_factory=list)
+    softmax_attn: bool = False
+    target_merge: str = "mean"
 
     @classmethod
     def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "DINModelConfig":
@@ -80,6 +82,8 @@ class DINModelConfig(GwENModelConfig):
             embedding_fields={field.field_name: field for field in field_entries},
             behavior_fields=list(model_cfg.get("behavior_fields", [])),
             target_fields=list(model_cfg.get("target_fields", [])),
+            softmax_attn=bool(model_cfg.get("softmax_attn", False)),
+            target_merge=str(model_cfg.get("target_merge", "mean")),
             mlp=dict(model_cfg.get("mlp", {})),
             field_attention=dict(model_cfg.get("field_attention", {})),
             field_stats=dict(model_cfg.get("field_stats", {})),

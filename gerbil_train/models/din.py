@@ -9,7 +9,7 @@ from torch import Tensor, nn
 
 from gerbil_train.config.model_config import DINModelConfig
 from gerbil_train.utils.embedding import bag_to_padded, embed_one_field, to_device
-from gerbil_train.utils.nn import FullyConnectedLayer
+from gerbil_train.models.layers import FullyConnectedLayer
 
 __all__ = ["DIN"]
 
@@ -17,34 +17,18 @@ __all__ = ["DIN"]
 class DIN(nn.Module):
     """DIN (Deep Interest Network) for binary classification with behavior-sequence attention."""
 
-    def __init__(self, model_cfg: DINModelConfig, softmax_attn=False, target_merge: str = "mean") -> None:
-        """
-        :param softmax_attn: If True, apply softmax normalization to attention scores;
-            otherwise use raw scores (original DIN style).
-        :param target_merge: How to merge multiple target fields into an attention query.
-            "mean" — average all target embeddings (requires same emb_dim).
-            "proj" — concat then linearly project to behavior embedding dim.
-        """
+    def __init__(self, model_cfg: DINModelConfig) -> None:
         super().__init__()
 
         behavior_fields = model_cfg.behavior_fields
         target_fields = model_cfg.target_fields
-        
-        fields_cfg = model_cfg.embedding_fields
-        if not fields_cfg:
-            raise ValueError("embedding_fields must be a non-empty mapping")
-        for bf in behavior_fields:
-            if bf not in fields_cfg:
-                raise ValueError(f"behavior_field '{bf}' not found in embedding_fields")
-        for tf in target_fields:
-            if tf not in fields_cfg:
-                raise ValueError(f"target_field '{tf}' not found in embedding_fields")
+        self._validate_fields(model_cfg)
 
         self.item_num = model_cfg.target_size
-        self.softmax_attn = softmax_attn
+        self.softmax_attn = model_cfg.softmax_attn
+        self.target_merge = model_cfg.target_merge
         self.behavior_fields = behavior_fields
         self.target_fields = target_fields
-        self.target_merge = target_merge
         reserved = set(behavior_fields) | set(target_fields)
         self.field_names = [n for n in fields_cfg if n not in reserved]
 
@@ -114,6 +98,18 @@ class DIN(nn.Module):
         self.head = nn.Linear(final_hidden_dim, 1)
         self.reset_parameters()
 
+
+    @staticmethod
+    def _validate_fields(model_cfg: DINModelConfig) -> None:
+        fields_cfg = model_cfg.embedding_fields
+        if not fields_cfg:
+            raise ValueError("embedding_fields must be a non-empty mapping")
+        for bf in model_cfg.behavior_fields:
+            if bf not in fields_cfg:
+                raise ValueError(f"behavior_field '{bf}' not found in embedding_fields")
+        for tf in model_cfg.target_fields:
+            if tf not in fields_cfg:
+                raise ValueError(f"target_field '{tf}' not found in embedding_fields")
 
     def reset_parameters(self) -> None:
         # Even without explicit reset, PyTorch nn.EmbeddingBag defaults to Xavier uniform

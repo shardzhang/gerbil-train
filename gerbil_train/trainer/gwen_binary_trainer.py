@@ -240,9 +240,14 @@ class GwENBinaryTrainer(BaseTrainer):
             cat_uids: torch.Tensor = torch.cat(all_uids)
             n_unique = cat_uids.unique().shape[0]
             print(f"[DEBUG] uids: unique={n_unique}, total={cat_uids.shape[0]}, first_20={cat_uids[:20].tolist()}")
-            result["gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
-            result["map"] = round(map_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
-            result["mrr"] = round(mrr_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
+            valid_mask = cat_uids != 0
+            if valid_mask.any():
+                valid_uids = cat_uids[valid_mask]
+                valid_labels = cat_labels[valid_mask]
+                valid_scores = cat_scores[valid_mask]
+                result["gauc"] = round(gauc(valid_uids, valid_labels, valid_scores), 4)
+                result["map"] = round(map_score(valid_uids, valid_labels, valid_scores, weighted=True), 4)
+                result["mrr"] = round(mrr_score(valid_uids, valid_labels, valid_scores, weighted=True), 4)
         return result
 
 
@@ -281,9 +286,14 @@ class GwENBinaryTrainer(BaseTrainer):
             cat_uids: torch.Tensor = torch.cat(all_uids)
             n_unique = cat_uids.unique().shape[0]
             print(f"[DEBUG] test uids: unique={n_unique}, total={cat_uids.shape[0]}, first_20={cat_uids[:20].tolist()}")
-            result["test_gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
-            result["test_map"] = round(map_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
-            result["test_mrr"] = round(mrr_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
+            valid_mask = cat_uids != 0
+            if valid_mask.any():
+                valid_uids = cat_uids[valid_mask]
+                valid_labels = cat_labels[valid_mask]
+                valid_scores = cat_scores[valid_mask]
+                result["test_gauc"] = round(gauc(valid_uids, valid_labels, valid_scores), 4)
+                result["test_map"] = round(map_score(valid_uids, valid_labels, valid_scores, weighted=True), 4)
+                result["test_mrr"] = round(mrr_score(valid_uids, valid_labels, valid_scores, weighted=True), 4)
         return result
 
     

@@ -13,6 +13,8 @@ behavior_fields:
 target_fields:
 - movie_id
 - genres
+softmax_attn: false
+target_merge: mean
 embedding:
   default_emb_size: 16
   fields:
