@@ -445,23 +445,6 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         """
         return {}
 
-    def save_checkpoint(self, path: str) -> None:
-        """Save model and both optimizer states to a checkpoint file.
-
-        :param path: Destination checkpoint path
-        """
-        checkpoint_path = Path(path)
-        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-        checkpoint = {
-            "model_state_dict": self.model.state_dict(),
-            "implicit_optimizer_state_dict": self.implicit_optimizer.state_dict(),
-            "explicit_optimizer_state_dict": self.explicit_optimizer.state_dict(),
-            "config": self.config,
-            "best_metric": self.best_metric,
-            "current_stage": self.current_stage,
-        }
-        torch.save(checkpoint, checkpoint_path)
-
     def load_checkpoint(self, path: str) -> None:
         """Load model and optimizer states from a checkpoint file.
 

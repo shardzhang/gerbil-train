@@ -15,7 +15,7 @@ from gerbil_train.config.train_config import GwENTrainConfig
 from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils import BatchInspector
 from gerbil_train.utils.plot import save_curve_values
-from gerbil_train.metrics.classification import auc, average_precision, gauc
+from gerbil_train.metrics.classification import auc, average_precision, gauc, map_score
 
 __all__ = ["GwENBinaryTrainer", "GwENBinaryTrainingResult"]
 
@@ -26,7 +26,8 @@ class GwENBinaryTrainingResult:
     val_auc_history: list[float]
     val_ap_history: list[float]
     val_gauc_history: list[float]
-    best_metric: float              # gauc值
+    val_map_history: list[float]
+    best_metric: float
 
 
 class GwENBinaryTrainer(BaseTrainer):
@@ -79,6 +80,7 @@ class GwENBinaryTrainer(BaseTrainer):
         self.val_auc_history: list[float] = []
         self.val_ap_history: list[float] = []
         self.val_gauc_history: list[float] = []
+        self.val_map_history: list[float] = []
         self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
 
         if data_cfg is not None:
@@ -102,6 +104,7 @@ class GwENBinaryTrainer(BaseTrainer):
         self.val_auc_history.clear()
         self.val_ap_history.clear()
         self.val_gauc_history.clear()
+        self.val_map_history.clear()
 
         super().fit_epochs()
         
@@ -110,6 +113,7 @@ class GwENBinaryTrainer(BaseTrainer):
             val_auc_history=list(self.val_auc_history),
             val_ap_history=list(self.val_ap_history),
             val_gauc_history=list(self.val_gauc_history),
+            val_map_history=list(self.val_map_history),
             best_metric=self.best_metric,
         )
     
@@ -158,6 +162,7 @@ class GwENBinaryTrainer(BaseTrainer):
         val_auc = metrics.get("val_auc")
         val_ap = metrics.get("val_ap")
         val_gauc = metrics.get("val_gauc")
+        val_map = metrics.get("val_map")
 
         if train_loss is not None:
             self.train_loss_history.append(float(train_loss))
@@ -169,6 +174,8 @@ class GwENBinaryTrainer(BaseTrainer):
             self.val_ap_history.append(float(val_ap))
         if val_gauc is not None:
             self.val_gauc_history.append(float(val_gauc))
+        if val_map is not None:
+            self.val_map_history.append(float(val_map))
 
         message = f"Epoch {epoch + 1} | loss: {train_loss:.4f}" if train_loss is not None else f"Epoch {epoch + 1}"
         if val_loss is not None:
@@ -179,6 +186,8 @@ class GwENBinaryTrainer(BaseTrainer):
             message += f" | ap: {val_ap:.4f}"
         if val_gauc is not None:
             message += f" | gauc: {val_gauc:.4f}"
+        if val_map is not None:
+            message += f" | map: {val_map:.4f}"
         self.finalize_epoch(epoch, metrics, message)
 
 
@@ -200,25 +209,24 @@ class GwENBinaryTrainer(BaseTrainer):
                 targets = batch["targets"].float()
                 total_loss += self.compute_loss(sigmoids, targets).item()
                 uid_bag = batch["feature_bags"].get("user_id")
-                if uid_bag is not None:
-                    all_uids.append(uid_bag["indices"][uid_bag["offsets"]])
+                if uid_bag is None:
+                    raise ValueError("GAUC requires 'user_id' in feature_bags")
+                all_uids.append(uid_bag["indices"][uid_bag["offsets"]])
                 all_labels.append(targets)
                 all_scores.append(sigmoids)
                 total_steps += 1
 
-        cat_labels = torch.cat(all_labels)
-        cat_scores = torch.cat(all_scores)
-
+        cat_labels: torch.Tensor = torch.cat(all_labels)
+        cat_scores: torch.Tensor = torch.cat(all_scores)
         result = {
-            "loss": total_loss / max(total_steps, 1),
-            "auc": auc(cat_labels, cat_scores),
-            "ap": average_precision(cat_labels, cat_scores),
+            "loss": round(total_loss / max(total_steps, 1), 4),
+            "auc": round(auc(cat_labels, cat_scores), 4),
+            "ap": round(average_precision(cat_labels, cat_scores), 4),
         }
-
         if all_uids:
-            cat_uids = torch.cat(all_uids)
-            result["gauc"] = gauc(cat_uids, cat_labels, cat_scores)
-
+            cat_uids: torch.Tensor = torch.cat(all_uids)
+            result["gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
+            result["map"] = round(map_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
         return result
 
 
@@ -238,24 +246,23 @@ class GwENBinaryTrainer(BaseTrainer):
                 sigmoids = self.forward_step(batch)
                 targets = batch["targets"].float()
                 uid_bag = batch["feature_bags"].get("user_id")
-                if uid_bag is not None:
-                    all_uids.append(uid_bag["indices"][uid_bag["offsets"]])
+                if uid_bag is None:
+                    raise ValueError("GAUC requires 'user_id' in feature_bags")
+                all_uids.append(uid_bag["indices"][uid_bag["offsets"]])
                 all_labels.append(targets)
                 all_scores.append(sigmoids)
                 total_steps += 1
 
-        cat_labels = torch.cat(all_labels)
-        cat_scores = torch.cat(all_scores)
-
+        cat_labels: torch.Tensor = torch.cat(all_labels)
+        cat_scores: torch.Tensor = torch.cat(all_scores)
         result = {
             "test_auc": round(auc(cat_labels, cat_scores), 4),
             "test_ap": round(average_precision(cat_labels, cat_scores), 4),
         }
-
         if all_uids:
-            cat_uids = torch.cat(all_uids)
+            cat_uids: torch.Tensor = torch.cat(all_uids)
             result["test_gauc"] = round(gauc(cat_uids, cat_labels, cat_scores), 4)
-
+            result["test_map"] = round(map_score(cat_uids, cat_labels, cat_scores, weighted=True), 4)
         return result
 
     

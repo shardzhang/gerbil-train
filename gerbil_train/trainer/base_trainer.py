@@ -198,6 +198,8 @@ class BaseTrainer:
         if self.best_checkpoint_path is not None:
             self.best_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
+        if self.plot_path is not None and not self.plot_path.suffix:
+            self.plot_path = self.plot_path / "training_curves"
 
     def cleanup(self) -> None:
         """Release resources after training completes.
@@ -361,6 +363,8 @@ class BaseTrainer:
         :param path: Destination checkpoint path
         """
         checkpoint_path = Path(path)
+        if checkpoint_path.is_dir():
+            checkpoint_path = checkpoint_path / "best_model.pth"
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         checkpoint = {
             "model_state_dict": self.model.state_dict(),

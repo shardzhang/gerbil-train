@@ -165,7 +165,7 @@ class GwENMultiTrainer(BaseTrainer):
         if val_hit1 is not None:
             self.val_hit1_history.append(float(val_hit1))
         if val_hit10 is not None:
-            self.val_hitk_history.append(float(val_hit10))
+            self.val_hit10_history.append(float(val_hit10))
 
         message = f"Epoch {epoch + 1} | loss: {train_loss:.4f}" if train_loss is not None else f"Epoch {epoch + 1}"
         if val_loss is not None:
@@ -245,8 +245,8 @@ class GwENMultiTrainer(BaseTrainer):
         """Save training artifacts such as loss and metric curves after training completes. """
         if self.plot_path is None:
             return
-        save_curve_values(self.train_loss_history, self.plot_path + "/training_curves_loss.txt")
-        save_curve_values(self.val_hit1_history, self.plot_path + "/training_curves_metric.txt")
+        save_curve_values(self.train_loss_history, self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt"))
+        save_curve_values(self.val_hit1_history, self.plot_path.with_name(f"{self.plot_path.stem}_metric.txt"))
         self.plot_loss_curve()
         self.plot_metric_curve()
 

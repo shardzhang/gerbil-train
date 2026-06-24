@@ -10,6 +10,10 @@ Potential future additions:
     - MAP@k
     - AUC
     - F1@k
+    - ILS(intra-list similarity)： 针对单个用户，一般来说ILS值越大，单个用户推荐列表多样性越差
+
+推荐算法的离线评价指标综述 - Tang AI的文章 - 知乎
+https://zhuanlan.zhihu.com/p/584923052
 """
 
 import torch
