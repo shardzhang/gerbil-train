@@ -69,6 +69,7 @@ class GwENMultiTrainer(BaseTrainer):
             best_metric=None,
             wait=0,
             seed=train_cfg.seed,
+            verbose=logging_cfg.verbose,
         )
 
         self.config = train_cfg
@@ -110,6 +111,7 @@ class GwENMultiTrainer(BaseTrainer):
         self.val_top10_history.clear()
 
         super().fit_epochs()
+        
         return GwENMultiTrainingResult(
             train_loss_history=list(self.train_loss_history),
             val_top1_history=list(self.val_top1_history),
@@ -137,8 +139,8 @@ class GwENMultiTrainer(BaseTrainer):
                 else:
                     loss = sampled_softmax_loss(hidden,  self.model.head.weight,  batch["targets"].long(), num_sampled=self.loss_cfg.num_sampled, class_bias=self.model.head.bias)
             else:
-                outputs = self.model(batch["feature_bags"])
-                loss = F.cross_entropy(outputs, batch["targets"].long())
+                logits = self.model(batch["feature_bags"])
+                loss = F.cross_entropy(logits, batch["targets"].long())
 
             self.zero_grad()
             self.backward_step(loss)
@@ -236,7 +238,7 @@ class GwENMultiTrainer(BaseTrainer):
 
 
     def compute_loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """ Compute the loss for a batch of outputs and targets. Uses cross-entropy for multi-class classification. """
+        """Compute the loss for a batch of outputs and targets. Uses cross-entropy for multi-class classification. """
 
         if logits.size(1) <= 1:
             return logits.sum() * 0.0
@@ -244,17 +246,17 @@ class GwENMultiTrainer(BaseTrainer):
 
 
     def on_validation_end(self, metrics: dict[str, float]) -> None:
-        """ Hook called after validation ends to step the scheduler based on monitored metric. """
+        """Hook called after validation ends to step the scheduler based on monitored metric. """
         monitored = metrics.get("hit@1")
         if monitored is not None:
             self.scheduler_step(monitored)
 
 
     def save_training_artifacts(self) -> None:
-        """ Save training artifacts such as loss and metric curves after training completes. """
+        """Save training artifacts such as loss and metric curves after training completes. """
         if self.plot_path is None:
             return
-        save_curve_values(self.train_loss_history, self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt"),)
+        save_curve_values(self.train_loss_history, self.plot_path.with_name(f"{self.plot_path.stem}_loss.txt"))
         save_curve_values(self.val_top1_history, self.plot_path.with_name(f"{self.plot_path.stem}_metric.txt"))
         self.plot_loss_curve()
         self.plot_metric_curve()
@@ -264,28 +266,51 @@ class GwENMultiTrainer(BaseTrainer):
         if self.plot_path is None or not self.train_loss_history:
             return
         from matplotlib import pyplot as plt
-        plt.figure(figsize=(8, 4))
+        fig, ax1 = plt.subplots(figsize=(8, 4))
         epochs = range(1, len(self.train_loss_history) + 1)
-        plt.plot(epochs, self.train_loss_history, label="train_loss")
+
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Train Loss", color="tab:blue")
+        ax1.plot(epochs, self.train_loss_history, color="tab:blue", linestyle="-", label="train_loss")
+        ax1.tick_params(axis="y", labelcolor="tab:blue")
+        ax1.legend(loc="upper left")
+
         if self.val_loss_history:
-            plt.plot(epochs, self.val_loss_history, label="val_loss")
-        plt.xlabel("Epoch"); plt.ylabel("Loss"); plt.title("GwEN Training & Validation Loss")
-        plt.grid(True, linestyle="--", alpha=0.3); plt.legend(); plt.tight_layout()
+            ax2 = ax1.twinx()
+            ax2.set_ylabel("Val Loss", color="tab:red")
+            ax2.plot(epochs, self.val_loss_history, color="tab:red", linestyle="--", label="val_loss")
+            ax2.tick_params(axis="y", labelcolor="tab:red")
+            ax2.legend(loc="upper right")
+
+        plt.title("GwEN Loss")
+        fig.tight_layout()
         self.plot_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_loss.png"))
         plt.close()
+
 
     def plot_metric_curve(self) -> None:
         if self.plot_path is None or not self.val_top1_history:
             return
         from matplotlib import pyplot as plt
-        plt.figure(figsize=(8, 4))
+        fig, ax1 = plt.subplots(figsize=(8, 4))
         epochs = range(1, len(self.val_top1_history) + 1)
-        plt.plot(epochs, self.val_top1_history, label=f"Hit@{1}")
+
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Hit@1", color="tab:orange")
+        ax1.plot(epochs, self.val_top1_history, color="tab:orange", linestyle="-", label=f"Hit@{1}")
+        ax1.tick_params(axis="y", labelcolor="tab:orange")
+        ax1.legend(loc="upper left")
+
         if self.val_topk_history:
-            plt.plot(epochs, self.val_topk_history, label=f"Hit@{self.topk}")
-        plt.xlabel("Epoch"); plt.ylabel("Hit Rate"); plt.title("GwEN Validation Hit Rate")
-        plt.grid(True, linestyle="--", alpha=0.3); plt.legend(); plt.tight_layout()
+            ax2 = ax1.twinx()
+            ax2.set_ylabel(f"Hit@{self.topk}", color="tab:green")
+            ax2.plot(epochs, self.val_topk_history, color="tab:green", linestyle="--", label=f"Hit@{self.topk}")
+            ax2.tick_params(axis="y", labelcolor="tab:green")
+            ax2.legend(loc="upper right")
+
+        plt.title("GwEN Validation Hit Rate")
+        fig.tight_layout()
         self.plot_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_metric.png"))
         plt.close()

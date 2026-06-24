@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 from gerbil_train.config.model_config import FieldEntry
 from gerbil_train.config.train_config import GwENModelConfig, GwENTrainConfig
-from gerbil_train.data.tfrecord_binary_dataset import BinaryTFRecordDataset
+from gerbil_train.data.tfrecord_dataset import BinaryTFRecordDataset
 from gerbil_train.data.tfrecord_dataset import (
     BatchCollator, collect_tfrecord_part_files,
     load_field_specs,

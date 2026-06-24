@@ -17,7 +17,7 @@ compile:
 optimizer:
   type: adam
   lr: 0.001
-  weight_decay: 0.0
+  weight_decay: 0.00001
 
 scheduler:
   enabled: true
@@ -25,6 +25,9 @@ scheduler:
 checkpoint:
   monitor: val_auc
   mode: max
+
+logging:
+  verbose: true
 
 early_stop:
   enabled: true

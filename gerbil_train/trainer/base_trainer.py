@@ -13,6 +13,7 @@ from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from gerbil_train.data.tfrecord_dataset import collect_tfrecord_part_files, count_tfrecord_records
 from gerbil_train.metrics.classification import auc
+from gerbil_train.utils.nn import count_parameters, print_model_structure
 from gerbil_train.utils.seed import set_seed
 
 __all__ = ["BaseTrainer"]
@@ -36,6 +37,7 @@ class BaseTrainer:
         best_metric: float | None,
         wait: int,
         seed: int | None,
+        verbose: bool = False,
     ) -> None:
         """Initialize shared trainer state.
 
@@ -64,6 +66,7 @@ class BaseTrainer:
         self.best_metric: float | None = best_metric
         self.wait: int = wait
         self.seed: int | None = seed
+        self.verbose: bool = verbose
 
         self.current_epoch: int = 0
         self.epochs: int = 0
@@ -77,11 +80,10 @@ class BaseTrainer:
         self.plot_path: Path | None = None
 
         self.train_loss_history: list[float] = []
-        self.val_metric_history: list[float] = []
+        self.val_loss_history: list[float] = []
         self.model_name: str = "Model"
-        self.metric_name: str = "Metric"
         self._metric_key: str = "auc"
-        self._compute_metric = staticmethod(auc)
+
 
     def set_batch_inspector(self, inspector: Any) -> None:
         """Attach a batch inspector for logging training batches."""
@@ -127,7 +129,7 @@ class BaseTrainer:
         self.validation_loader = val_loader
         self.test_loader = test_loader
         self.train_loss_history.clear()
-        self.val_metric_history.clear()
+        pass
 
 
     def build_result(self) -> Any:
@@ -185,6 +187,10 @@ class BaseTrainer:
             set_seed(self.seed)
 
         self.model.to(self.device)
+
+        if self.verbose:
+            print_model_structure(self.model)
+            count_parameters(self.model)
 
         if self.best_checkpoint_path is not None:
             self.best_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -468,4 +474,3 @@ class BaseTrainer:
     def log_message(self, message: str) -> None:
         """Emit a trainer log message."""
         print(message)
-

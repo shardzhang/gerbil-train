@@ -61,4 +61,23 @@ def auc(labels: torch.Tensor, predictions: torch.Tensor) -> float:
     return float(auc_value.item())
 
 
-__all__ = ["auc", "hit_rate"]
+def average_precision(labels: torch.Tensor, predictions: torch.Tensor) -> float:
+    """Compute Average Precision (AP) for binary predictions.
+
+    :param labels: Ground-truth labels ``[batch_size]``, each 0 or 1.
+    :param predictions: Predicted probabilities ``[batch_size]`` in ``[0, 1]``.
+    :return: AP score as a float.
+    """
+    labels = labels.flatten()
+    predictions = predictions.flatten()
+    sorted_indices = torch.argsort(predictions, descending=True)
+    sorted_labels = labels[sorted_indices].float()
+    pos_count = sorted_labels.sum()
+    if pos_count == 0:
+        return 0.0
+    ranks = torch.arange(1, len(labels) + 1, device=labels.device).float()
+    precisions = sorted_labels.cumsum(dim=0) / ranks
+    return float((precisions * sorted_labels).sum() / pos_count)
+
+
+__all__ = ["auc", "average_precision", "hit_rate"]

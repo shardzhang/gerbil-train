@@ -23,7 +23,6 @@ def parse_args(path: Path) -> argparse.Namespace:
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
     """Load a YAML file into a dictionary.
-
     :param path: Path to the YAML file
     :return: Parsed YAML content
     """

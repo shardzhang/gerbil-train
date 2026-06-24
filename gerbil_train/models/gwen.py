@@ -37,12 +37,14 @@ class GwENBaseModel(nn.Module):
             if key in self.field_embeddings:
                 print(f"Field {field_name} (field_index={entry.field_index})共享词表")
                 continue
-            self.field_embeddings[key] = nn.EmbeddingBag(
+            bag = nn.EmbeddingBag(
                 num_embeddings=vocab_size,
                 embedding_dim=embedding_size,
                 mode="sum",
                 include_last_offset=False,
             )
+            bag.field_name = field_name
+            self.field_embeddings[key] = bag
 
         self.enable_attention = bool(config.field_attention.get("enabled", False))
         if self.enable_attention:
@@ -143,11 +145,16 @@ class GwENBaseModel(nn.Module):
 
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
-        hidden = self.encode(feature_bags)
+        """Forward pass of the model.
+        :param feature_bags: Feature bags for each field.
+        :return: sigmoid of logits for binary classification or logits for multi-class classification.
+        """
+        logits = self.head(self.encode(feature_bags))
         if self.task == "binary":
-            return torch.sigmoid(self.head(hidden)).squeeze(-1)
-        elif self.task == "multiclass":
-            return self.head(hidden)
+            return torch.sigmoid(logits).squeeze(-1)
+        if self.task == "multiclass":
+            return logits
+        raise ValueError(f"Unsupported task: {self.task}")
 
 
 class GwENBinaryModel(GwENBaseModel):
@@ -160,5 +167,3 @@ class GwENMulticlassModel(GwENBaseModel):
     """GwEN for multi-class classification."""
     def __init__(self, config: GwENModelConfig) -> None:
         super().__init__(config, task="multiclass")
-
-

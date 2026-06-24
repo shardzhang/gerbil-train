@@ -35,6 +35,9 @@ checkpoint:
 early_stop:
   enabled: false
 
+logging:
+  verbose: true
+
 evaluation:
   topk: 10
 

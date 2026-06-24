@@ -1,6 +1,6 @@
 task: binary
 embedding:
-  default_emb_size: 16
+  default_emb_size: 8
   fields:
     user_id:
       field_index: 1
@@ -369,6 +369,6 @@ mlp:
   - 256
   - 128
   activation: relu
-  dropout: 0.1
+  dropout: 0.3
   batch_norm: true
   input_batch_norm: true

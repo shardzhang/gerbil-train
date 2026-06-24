@@ -235,36 +235,6 @@ class LocalActivationUnit(nn.Module):
         return attention_output
 
 
-class Dice(nn.Module):
-    def __init__(self, num_features, dim=2):
-        self.num_features = num_features
-        self.dim = dim
-        super(Dice, self).__init__()
-
-        assert dim == 2 or dim == 3
-    
-        self.bn = nn.BatchNorm1d(num_features, eps=1e-9)
-        self.sigmoid = nn.Sigmoid()
-        self.dim = dim
-        
-        if self.dim == 3:
-            self.alpha = nn.Parameter(torch.rand((num_features, 1)))
-        elif self.dim == 2:
-            self.alpha = nn.Parameter(torch.rand((num_features,)))
-    
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        if self.dim == 3:
-            # Input shape: [batch_size, seq_len, hidden_size]
-            x = torch.transpose(x, 1, 2)
-            x_p = self.sigmoid(self.bn(x))
-            out = self.alpha * (1 - x_p) * x + x_p * x
-            out = torch.transpose(out, 1, 2)
-        elif self.dim == 2:
-            x_p = self.sigmoid(self.bn(x))
-            out = self.alpha * (1 - x_p) * x + x_p * x
-        return out
-
-
 class EmbeddingLayer(nn.Module):
     def __init__(self, item_num: int, embedding_dim: int):
         super(EmbeddingLayer, self).__init__()

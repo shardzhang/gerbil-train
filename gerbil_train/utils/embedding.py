@@ -18,16 +18,13 @@ def embed_one_field(emb: nn.EmbeddingBag,
                     weights: Tensor, 
                     device: torch.device) -> Tensor:
     """Embeds a single field using the provided embedding bag.
-
-    Args:
-        emb (nn.EmbeddingBag): The embedding bag to use. 不需要解包，直接查表加和，一步完成 Embedding
-        indices (Tensor): The indices of the elements to embed. shape: [total_num_indices]
-        offsets (Tensor): The offsets for the embedding bag. shape: [batch_size]
-        weights (Tensor): The weights for the embedding bag. shape: [total_num_indices]
-        device (torch.device): The device to perform the computation on.
-
-    Returns:
-        Tensor: The embedded representation of the field. shape: [batch_size, embedding_dim]
+    
+    :param emb (nn.EmbeddingBag): The embedding bag to use. 不需要解包，直接查表加和，一步完成 Embedding
+    :param indices (Tensor): The indices of the elements to embed. shape: [total_num_indices]
+    :param offsets (Tensor): The offsets for the embedding bag. shape: [batch_size]
+    :param weights (Tensor): The weights for the embedding bag. shape: [total_num_indices]
+    :param device (torch.device): The device to perform the computation on.
+    :return: The embedded representation of the field. shape: [batch_size, embedding_dim]
     """
     indices = to_device(indices.long(), device)
     offsets = to_device(offsets.long(), device)

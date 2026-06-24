@@ -44,6 +44,7 @@ class TrainEarlyStopConfig:
 
 @dataclass
 class TrainLoggingConfig:
+    verbose: bool = False
     plot_path: str | None = None
 
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import random
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -233,8 +232,6 @@ class TFRecordDataset(IterableDataset):
 
                 target = self._extract_target(example)
                 features: dict[str, example_pb2.Feature] = example.features.feature
-                # 将features中的key(field_name:field_index), 按照:切分后取[0]重新作为key, value不变
-                features = {k.split(":")[0]: v for k, v in features.items()}
                 field_indices: dict[str, list[int]] = {}
                 field_values: dict[str, list[float]] = {}
                 for f_spec in self.field_specs:
@@ -268,11 +265,8 @@ class TFRecordDataset(IterableDataset):
             yield from buf
 
 
-
 class BinaryTFRecordDataset(TFRecordDataset):
     """TFRecord dataset for binary CTR classification."""
-
-    @staticmethod
     def _extract_target(example: example_pb2.Example) -> float:
         target_feature = example.features.feature.get("target")
         if target_feature is None:
@@ -285,8 +279,6 @@ class BinaryTFRecordDataset(TFRecordDataset):
 
 class MultiTFRecordDataset(TFRecordDataset):
     """TFRecord dataset for multi-class classification."""
-
-    @staticmethod
     def _extract_target(example: example_pb2.Example) -> int:
         target_feature: example_pb2.Feature | None = example.features.feature.get("target")
         if target_feature is None:
