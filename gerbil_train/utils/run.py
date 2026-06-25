@@ -3,9 +3,49 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
+
 import yaml
+
+_log_file: Any = None
+_orig_stdout: Any = None
+
+
+class _ExpTee:
+    """Duplicates writes to multiple file-like objects."""
+    def __init__(self, *files):
+        self.files = files
+    def write(self, data):
+        for f in self.files:
+            f.write(data)
+        self.flush()
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+
+def setup_exp_log(run_dir: str | Path) -> None:
+    """Redirect stdout to both terminal and exp.log in the run directory."""
+    global _log_file, _orig_stdout
+    log_path = Path(run_dir) / "exp.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    _log_file = open(log_path, "a", encoding="utf-8")
+    _orig_stdout = sys.stdout
+    sys.stdout = _ExpTee(sys.stdout, _log_file)
+
+
+def close_exp_log() -> None:
+    """Restore stdout and close the exp.log file."""
+    global _log_file, _orig_stdout
+    if _orig_stdout is not None:
+        sys.stdout = _orig_stdout
+        _orig_stdout = None
+    if _log_file is not None:
+        _log_file.close()
+        _log_file = None
 
 
 def create_run_dir(base_dir: str | Path) -> Path:

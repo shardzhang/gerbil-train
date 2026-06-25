@@ -54,7 +54,6 @@ def ndcg_score(y_true, y_score, k=5):
 # Precision + Recall 的综合分数→ 越高说明整体效果越好
 # 4. Novelty（新颖度）
 # 推荐结果的多样性 / 新奇度→ 越高说明推荐不重复、不单调
-
 def presision(result_list, gt_list, top_k):
     """计算precision指标
     :param result_list: list of list, 每个list是一个用户的推荐结果

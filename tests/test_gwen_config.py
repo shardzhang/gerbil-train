@@ -8,9 +8,9 @@ from gerbil_train.config.train_config import (
     TrainDataConfig,
     FieldEntry,
     TrainLossConfig,
-    GwENModelConfig,
+    ModelConfig,
     TrainOptimizerConfig,
-    GwENTrainConfig,
+    TrainConfig,
 )
 
 
@@ -30,14 +30,14 @@ class GwENFieldEntryTests(unittest.TestCase):
         self.assertFalse(entry.enabled)
 
 
-class GwENModelConfigTests(unittest.TestCase):
-    """Tests for GwENModelConfig."""
+class ModelConfigTests(unittest.TestCase):
+    """Tests for ModelConfig."""
 
     def test_from_dict(self) -> None:
         entries = {
             "age": FieldEntry(f_index=2, f_type=1, vocab_size=8, emb_dim=4),
         }
-        cfg = GwENModelConfig.from_dict(
+        cfg = ModelConfig.from_dict(
             {"target_size": 100, "mlp": {"hidden_dims": [32]}, "field_attention": {"enabled": False}},
             entries,
         )
@@ -48,7 +48,7 @@ class GwENModelConfigTests(unittest.TestCase):
 
     def test_from_dict_minimal(self) -> None:
         entries = {}
-        cfg = GwENModelConfig.from_dict({}, entries)
+        cfg = ModelConfig.from_dict({}, entries)
         self.assertEqual(cfg.target_size, 0)
         self.assertEqual(cfg.embedding_fields, {})
 
@@ -119,17 +119,17 @@ class GwENCheckpointConfigTests(unittest.TestCase):
         self.assertEqual(cfg.mode, "max")
 
 
-class GwENTrainConfigFromDictTests(unittest.TestCase):
-    """Tests for GwENTrainConfig.from_dict."""
+class TrainConfigFromDictTests(unittest.TestCase):
+    """Tests for TrainConfig.from_dict."""
 
     def test_empty_dict(self) -> None:
-        cfg = GwENTrainConfig.from_dict({})
+        cfg = TrainConfig.from_dict({})
         self.assertEqual(cfg.seed, 42)
         self.assertEqual(cfg.device, "cpu")
         self.assertEqual(cfg.epochs, 1)
 
     def test_full_config(self) -> None:
-        cfg = GwENTrainConfig.from_dict({
+        cfg = TrainConfig.from_dict({
             "seed": 7,
             "device": "cuda",
             "epochs": 10,
@@ -150,7 +150,7 @@ class GwENTrainConfigFromDictTests(unittest.TestCase):
 
     def test_compile_bool(self) -> None:
         """from_dict handles compile: true (bool) gracefully."""
-        cfg = GwENTrainConfig.from_dict({"compile": True})
+        cfg = TrainConfig.from_dict({"compile": True})
         self.assertTrue(cfg.compile.enabled)
 
 

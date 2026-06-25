@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -77,8 +76,7 @@ class BaseTrainer:
         self.current_epoch: int = 0
         self.epochs: int = 0
         self.global_step: int = 0
-        self._file_logger: logging.Logger | None = None
-        self._log_path: Path | None = None
+
         self.plot_path: Path | None = None
         self.train_loss_history: list[float] = []
         self.val_loss_history: list[float] = []
@@ -117,14 +115,6 @@ class BaseTrainer:
     def set_profile_path(self, run_dir: Path) -> None:
         """Set the path for saving training profile logs."""
         self._profile_path = run_dir / "profile.txt"
-        self._log_path = self._profile_path.parent / "exp.log"
-        self._file_logger = logging.getLogger(f"trainer.{id(self)}")
-        self._file_logger.setLevel(logging.INFO)
-        self._file_logger.propagate = False
-        self._log_path.parent.mkdir(parents=True, exist_ok=True)
-        handler = logging.FileHandler(str(self._log_path), encoding="utf-8")
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        self._file_logger.addHandler(handler)
 
 
     def finalize_epoch(self, epoch: int, metrics: dict[str, float], message: str) -> None:
@@ -148,17 +138,11 @@ class BaseTrainer:
         pass
 
 
-    def build_result(self) -> Any:
-        """Construct a training result object from the collected training state."""
-        pass
-
-
-    def fit(self, train_loader: Any, val_loader: Any = None, test_loader: Any = None) -> Any:
+    def fit(self, train_loader: Any, val_loader: Any = None, test_loader: Any = None) -> None:
         """Run the full training lifecycle with the given dataloaders."""
         self.on_fit_start(train_loader, val_loader, test_loader)
         self.fit_epochs()
-        self.build_result()
-        raise NotImplementedError
+        raise NotImplementedError()
     
 
     def fit_epochs(self) -> None:
@@ -201,29 +185,33 @@ class BaseTrainer:
         Subclasses can extend this to create loggers, writers, directories, or caches.
         """
         if self.seed is not None:
+            self.log_message(f"Setting random seed to {self.seed}")
             set_seed(self.seed)
 
         self.model.to(self.device)
 
         if self.verbose:
+            self.log_message(f"verbose: {self.verbose}")
             print_model_structure(self.model)
             count_parameters(self.model)
 
         if self.best_checkpoint_path is not None:
+            self.log_message(f"Setting best checkpoint path to {self.best_checkpoint_path}")
             self.best_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
 
         if self.plot_path is not None and not self.plot_path.suffix:
+            self.log_message(f"Setting plot path to {self.plot_path}")
             self.plot_path = self.plot_path / "training_curves"
 
+
     def cleanup(self) -> None:
-        """Release resources after training completes.
-        Subclasses can override this to close writers, files, or other handles.
-        """
+        """Release resources after training completes."""
         pass
 
 
     def on_train_start(self) -> None:
         """Hook called before the first training epoch."""
+        self.log_message(f"Begin training for {self.model_name}")
         pass
 
 
@@ -487,7 +475,5 @@ class BaseTrainer:
 
 
     def log_message(self, message: str) -> None:
-        """Emit a trainer log message to stdout and exp.log."""
+        """Emit a trainer log message to stdout (also captured by exp.log via _Tee)."""
         print(message)
-        if self._file_logger is not None:
-            self._file_logger.info(message)

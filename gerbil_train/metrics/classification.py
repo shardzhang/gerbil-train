@@ -24,11 +24,7 @@ import torch
 __all__ = ["auc", "average_precision", "gauc", "map_score", "mrr_score", "hit_rate"]
 
 
-def hit_rate(
-    logits: torch.Tensor,
-    targets: torch.Tensor,
-    k: int,
-) -> float:
+def hit_rate(logits: torch.Tensor, targets: torch.Tensor, k: int) -> float:
     """Compute Hit@K: whether the true class is in the top-K predictions.
 
     :param logits: Predicted logits ``[batch_size, num_classes]``.
@@ -40,7 +36,8 @@ def hit_rate(
         return 1.0
     k = min(k, int(logits.size(1)))
     topk_indices = torch.topk(logits, k=k, dim=1).indices
-    hits = (topk_indices == targets.unsqueeze(1)).any(dim=1).float()
+    # [batch_size]
+    hits: torch.Tensor = (topk_indices == targets.unsqueeze(1)).any(dim=1).float()
     return float(hits.mean().item())
 
 
@@ -63,7 +60,7 @@ def auc(labels: torch.Tensor, predictions: torch.Tensor) -> float:
     sum_pos_ranks = (sorted_labels * ranks).sum()
     # AUC统计量公式
     # $$ \text{AUC} = \frac{\sum \text{pos_ranks} - \frac{P(P+1)}{2}}{P \times N} $$
-    auc_value = (sum_pos_ranks - pos_count * (pos_count + 1) / 2) / (pos_count * neg_count)
+    auc_value: torch.Tensor = (sum_pos_ranks - pos_count * (pos_count + 1) / 2) / (pos_count * neg_count)
     return float(auc_value.item())
 
 
@@ -99,6 +96,8 @@ def gauc(user_ids: torch.Tensor, labels: torch.Tensor, predictions: torch.Tensor
     total_weight = 0
     total_gauc = 0.0
     for uid in user_ids.unique():
+        if uid <= 0:
+            continue
         mask = user_ids == uid
         g_labels = labels[mask]
         g_scores = predictions[mask]
@@ -110,12 +109,7 @@ def gauc(user_ids: torch.Tensor, labels: torch.Tensor, predictions: torch.Tensor
     return total_gauc / max(total_weight, 1)
 
 
-def map_score(
-    user_ids: torch.Tensor,
-    labels: torch.Tensor,
-    predictions: torch.Tensor,
-    weighted: bool = True,
-) -> float:
+def map_score(user_ids: torch.Tensor, labels: torch.Tensor, predictions: torch.Tensor, weighted: bool = True) -> float:
     """Mean Average Precision (MAP), grouped by user_id.
 
     For each user (group), computes AP only if the group has both
@@ -130,6 +124,8 @@ def map_score(
     total = 0.0
     total_weight = 0
     for uid in user_ids.unique():
+        if uid <= 0:
+            continue
         mask = user_ids == uid
         g_labels = labels[mask]
         g_scores = predictions[mask]
@@ -142,12 +138,7 @@ def map_score(
     return total / max(total_weight, 1)
 
 
-def mrr_score(
-    user_ids: torch.Tensor,
-    labels: torch.Tensor,
-    predictions: torch.Tensor,
-    weighted: bool = True,
-) -> float:
+def mrr_score(user_ids: torch.Tensor, labels: torch.Tensor, predictions: torch.Tensor, weighted: bool = True) -> float:
     """Mean Reciprocal Rank (MRR), grouped by user_id.
 
     For each user (group), finds the first positive sample sorted by
@@ -163,6 +154,8 @@ def mrr_score(
     total = 0.0
     total_weight = 0
     for uid in user_ids.unique():
+        if uid <= 0:
+            continue
         mask = user_ids == uid
         g_labels = labels[mask]
         g_scores = predictions[mask]

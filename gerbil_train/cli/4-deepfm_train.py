@@ -17,7 +17,7 @@ from gerbil_train.data.tfrecord_dataset import (
 from gerbil_train.models.deepfm import DeepFM
 from gerbil_train.trainer.deepfm_trainer import DeepFMTrainer
 from gerbil_train.utils.config import load_experiment_config, parse_args
-from gerbil_train.utils.run import build_field_entries, create_run_dir, filter_enabled_fields, save_run_configs
+from gerbil_train.utils.run import build_field_entries, close_exp_log, create_run_dir, filter_enabled_fields, save_run_configs, setup_exp_log
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 CONFIG_PATH = PROJECT_ROOT / "configs/experiment/deepfm_ml1m.yaml"
@@ -62,13 +62,14 @@ def build_model_config(raw: dict[str, Any], all_specs: list) -> DeepFMConfig:
 
 def main() -> None:
     args = parse_args(CONFIG_PATH)
-    run_dir, ckpt_path, plot_path = create_run_dir(PROJECT_ROOT / "checkpoints" / "deepfm_ml1m")
+    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "deepfm_ml1m")
+    setup_exp_log(run_dir)
 
     cfg = load_experiment_config(args.config)
     model_raw = cfg["model"]
     train_cfg = DeepFMTrainConfig.from_dict(cfg["train"])
-    train_cfg.checkpoint.path = str(ckpt_path)
-    train_cfg.logging.plot_path = str(plot_path)
+    train_cfg.checkpoint.path = str(run_dir)
+    train_cfg.logging.plot_path = str(run_dir)
     print(f"Training config | seed={train_cfg.seed} | epochs={train_cfg.epochs} | batch_size={train_cfg.trainer.batch_size}")
     print(f"Run dir: {run_dir}")
 
@@ -87,6 +88,7 @@ def main() -> None:
 
     if test_loader is not None:
         print(f"Final test metrics: {trainer.evaluate(test_loader)}")
+    close_exp_log()
     save_run_configs(args.config, run_dir, project_root=PROJECT_ROOT)
 
 

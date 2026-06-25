@@ -48,10 +48,6 @@ class TrainLoggingConfig:
     plot_path: str | None = None
 
 
-@dataclass
-class TrainEvalConfig:
-    topk: int = 10
-
 
 @dataclass
 class TrainLossConfig:
@@ -74,7 +70,7 @@ class TrainCompileConfig:
 
 
 @dataclass
-class GwENTrainConfig:
+class TrainConfig:
     seed: int = 42
     device: str = "cpu"
     epochs: int = 1
@@ -85,12 +81,11 @@ class GwENTrainConfig:
     checkpoint: TrainCheckpointConfig = field(default_factory=TrainCheckpointConfig)
     early_stop: TrainEarlyStopConfig = field(default_factory=TrainEarlyStopConfig)
     logging: TrainLoggingConfig = field(default_factory=TrainLoggingConfig)
-    evaluation: TrainEvalConfig = field(default_factory=TrainEvalConfig)
     loss: TrainLossConfig = field(default_factory=TrainLossConfig)
     inspector: TrainInspectorConfig = field(default_factory=TrainInspectorConfig)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "GwENTrainConfig":
+    def from_dict(cls, d: dict[str, Any]) -> "TrainConfig":
         return cls(
             seed=int(d.get("seed", 42)),
             device=str(d.get("device", "cpu")),
@@ -101,7 +96,6 @@ class GwENTrainConfig:
             checkpoint=TrainCheckpointConfig(**d.get("checkpoint", {})),
             early_stop=TrainEarlyStopConfig(**d.get("early_stop", {})),
             logging=TrainLoggingConfig(**d.get("logging", {})),
-            evaluation=TrainEvalConfig(**d.get("evaluation", {})),
             loss=TrainLossConfig(**d.get("loss", {})),
             compile=TrainCompileConfig(**d.get("compile")) if isinstance(d.get("compile"), dict) else TrainCompileConfig(enabled=bool(d.get("compile", False))),
             inspector=TrainInspectorConfig(**d.get("inspector", {})),

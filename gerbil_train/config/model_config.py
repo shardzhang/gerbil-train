@@ -47,7 +47,7 @@ def load_enabled_field_entries(model_cfg: dict[str, Any]) -> tuple[list[FieldEnt
 
 
 @dataclass
-class GwENModelConfig:
+class ModelConfig:
     target_size: int
     # dict[field_name, FieldEntry]
     embedding_fields: dict[str, FieldEntry]
@@ -58,7 +58,7 @@ class GwENModelConfig:
     field_stats: dict[str, dict[int, tuple[float, float]]] = field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "GwENModelConfig":
+    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "ModelConfig":
         return cls(
             target_size=int(model_cfg.get("target_size", 0)),
             embedding_fields={field.field_name: field for field in field_entries},
@@ -69,7 +69,7 @@ class GwENModelConfig:
 
 
 @dataclass
-class DINModelConfig(GwENModelConfig):
+class DINModelConfig(ModelConfig):
     behavior_fields: list[str] = field(default_factory=list)
     target_fields: list[str] = field(default_factory=list)
     softmax_attn: bool = False

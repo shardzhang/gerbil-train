@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -19,16 +18,7 @@ from gerbil_train.trainer.base_trainer import BaseTrainer
 from gerbil_train.utils.plot import save_curve_values
 
 
-__all__ = ["LearningToRankTrainer", "LearningToRankTrainingResult"]
-
-
-@dataclass
-class LearningToRankTrainingResult:
-    """Container for aggregated learning-to-rank training results."""
-
-    train_loss_history: list[float]
-    val_ndcg_history: list[float]
-    best_ndcg: float
+__all__ = ["LearningToRankTrainer"]
 
 
 class LearningToRankTrainer(BaseTrainer):
@@ -125,12 +115,11 @@ class LearningToRankTrainer(BaseTrainer):
         self,
         train_loader: DataLoader,
         val_loader: DataLoader,
-    ) -> LearningToRankTrainingResult:
-        """Run learning-to-rank training and return summarized history.
+    ) -> None:
+        """Run learning-to-rank training.
 
         :param train_loader: Training dataloader
         :param val_loader: Validation dataloader
-        :return: Aggregated training history and best score
         """
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -138,12 +127,6 @@ class LearningToRankTrainer(BaseTrainer):
         self.val_ndcg_history.clear()
 
         super().fit(epochs=self.epochs)
-
-        return LearningToRankTrainingResult(
-            train_loss_history=list(self.train_loss_history),
-            val_ndcg_history=list(self.val_ndcg_history),
-            best_ndcg=self.best_metric or 0.0,
-        )
 
     def train_one_epoch(self, epoch: int) -> dict[str, float]:
         """Train over all ranking groups for one epoch.
@@ -199,6 +182,7 @@ class LearningToRankTrainer(BaseTrainer):
     def on_train_end(self):
         self.save_training_curves()
 
+    @torch.no_grad()
     def validate(self, epoch: int | None = None) -> dict[str, float]:
         """Evaluate NDCG on the validation split.
 
@@ -211,18 +195,16 @@ class LearningToRankTrainer(BaseTrainer):
         epoch_index = self.current_epoch if epoch is None else epoch
         epoch_display = epoch_index + 1
         ndcg_sum = 0.0
-
-        with torch.no_grad():
-            val_pbar = tqdm(
+        val_pbar = tqdm(
                 self.val_loader,
-                desc=f"Epoch {epoch_display}/{self.epochs} [val]",
-                leave=False,
-            )
-            for step, batch in enumerate(val_pbar, start=1):
-                batch = self.move_batch_to_device(batch)
-                outputs = self.forward_step(batch)
-                ndcg_sum += self.compute_metrics(outputs, y=batch["y"])["ndcg"]
-                val_pbar.set_postfix(ndcg=f"{ndcg_sum / step:.4f}")
+            desc=f"Epoch {epoch_display}/{self.epochs} [val]",
+            leave=False,
+        )
+        for step, batch in enumerate(val_pbar, start=1):
+            batch = self.move_batch_to_device(batch)
+            outputs = self.forward_step(batch)
+            ndcg_sum += self.compute_metrics(outputs, y=batch["y"])["ndcg"]
+            val_pbar.set_postfix(ndcg=f"{ndcg_sum / step:.4f}")
         metrics = {"ndcg": ndcg_sum / len(self.val_loader)}
 
         self.on_validation_end(metrics)
@@ -270,11 +252,8 @@ class LearningToRankTrainer(BaseTrainer):
         if message:
             self.finalize_epoch(epoch, metrics, message)
 
-    def evaluate(
-        self,
-        dataloader: DataLoader | None = None,
-        ks: Sequence[int] = (5,),
-    ) -> dict[int, float]:
+    @torch.no_grad()
+    def evaluate(self, dataloader: DataLoader | None = None, ks: Sequence[int] = (5,)) -> dict[int, float]:
         """Evaluate the model on a split using one or more NDCG cutoffs.
 
         :param dataloader: Optional dataloader to evaluate; defaults to validation loader
@@ -286,13 +265,11 @@ class LearningToRankTrainer(BaseTrainer):
         dataloader = self.val_loader if dataloader is None else dataloader
         self.model.eval()
         ndcg_totals = {k: 0.0 for k in ks}
-
-        with torch.no_grad():
-            for batch in dataloader:
-                batch = self.move_batch_to_device(batch)
-                outputs = self.forward_step(batch)
-                for k in ks:
-                    ndcg_totals[k] += float(ndcg_score(batch["y"], outputs, k=k))
+        for batch in dataloader:
+            batch = self.move_batch_to_device(batch)
+            outputs = self.forward_step(batch)
+            for k in ks:
+                ndcg_totals[k] += float(ndcg_score(batch["y"], outputs, k=k))
 
         metrics = {k: ndcg_totals[k] / len(dataloader) for k in ks}
 

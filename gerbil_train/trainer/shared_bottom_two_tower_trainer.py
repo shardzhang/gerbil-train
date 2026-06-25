@@ -325,6 +325,7 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         self.on_train_step_end(metrics)
         return metrics
 
+    @torch.no_grad()
     def validate(self, epoch: int | None = None) -> dict[str, float]:
         """Run validation.
 
@@ -339,26 +340,25 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         self.model.eval()
         ndcg_total = 0.0
         total_steps = 0
-
-        with torch.no_grad():
-            for batch in self.validation_loader:
-                batch = self.move_batch_to_device(batch)
-                outputs = self.model(
-                    query_features=batch["query_features"],
-                    item_features=batch["item_features"],
-                    detach_shared_for_explicit=True,
+        for batch in self.validation_loader:
+            batch = self.move_batch_to_device(batch)
+            outputs = self.model(
+                query_features=batch["query_features"],
+                item_features=batch["item_features"],
+                detach_shared_for_explicit=True,
+            )
+            ndcg_total += float(
+                ndcg_score(
+                    batch["labels"],
+                    outputs.explicit_score,
+                    k=self.validation_k,
                 )
-                ndcg_total += float(
-                    ndcg_score(
-                        batch["labels"],
-                        outputs.explicit_score,
-                        k=self.validation_k,
-                    )
-                )
-                total_steps += 1
+            )
+            total_steps += 1
 
         return {f"ndcg@{self.validation_k}": ndcg_total / max(total_steps, 1)}
 
+    @torch.no_grad()
     def evaluate(self, dataloader: DataLoader | None = None) -> dict[str, float]:
         """Run explicit ranking evaluation on a held-out test loader.
 
@@ -374,23 +374,21 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         self.model.eval()
         ndcg_total = 0.0
         total_steps = 0
-
-        with torch.no_grad():
-            for batch in dataloader:
-                batch = self.move_batch_to_device(batch)
-                outputs = self.model(
-                    query_features=batch["query_features"],
-                    item_features=batch["item_features"],
-                    detach_shared_for_explicit=True,
+        for batch in dataloader:
+            batch = self.move_batch_to_device(batch)
+            outputs = self.model(
+                query_features=batch["query_features"],
+                item_features=batch["item_features"],
+                detach_shared_for_explicit=True,
+            )
+            ndcg_total += float(
+                ndcg_score(
+                    batch["labels"],
+                    outputs.explicit_score,
+                    k=self.validation_k,
                 )
-                ndcg_total += float(
-                    ndcg_score(
-                        batch["labels"],
-                        outputs.explicit_score,
-                        k=self.validation_k,
-                    )
-                )
-                total_steps += 1
+            )
+            total_steps += 1
 
         metrics = {f"test_ndcg@{self.validation_k}": ndcg_total / max(total_steps, 1)}
         self.on_evaluate_end(metrics)
@@ -531,6 +529,7 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         scores = outputs.explicit_score
         return F.mse_loss(scores, labels)
 
+    @torch.no_grad()
     def evaluate_explicit(self, dataloader: DataLoader) -> dict[str, float]:
         """Evaluate the explicit stage using mean squared error.
 
@@ -543,15 +542,14 @@ class SharedBottomTwoTowerTrainer(BaseTrainer):
         total_steps = 0
         previous_stage = self.current_stage
 
-        with torch.no_grad():
-            self.current_stage = "explicit"
-            for batch in dataloader:
-                batch = self.move_batch_to_device(batch)
-                outputs = self.forward_step(batch)
-                loss = self.compute_explicit_loss(batch, outputs)
+        self.current_stage = "explicit"
+        for batch in dataloader:
+            batch = self.move_batch_to_device(batch)
+            outputs = self.forward_step(batch)
+            loss = self.compute_explicit_loss(batch, outputs)
 
-                total_loss += float(loss.item())
-                total_steps += 1
+            total_loss += float(loss.item())
+            total_steps += 1
 
         self.current_stage = previous_stage
         avg_loss = total_loss / max(total_steps, 1)

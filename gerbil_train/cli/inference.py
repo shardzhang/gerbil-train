@@ -18,54 +18,59 @@ from torch.utils.data import DataLoader
 
 from gerbil_train.utils.config import load_experiment_config
 from gerbil_train.data.tfrecord_dataset import (
-    BatchCollator, BinaryTFRecordDataset, collect_tfrecord_part_files,
-    load_target_size, load_field_stats,
+    BatchCollator, BinaryTFRecordDataset, MultiTFRecordDataset,
+    collect_tfrecord_part_files, load_target_size, load_field_stats,
 )
-from gerbil_train.config.model_config import GwENModelConfig, FieldEntry, load_enabled_field_entries
-from gerbil_train.config.train_config import GwENTrainConfig
+from gerbil_train.config.model_config import ModelConfig, FieldEntry, load_enabled_field_entries
 from gerbil_train.models.gwen import GwENBinaryModel, GwENMulticlassModel
 from gerbil_train.inference import Predictor
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
-MODEL_REGISTRY: dict[str, Any] = {}
-MODEL_REGISTRY["gwen_binary"] = GwENBinaryModel
-MODEL_REGISTRY["gwen_multiclass"] = GwENMulticlassModel
+MODEL_REGISTRY: dict[str, dict[str, Any]] = {
+    "gwen_binary": {"model": GwENBinaryModel, "config": ModelConfig, "dataset": BinaryTFRecordDataset},
+    "gwen_multiclass": {"model": GwENMulticlassModel, "config": ModelConfig, "dataset": MultiTFRecordDataset},
+}
 
 
-def build_loader(split_name: str, experiment_cfg: dict[str, Any]) -> DataLoader:
-    model_cfg: GwENModelConfig = experiment_cfg["_model_cfg"]
-    data_cfg = experiment_cfg["data"]
-    train_cfg = GwENTrainConfig.from_dict(experiment_cfg["train"])
+def build_loader(
+    split_name: str,
+    data_cfg: dict[str, Any],
+    field_entries: list[FieldEntry],
+    field_stats: dict[str, Any] | None,
+    batch_size: int,
+    num_workers: int,
+    pin_memory: bool = False,
+    dataset_cls: type = BinaryTFRecordDataset,
+) -> DataLoader:
     root = Path(data_cfg["paths"]["tfrecord_root"])
     subs = data_cfg["split_subdirs"]
     files = collect_tfrecord_part_files(root / subs[split_name] / "tfrecord")
-    field_entries = list(model_cfg.embedding_fields.values())
-    dataset = BinaryTFRecordDataset(
+    dataset = dataset_cls(
         files,
         field_entries,
-        field_stats=model_cfg.field_stats,
+        field_stats=field_stats,
         shuffle_files=False,
         shuffle_buffer=0,
         seed=42,
     )
     return DataLoader(
         dataset,
-        batch_size=train_cfg.data.batch_size,
+        batch_size=batch_size,
         shuffle=False,
-        num_workers=train_cfg.data.num_workers,
-        pin_memory=train_cfg.data.pin_memory,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
         collate_fn=BatchCollator([e.field_name for e in field_entries]),
         drop_last=False,
     )
 
 
-def build_model_config(exp_cfg: dict[str, Any]) -> GwENModelConfig:
-    """Build a GwENModelConfig from the experiment configuration."""
+def build_model_config(exp_cfg: dict[str, Any], config_class: type) -> Any:
+    """Build a model config from the experiment configuration."""
     data_cfg = exp_cfg["data"]
     model_cfg_raw = exp_cfg["model"]
     enabled_entries, _ = load_enabled_field_entries(model_cfg_raw)
-    model_cfg = GwENModelConfig.from_dict(model_cfg_raw, enabled_entries)
+    model_cfg = config_class.from_dict(model_cfg_raw, enabled_entries)
     pos_map_json = Path(data_cfg["paths"]["nn_pos_map_json"])
     model_cfg.field_stats = load_field_stats(pos_map_json)
     model_cfg.target_size = load_target_size(pos_map_json)
@@ -83,12 +88,23 @@ def main() -> None:
     parser.add_argument("--device", type=str, default="cpu")
     args = parser.parse_args()
 
+    model_info = MODEL_REGISTRY[args.model_type]
     exp_cfg = load_experiment_config(args.config)
-    model_cfg = build_model_config(exp_cfg)
-    dataloader = build_loader(args.split, exp_cfg)
+    data_cfg = exp_cfg["data"]
+    train_cfg = exp_cfg["train"]
+    model_cfg = build_model_config(exp_cfg, model_info["config"])
+    dataloader = build_loader(
+        args.split,
+        data_cfg,
+        list(model_cfg.embedding_fields.values()),
+        model_cfg.field_stats,
+        train_cfg["data"]["batch_size"],
+        train_cfg["data"]["num_workers"],
+        train_cfg["data"].get("pin_memory", False),
+        model_info["dataset"],
+    )
 
-    model_class = MODEL_REGISTRY[args.model_type]
-    model = model_class(model_cfg)
+    model = model_info["model"](model_cfg)
     predictor = Predictor(model, device=args.device)
     predictor.load_checkpoint(args.checkpoint)
     metrics = predictor.predict_and_eval(dataloader, output_path=args.output)
@@ -102,7 +118,7 @@ if __name__ == "__main__":
 
 
 """
-python3 -m gerbil_train.cli.inference \                                                                    ✔  gerbil-train Py  at 17:28:16
+python3 -m gerbil_train.cli.inference \
 --config configs/2-gwen_ml1m_binary/experiment.yaml \
 --checkpoint checkpoints/gwen_ml1m_binary/20260624170859/best_model.pth \
 --model-type gwen_binary \

@@ -6,12 +6,12 @@ data:
   batch_size: 512
   num_workers: 4
   pin_memory: false
-  drop_last: false
+  drop_last: true
   prefetch_factor: 4
   shuffle_buffer: 8192
 
 compile:
-  enabled: true
+  enabled: false
   mode: default
 
 optimizer:
@@ -20,7 +20,7 @@ optimizer:
   weight_decay: 0.00001
 
 scheduler:
-  enabled: true
+  enabled: false
 
 checkpoint:
   monitor: val_gauc
@@ -30,7 +30,7 @@ logging:
   verbose: true
 
 early_stop:
-  enabled: true
+  enabled: false
 
 evaluation: {}
 

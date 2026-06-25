@@ -26,11 +26,7 @@ class Predictor:
         predictor.predict_and_eval(test_loader, output)     # → metrics + file
     """
 
-    def __init__(
-        self,
-        model: nn.Module,
-        device: str = "cpu",
-    ) -> None:
+    def __init__(self, model: nn.Module, device: str = "cpu") -> None:
         self.model = model.to(device)
         self.device = torch.device(device)
         self.model.eval()
@@ -71,6 +67,7 @@ class Predictor:
                 })
         return results
 
+
     def evaluate(self, dataloader: DataLoader) -> dict[str, float]:
         """Run inference and compute ranking metrics.
 
@@ -93,6 +90,7 @@ class Predictor:
         }
         return metrics
 
+
     def predict_and_eval(
         self,
         dataloader: DataLoader,
@@ -114,12 +112,6 @@ class Predictor:
         labels = torch.tensor([r["label"] for r in results], dtype=torch.float32)
         user_ids = torch.tensor([r["user_id"] for r in results], dtype=torch.long)
 
-        if user_ids.numel() > 0:
-            unique = user_ids.unique()
-            print(f"[Diagnostic] user_ids: {len(user_ids)} total, {len(unique)} unique, "
-                  f"min={user_ids.min().item()}, max={user_ids.max().item()}, "
-                  f"first_10={user_ids[:10].tolist()}")
-
         return {
             "auc": round(auc(labels, scores), 4),
             "ap": round(average_precision(labels, scores), 4),
@@ -128,6 +120,7 @@ class Predictor:
             "mrr": round(mrr_score(user_ids, labels, scores, weighted=True), 4),
         }
 
+
     def _move_batch(self, batch: dict[str, Any]) -> dict[str, Any]:
         if isinstance(batch, dict):
             return {k: self._move_batch(v) for k, v in batch.items()}
@@ -135,9 +128,14 @@ class Predictor:
             return batch.to(self.device)
         return batch
 
+
     @staticmethod
     def _extract_user_ids(batch: dict[str, Any]) -> torch.Tensor | None:
+        """Extract user IDs from a batch of feature bags."""
         uid_bag = batch.get("feature_bags", {}).get("user_id")
         if uid_bag is None:
             return None
-        return uid_bag["indices"][uid_bag["offsets"]]
+        indices = uid_bag["indices"]
+        offsets = uid_bag["offsets"]
+        next_offsets = torch.cat([offsets[1:], torch.tensor([len(indices)], device=offsets.device)])
+        return indices[next_offsets - 1]

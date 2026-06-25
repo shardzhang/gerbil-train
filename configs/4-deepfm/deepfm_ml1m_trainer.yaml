@@ -6,12 +6,12 @@ data:
   batch_size: 512
   num_workers: 4
   pin_memory: false
-  drop_last: false
+  drop_last: true
   prefetch_factor: 4
   shuffle_buffer: 8192
 
 compile:
-  enabled: true
+  enabled: false
   mode: default
 
 optimizer:
@@ -27,7 +27,7 @@ checkpoint:
   mode: max
 
 early_stop:
-  enabled: true
+  enabled: false
   patience: 3
 
 evaluation: {}
