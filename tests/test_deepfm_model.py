@@ -4,28 +4,24 @@ import unittest
 
 import torch
 
+from gerbil_train.config.model_config import DeepFMModelConfig, FieldEntry
 from gerbil_train.models.deepfm import DeepFM
 
 
 class DeepFMModelTests(unittest.TestCase):
     """Unit tests for the DeepFM model."""
 
-    def _make_config(self) -> dict:
-        return {
-            "field_names": ["user_id", "item_id"],
-            "embedding_dim": 4,
-            "sparse_fields": {
-                "user_id": {"vocab_size": 10},
-                "item_id": {"vocab_size": 20},
-            },
-            "deep": {
-                "hidden_dims": [8, 4],
-                "activation": "relu",
-                "dropout": 0.0,
-                "batch_norm": False,
-            },
-            "output": {"activation": None},
+    def _make_config(self, output_activation: str = "none") -> DeepFMModelConfig:
+        fields = {
+            "user_id": FieldEntry(field_name="user_id", field_index=1, field_type=1, dim=10, emb_size=4),
+            "item_id": FieldEntry(field_name="item_id", field_index=2, field_type=1, dim=20, emb_size=4),
         }
+        return DeepFMModelConfig(
+            target_size=0,
+            embedding_fields=fields,
+            mlp={"hidden_dims": [8, 4], "activation": "relu", "dropout": 0.0, "batch_norm": False},
+            output={"activation": output_activation},
+        )
 
     def _make_bags(self) -> dict:
         return {
@@ -51,9 +47,7 @@ class DeepFMModelTests(unittest.TestCase):
 
     def test_deepfm_forward_with_sigmoid(self) -> None:
         """Verify sigmoid output is in [0, 1] range."""
-        config = self._make_config()
-        config["output"] = {"activation": "sigmoid"}
-        model = DeepFM(config)
+        model = DeepFM(self._make_config(output_activation="sigmoid"))
         outputs = model(self._make_bags()["feature_bags"])
         self.assertEqual(tuple(outputs.shape), (2,))
         self.assertTrue(torch.all(outputs >= 0.0).item())

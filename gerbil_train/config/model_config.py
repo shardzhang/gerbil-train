@@ -93,4 +93,15 @@ class DINModelConfig(BaseModelConfig):
 
 @dataclass
 class DeepFMModelConfig(BaseModelConfig):
-    pass
+    output: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "DeepFMModelConfig":
+        return cls(
+            target_size=int(model_cfg.get("target_size", 0)),
+            embedding_fields={field.field_name: field for field in field_entries},
+            output=dict(model_cfg.get("output", {})),
+            mlp=dict(model_cfg.get("mlp", {})),
+            field_attention=dict(model_cfg.get("field_attention", {})),
+            field_stats=dict(model_cfg.get("field_stats", {})),
+        )

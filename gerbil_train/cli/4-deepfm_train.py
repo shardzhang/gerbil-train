@@ -27,7 +27,7 @@ def main() -> None:
     data_cfg: dict[str, Any] = exp_cfg["data"]
     model_cfg: DeepFMModelConfig = build_model_config(exp_cfg, DeepFMModelConfig)
     
-    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_ml1m_binary")
+    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "deepfm")
     setup_exp_log(run_dir)
     train_cfg: TrainConfig = TrainConfig.from_dict(exp_cfg["train"])
     train_cfg.checkpoint.path = str(run_dir)

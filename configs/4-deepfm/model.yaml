@@ -1,29 +1,4 @@
 task: binary
-behavior_fields:
-- user_movie_rate
-- user_movie_rate_1day
-- user_movie_rate_3day
-- user_movie_rate_7day
-- user_movie_rate_15day
-- user_genres_rate
-- user_genres_rate_1day
-- user_genres_rate_3day
-- user_genres_rate_7day
-- user_genres_rate_15day
-target_fields:
-- movie_id
-- movie_genres
-softmax_attn: false
-target_merge: mean
-local_activation_unit:
-  hidden_dims:
-  - 32
-  - 16
-  bias:
-  - true
-  - true
-  batch_norm: true
-  activation: relu
 embedding:
   default_emb_size: 4
   fields:
@@ -175,37 +150,37 @@ embedding:
       field_index: 101
       field_type: 1
       dim: 3579
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_movie_rate:
       field_index: 101
       field_type: 1
       dim: 3579
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_movie_rate_15day:
       field_index: 101
       field_type: 1
       dim: 3579
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_movie_rate_1day:
       field_index: 101
       field_type: 1
       dim: 3579
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_movie_rate_3day:
       field_index: 101
       field_type: 1
       dim: 3579
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_movie_rate_7day:
       field_index: 101
       field_type: 1
       dim: 3579
-      emb_size: 16
+      emb_size: 4
       enabled: true
     movie_title:
       field_index: 102
@@ -217,37 +192,37 @@ embedding:
       field_index: 103
       field_type: 1
       dim: 19
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_genres_rate:
       field_index: 103
       field_type: 1
       dim: 19
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_genres_rate_15day:
       field_index: 103
       field_type: 1
       dim: 19
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_genres_rate_1day:
       field_index: 103
       field_type: 1
       dim: 19
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_genres_rate_3day:
       field_index: 103
       field_type: 1
       dim: 19
-      emb_size: 16
+      emb_size: 4
       enabled: true
     user_genres_rate_7day:
       field_index: 103
       field_type: 1
       dim: 19
-      emb_size: 16
+      emb_size: 4
       enabled: true
     movie_rate_count:
       field_index: 104

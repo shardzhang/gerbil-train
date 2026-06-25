@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from torch import nn
 
 from gerbil_train.config.train_config import TrainConfig
@@ -11,6 +13,6 @@ __all__ = ["DINTrainer"]
 
 
 class DINTrainer(BinaryClassificationTrainer):
-    def __init__(self, model: nn.Module, config: TrainConfig, data_cfg: dict[str, str] | None = None) -> None:
-        super().__init__(model, config, data_cfg)
+    def __init__(self, model: nn.Module, train_cfg: TrainConfig, data_cfg: dict[str, Any] | None = None) -> None:
+        super().__init__(model, train_cfg, data_cfg)
         self.model_name = "DIN"

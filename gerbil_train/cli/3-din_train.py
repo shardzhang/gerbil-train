@@ -26,7 +26,7 @@ def main() -> None:
     data_cfg: dict[str, Any] = exp_cfg["data"]
     model_cfg: DINModelConfig = build_model_config(exp_cfg, DINModelConfig)
     
-    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_ml1m_binary")
+    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "din")
     setup_exp_log(run_dir)
     train_cfg: TrainConfig = TrainConfig.from_dict(exp_cfg["train"])
     train_cfg.checkpoint.path = str(run_dir)

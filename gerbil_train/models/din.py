@@ -11,38 +11,34 @@ from gerbil_train.config.model_config import DINModelConfig
 from gerbil_train.utils.embedding import bag_to_padded, embed_one_field, to_device
 from gerbil_train.models.layers import FullyConnectedLayer
 from gerbil_train.config.model_config import FieldEntry
+from gerbil_train.models.base_model import BaseModel
 
 __all__ = ["DIN"]
 
 
-class DIN(nn.Module):
+class DIN(BaseModel):
     """DIN (Deep Interest Network) for binary classification with behavior-sequence attention."""
 
     def __init__(self, model_cfg: DINModelConfig) -> None:
         super().__init__()
 
+        self.validate_fields(model_cfg)
         self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        if not self.fields_cfg:
-            raise ValueError("embedding_fields must be a non-empty mapping")
                              
-        behavior_fields = model_cfg.behavior_fields
-        target_fields = model_cfg.target_fields
-        self._validate_fields(model_cfg)
-
         self.item_num = model_cfg.target_size
         # Whether to use softmax attention
         self.softmax_attn = model_cfg.softmax_attn
         # Target merge strategy: "mean" or "proj"
         self.target_merge = model_cfg.target_merge
-        self.behavior_fields = behavior_fields
-        self.target_fields = target_fields
-        reserved = set(behavior_fields) | set(target_fields)
+        self.behavior_fields = model_cfg.behavior_fields
+        self.target_fields = model_cfg.target_fields
+        reserved = set(self.behavior_fields) | set(self.target_fields)
         self.field_names = [n for n in self.fields_cfg if n not in reserved]
 
-        # Target (candidate item) field embeddings
+        # 1. Target (candidate item) field embeddings
         self.target_embedding_dims: dict[str, int] = {}
         self.target_embeddings = nn.ModuleDict()
-        for f_name in target_fields:
+        for f_name in self.target_fields:
             entry = self.fields_cfg[f_name]
             self.target_embedding_dims[f_name] = int(entry.emb_size)
             self.target_embeddings[str(entry.field_index)] = nn.EmbeddingBag(
@@ -52,13 +48,12 @@ class DIN(nn.Module):
                 include_last_offset=False,
             )
 
-        # Behavior field (user history sequence) embeddings
+        # 2. Behavior field (user history sequence) embeddings
         self.behavior_emb_dims: dict[str, int] = {}
         self.behavior_embeddings = nn.ModuleDict()
         self.attention_units = nn.ModuleDict()
-        for bf in behavior_fields:
+        for bf in self.behavior_fields:
             entry = self.fields_cfg[bf]
-            # print(f"[DEBUG] {bf}: dim={entry.dim}, emb_size={entry.emb_size}")
             self.behavior_emb_dims[bf] = int(entry.emb_size)
             self.behavior_embeddings[bf] = EmbeddingLayer(
                 item_num=int(entry.dim), 
@@ -79,7 +74,7 @@ class DIN(nn.Module):
             proj_dim = int(self.fields_cfg[self.behavior_fields[0]].emb_size)
             self.target_projection = nn.Linear(total_target_dim, proj_dim)
 
-        # Plain feature (non-behavior, non-target) field embeddings
+        # 3. Plain feature (non-behavior, non-target) field embeddings
         self.field_embedding_dims: dict[str, int] = {}
         self.field_embeddings = nn.ModuleDict()
         for field_name in self.field_names:
@@ -109,8 +104,7 @@ class DIN(nn.Module):
         self.reset_parameters()
 
 
-    @staticmethod
-    def _validate_fields(model_cfg: DINModelConfig) -> None:
+    def validate_fields(self, model_cfg: DINModelConfig) -> None:
         """Validate the model configuration."""
         fields_cfg = model_cfg.embedding_fields
         if not fields_cfg:
@@ -138,13 +132,12 @@ class DIN(nn.Module):
 
         # Embed plain feature fields
         field_embs: list[Tensor] = []
-        for fn in self.field_names:
-            bag = feature_bags[fn]
+        for field_name, entry in self.fields_cfg.items():
             field_emb = embed_one_field(
-                self.field_embeddings[fn], 
-                bag["indices"], 
-                bag["offsets"], 
-                bag["weights"], 
+                self.field_embeddings[str(entry.field_index)], 
+                feature_bags[field_name]["indices"], 
+                feature_bags[field_name]["offsets"], 
+                feature_bags[field_name]["weights"], 
                 device=device
             )
             field_embs.append(field_emb)
@@ -152,12 +145,11 @@ class DIN(nn.Module):
         # Embed target (candidate item) fields
         target_embs: list[Tensor] = []
         for field_name in self.target_fields:
-            bag = feature_bags[field_name]
             target_emb = embed_one_field(
                 self.target_embeddings[str(self.fields_cfg[field_name].field_index)],
-                bag["indices"],
-                bag["offsets"],
-                bag["weights"],
+                feature_bags[field_name]["indices"],
+                feature_bags[field_name]["offsets"],
+                feature_bags[field_name]["weights"],
                 device=device,
             )
             target_embs.append(target_emb)
@@ -208,9 +200,10 @@ class DIN(nn.Module):
         
         # [batch, 1]
         logit = self.head(hidden)
-        
+
         # [batch, ]
-        return torch.sigmoid(logit).squeeze(-1)
+        sigmoid = torch.sigmoid(logit).squeeze(-1)
+        return sigmoid
 
 
 class LocalActivationUnit(nn.Module):

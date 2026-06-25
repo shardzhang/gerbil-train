@@ -11,18 +11,18 @@ from gerbil_train.config.model_config import BaseModelConfig
 from gerbil_train.utils.embedding import embed_one_field
 from gerbil_train.models.layers import FullyConnectedLayer
 from gerbil_train.config.model_config import FieldEntry
+from gerbil_train.models.base_model import BaseModel
 
 __all__ = ["GwENBaseModel", "GwENBinaryModel", "GwENMulticlassModel"]
 
 
-class GwENBaseModel(nn.Module):
+class GwENBaseModel(BaseModel):
     """Shared GwEN implementation parameterized by ``task``. Use ``GwENBinary`` or ``GwENMulticlass``."""
 
     def __init__(self, config: BaseModelConfig, task: str = "multiclass") -> None:
         super().__init__()
         self.fields_cfg: Mapping[str, FieldEntry] = config.embedding_fields
-        if not self.fields_cfg:
-            raise ValueError("embedding_fields must be a non-empty mapping")
+        self.validate_fields(config)
 
         self.task = task
         # dict[field_name, dim]
@@ -78,6 +78,9 @@ class GwENBaseModel(nn.Module):
             raise ValueError(f"Unsupported task: {task}")
         self.reset_parameters()
 
+    def validate_fields(self, model_cfg: BaseModelConfig) -> None:
+        if not model_cfg.embedding_fields:
+            raise ValueError("embedding_fields must be a non-empty mapping")
 
     def reset_parameters(self) -> None:
         for embedding in self.field_embeddings.values():
@@ -135,13 +138,17 @@ class GwENBaseModel(nn.Module):
             weighted_embeddings = [
                 field_embeddings[fn] * field_weights[:, i].unsqueeze(-1) for i, fn in enumerate(self.fields_cfg.keys())
             ]
-            concat_embedding = torch.cat(weighted_embeddings, dim=-1)
+            input_emb = torch.cat(weighted_embeddings, dim=-1)
         else:
-            concat_embedding = torch.cat([field_embeddings[fn] for fn in self.fields_cfg.keys()], dim=-1)
+            input_emb = torch.cat([field_embeddings[fn] for fn in self.fields_cfg.keys()], dim=-1)
 
+        # [batch, embedding_sum_dim]
         if self.input_bn is not None:
-            concat_embedding = self.input_bn(concat_embedding)
-        return self.mlp(concat_embedding)
+            input_emb = self.input_bn(input_emb)
+        
+        # [batch, final_hidden_dim]
+        hidden = self.mlp(input_emb)
+        return hidden
 
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
