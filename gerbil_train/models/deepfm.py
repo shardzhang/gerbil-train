@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Any, Mapping
 
 import torch
 from torch import Tensor, nn
 
-from gerbil_train.config.model_config import BaseModelConfig as DeepFMConfig
 from gerbil_train.utils.embedding import embed_one_field
-from gerbil_train.utils.nn import FullyConnectedLayer
+from gerbil_train.models.layers import FullyConnectedLayer
 
 __all__ = ["DeepFM"]
 
@@ -17,25 +16,27 @@ __all__ = ["DeepFM"]
 class DeepFM(nn.Module):
     """DeepFM model for recommendation and CTR prediction."""
 
-    def __init__(self, config: DeepFMConfig) -> None:
+    def __init__(self, config: dict[str, Any]) -> None:
         super().__init__()
 
-        self.field_names = list(config.field_names)
+        self.field_names = list(config["field_names"])
         if not self.field_names:
             raise ValueError("DeepFM requires at least one field.")
 
-        self.output_activation = str(config.output.get("activation", "none"))
+        self.output_activation = str(config["output"].get("activation", "none"))
 
         self.linear_embeddings = nn.ModuleDict()
         self.feature_embeddings = nn.ModuleDict()
-        self.embedding_dim = int(config.embedding_dim)
+        self.embedding_dim = int(config["embedding_dim"])
 
         for field_name in self.field_names:
-            if config.embedding_fields and field_name in config.embedding_fields:
-                entry = config.embedding_fields[field_name]
-                vocab_size = int(entry.vocab_size)
-            elif config.sparse_fields and field_name in config.sparse_fields:
-                vocab_size = int(config.sparse_fields[field_name].vocab_size)
+            embedding_fields = config.get("embedding_fields", {})
+            sparse_fields = config.get("sparse_fields", {})
+            if embedding_fields and field_name in embedding_fields:
+                entry = embedding_fields[field_name]
+                vocab_size = int(entry["vocab_size"])
+            elif sparse_fields and field_name in sparse_fields:
+                vocab_size = int(sparse_fields[field_name]["vocab_size"])
             else:
                 raise ValueError(f"Field {field_name} not found in config")
 
@@ -46,7 +47,7 @@ class DeepFM(nn.Module):
                 num_embeddings=vocab_size, embedding_dim=self.embedding_dim, mode="sum",
             )
 
-        deep_cfg = config.deep
+        deep_cfg = config["deep"]
         self.deep_hidden_dims = list(deep_cfg.get("hidden_dims", [128, 64]))
         self.embedding_sum_dim = len(self.field_names) * self.embedding_dim
         self.deep_network = FullyConnectedLayer(

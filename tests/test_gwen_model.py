@@ -13,9 +13,9 @@ class GwENModelTests(unittest.TestCase):
 
     def _make_config(self) -> BaseModelConfig:
         fields = {
-            "user_age": FieldEntry(f_index=2, f_type=1, vocab_size=8, emb_dim=4),
-            "user_gender": FieldEntry(f_index=3, f_type=1, vocab_size=3, emb_dim=2),
-            "movie_genres": FieldEntry(f_index=103, f_type=1, vocab_size=19, emb_dim=4),
+            "user_age": FieldEntry(field_name="user_age", field_index=2, field_type=1, dim=8, emb_size=4),
+            "user_gender": FieldEntry(field_name="user_gender", field_index=3, field_type=1, dim=3, emb_size=2),
+            "movie_genres": FieldEntry(field_name="movie_genres", field_index=103, field_type=1, dim=19, emb_size=4),
         }
         return BaseModelConfig(
             target_size=10,

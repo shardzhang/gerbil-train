@@ -2,42 +2,41 @@ from __future__ import annotations
 
 import unittest
 
+from gerbil_train.config.model_config import FieldEntry, BaseModelConfig
 from gerbil_train.config.train_config import (
     TrainCheckpointConfig,
     TrainCompileConfig,
     TrainDataConfig,
-    FieldEntry,
     TrainLossConfig,
-    ModelConfig,
     TrainOptimizerConfig,
     TrainConfig,
 )
 
 
 class GwENFieldEntryTests(unittest.TestCase):
-    """Tests for GwENFieldEntry."""
+    """Tests for FieldEntry."""
 
     def test_field_entry_defaults(self) -> None:
-        entry = FieldEntry(f_index=1, f_type=1, vocab_size=10, emb_dim=8)
-        self.assertEqual(entry.f_index, 1)
-        self.assertEqual(entry.f_type, 1)
-        self.assertEqual(entry.vocab_size, 10)
-        self.assertEqual(entry.emb_dim, 8)
+        entry = FieldEntry(field_name="test", field_index=1, field_type=1, dim=10, emb_size=8)
+        self.assertEqual(entry.field_index, 1)
+        self.assertEqual(entry.field_type, 1)
+        self.assertEqual(entry.dim, 10)
+        self.assertEqual(entry.emb_size, 8)
         self.assertTrue(entry.enabled)
 
     def test_field_entry_disabled(self) -> None:
-        entry = FieldEntry(f_index=5, f_type=0, vocab_size=3, emb_dim=4, enabled=False)
+        entry = FieldEntry(field_name="test", field_index=5, field_type=0, dim=3, emb_size=4, enabled=False)
         self.assertFalse(entry.enabled)
 
 
-class ModelConfigTests(unittest.TestCase):
-    """Tests for ModelConfig."""
+class BaseModelConfigTests(unittest.TestCase):
+    """Tests for BaseModelConfig."""
 
     def test_from_dict(self) -> None:
-        entries = {
-            "age": FieldEntry(f_index=2, f_type=1, vocab_size=8, emb_dim=4),
-        }
-        cfg = ModelConfig.from_dict(
+        entries = [
+            FieldEntry(field_name="age", field_index=2, field_type=1, dim=8, emb_size=4),
+        ]
+        cfg = BaseModelConfig.from_dict(
             {"target_size": 100, "mlp": {"hidden_dims": [32]}, "field_attention": {"enabled": False}},
             entries,
         )
@@ -47,8 +46,8 @@ class ModelConfigTests(unittest.TestCase):
         self.assertEqual(cfg.field_attention["enabled"], False)
 
     def test_from_dict_minimal(self) -> None:
-        entries = {}
-        cfg = ModelConfig.from_dict({}, entries)
+        entries: list = []
+        cfg = BaseModelConfig.from_dict({}, entries)
         self.assertEqual(cfg.target_size, 0)
         self.assertEqual(cfg.embedding_fields, {})
 
@@ -110,10 +109,10 @@ class GwENCompileConfigTests(unittest.TestCase):
 
 
 class GwENCheckpointConfigTests(unittest.TestCase):
-    """Tests for GwENCheckpointConfig."""
+    """Tests for TrainCheckpointConfig."""
 
     def test_defaults(self) -> None:
-        cfg = TrainCheckpointConfig()
+        cfg = TrainCheckpointConfig(monitor="hit@1", mode="max")
         self.assertIsNone(cfg.path)
         self.assertEqual(cfg.monitor, "hit@1")
         self.assertEqual(cfg.mode, "max")
@@ -123,7 +122,9 @@ class TrainConfigFromDictTests(unittest.TestCase):
     """Tests for TrainConfig.from_dict."""
 
     def test_empty_dict(self) -> None:
-        cfg = TrainConfig.from_dict({})
+        cfg = TrainConfig.from_dict({
+            "checkpoint": {"monitor": "val_loss", "mode": "min"},
+        })
         self.assertEqual(cfg.seed, 42)
         self.assertEqual(cfg.device, "cpu")
         self.assertEqual(cfg.epochs, 1)
@@ -135,7 +136,7 @@ class TrainConfigFromDictTests(unittest.TestCase):
             "epochs": 10,
             "data": {"batch_size": 256, "num_workers": 2},
             "optimizer": {"lr": 0.01},
-            "checkpoint": {"monitor": "hit@10"},
+            "checkpoint": {"monitor": "hit@10", "mode": "max"},
             "loss": {"type": "nce", "num_sampled": 50},
             "compile": {"enabled": True},
         })
@@ -150,7 +151,7 @@ class TrainConfigFromDictTests(unittest.TestCase):
 
     def test_compile_bool(self) -> None:
         """from_dict handles compile: true (bool) gracefully."""
-        cfg = TrainConfig.from_dict({"compile": True})
+        cfg = TrainConfig.from_dict({"compile": True, "checkpoint": {"monitor": "val_loss", "mode": "min"}})
         self.assertTrue(cfg.compile.enabled)
 
 

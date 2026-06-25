@@ -90,3 +90,7 @@ class DINModelConfig(BaseModelConfig):
             field_attention=dict(model_cfg.get("field_attention", {})),
             field_stats=dict(model_cfg.get("field_stats", {})),
         )
+
+@dataclass
+class DeepFMModelConfig(BaseModelConfig):
+    pass
