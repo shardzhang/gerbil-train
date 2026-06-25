@@ -20,7 +20,7 @@ class DeepFM(BaseModel):
 
     def __init__(self, model_cfg: DeepFMModelConfig) -> None:
         super().__init__()
-        self.validate_fields(model_cfg)
+        self._validate_fields(model_cfg)
 
         self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.field_names = list(self.fields_cfg.keys())
@@ -63,7 +63,7 @@ class DeepFM(BaseModel):
         self.reset_parameters()
 
 
-    def validate_fields(self, model_cfg: DeepFMModelConfig) -> None:
+    def _validate_fields(self, model_cfg: DeepFMModelConfig) -> None:
         """Validate that the embedding fields are properly configured."""
         if not model_cfg.embedding_fields:
             raise ValueError("embedding_fields must be a non-empty mapping")
@@ -133,7 +133,7 @@ class DeepFM(BaseModel):
         stacked = feature_embs                                                          # [B, n, k]
         summed = stacked.sum(dim=1)                                                     # [B, k]
         sum_of_squares = (stacked * stacked).sum(dim=1)                                 # [B, k]
-        logits = logits + linear_sum / self.num_fields + 0.5 * (summed * summed - sum_of_squares).sum(dim=1)
+        logits = logits + linear_sum / self.num_fields + 0.5 * (summed * summed - sum_of_squares).sum(dim=1) / self.num_fields
 
         # 3. Deep term: high-order non-linear interactions via MLP
         deep_input = concat                                                             # [B, n*k]
