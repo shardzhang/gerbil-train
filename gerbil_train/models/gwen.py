@@ -22,7 +22,7 @@ class GwENBaseModel(BaseModel):
     def __init__(self, config: BaseModelConfig, task: str = "multiclass") -> None:
         super().__init__()
         self.fields_cfg: Mapping[str, FieldEntry] = config.embedding_fields
-        self.validate_fields(config)
+        self._validate_fields(config)
 
         self.task = task
         # dict[field_name, dim]
@@ -78,7 +78,7 @@ class GwENBaseModel(BaseModel):
             raise ValueError(f"Unsupported task: {task}")
         self.reset_parameters()
 
-    def validate_fields(self, model_cfg: BaseModelConfig) -> None:
+    def _validate_fields(self, model_cfg: BaseModelConfig) -> None:
         if not model_cfg.embedding_fields:
             raise ValueError("embedding_fields must be a non-empty mapping")
 

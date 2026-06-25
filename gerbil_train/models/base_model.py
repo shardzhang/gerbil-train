@@ -6,8 +6,8 @@ from torch import nn
 
 
 class BaseModel(nn.Module, ABC):
-    """All models must implement ``validate_fields``."""
+    """All models must implement ``_validate_fields``."""
 
     @abstractmethod
-    def validate_fields(self, model_cfg) -> None:
+    def _validate_fields(self, model_cfg) -> None:
         raise NotImplementedError

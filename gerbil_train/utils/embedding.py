@@ -28,8 +28,8 @@ def embed_one_field(emb: nn.EmbeddingBag,
     """
     indices = to_device(indices.long(), device)
     offsets = to_device(offsets.long(), device)
-    weights = to_device(weights.float(), device)
-    return emb(indices, offsets, per_sample_weights=weights)
+    bag_weight = to_device(weights.float(), device) if emb.mode == "sum" else None
+    return emb(indices, offsets, per_sample_weights=bag_weight)
 
 
 def bag_to_padded(indices: Tensor, offsets: Tensor) -> tuple[Tensor, Tensor, int]:

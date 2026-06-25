@@ -25,22 +25,29 @@ class DeepFM(BaseModel):
         self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.field_names = list(self.fields_cfg.keys())
         self.embedding_sum_dim = sum(entry.emb_size for entry in self.fields_cfg.values())
+        self.num_fields = len(self.field_names)
 
         self.linear_embeddings = nn.ModuleDict()
         self.feature_embeddings = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
-            self.linear_embeddings[str(entry.field_index)] = nn.EmbeddingBag(
-                num_embeddings=entry.dim, 
-                embedding_dim=1, 
-                mode="mean",
+        for _, entry in self.fields_cfg.items():
+            key = str(entry.field_index)
+            # Linear embedding: vocab → 1, used for the 1st-order term
+            self.linear_embeddings[key] = nn.EmbeddingBag(
+                num_embeddings=entry.dim,
+                embedding_dim=1,
+                mode="sum",
             )
-            self.feature_embeddings[str(entry.field_index)] = nn.EmbeddingBag(
+            # Feature embedding: vocab → k, shared by FM 2nd-order and Deep terms
+            self.feature_embeddings[key] = nn.EmbeddingBag(
                 num_embeddings=entry.dim,
                 embedding_dim=entry.emb_size,
-                mode="mean",
+                mode="sum",
             )
 
         mlp_cfg = model_cfg.mlp
+        # BatchNorm on concatenated feature embeddings to prevent logit saturation from mode="sum"
+        self.input_bn = nn.BatchNorm1d(self.embedding_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
+
         hidden_dims = list(mlp_cfg.get("hidden_dims", [128, 64]))
         self.deep_network = FullyConnectedLayer(
             input_dim=self.embedding_sum_dim,
@@ -57,8 +64,10 @@ class DeepFM(BaseModel):
 
 
     def validate_fields(self, model_cfg: DeepFMModelConfig) -> None:
+        """Validate that the embedding fields are properly configured."""
         if not model_cfg.embedding_fields:
             raise ValueError("embedding_fields must be a non-empty mapping")
+        
         first_emb = next(iter(model_cfg.embedding_fields.values())).emb_size
         if not all(entry.emb_size == first_emb for entry in model_cfg.embedding_fields.values()):
             raise ValueError("All fields must have the same embedding size")
@@ -77,56 +86,57 @@ class DeepFM(BaseModel):
 
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
-        """Forward pass of the DeepFM model."""
-        
-        # 1. Linear term
+        """Forward pass of the DeepFM model.
+
+        DeepFM = Linear (1st-order) + FM (2nd-order pair-wise) + Deep (high-order non-linear),
+        all sharing the same feature embeddings.
+        """
         first_offsets = feature_bags[self.field_names[0]]["offsets"]
         batch_size = int(first_offsets.size(0))
         device = next(self.parameters()).device
 
-        # [batch_size, ]
+        # 1. Linear term (1st-order): sum of per-field linear embeddings + global bias
         logits = self.bias.expand(batch_size).to(device)
+        linear_sum = torch.zeros(batch_size, device=device)
         feature_emb_list: list[Tensor] = []
 
         for field_name, entry in self.fields_cfg.items():
-            # [batch_size, 1]
+            key = str(entry.field_index)
             linear_emb = embed_one_field(
-                self.linear_embeddings[str(entry.field_index)], 
-                feature_bags[field_name]["indices"], 
+                self.linear_embeddings[key],
+                feature_bags[field_name]["indices"],
                 feature_bags[field_name]["offsets"],
-                feature_bags[field_name]["weights"], 
+                feature_bags[field_name]["weights"],
                 device=device,
             )
-            # [batch_size, ]
-            logits = logits + linear_emb.squeeze(-1)
+            linear_sum = linear_sum + linear_emb.squeeze(-1)
 
-            # [batch_size, embedding_dim]
             feature_emb = embed_one_field(
-                self.feature_embeddings[str(entry.field_index)], 
-                feature_bags[field_name]["indices"], 
+                self.feature_embeddings[key],
+                feature_bags[field_name]["indices"],
                 feature_bags[field_name]["offsets"],
-                feature_bags[field_name]["weights"], 
+                feature_bags[field_name]["weights"],
                 device=device,
             )
             feature_emb_list.append(feature_emb)
 
-        # 2. FM second-order term
-        # FM 公式: 0.5 * Σ((Σ f)^2 - Σ(f^2))
-        # $$\text{FM} = \frac{1}{2}\sum_{f=1}^{k}\left((\sum_{i=1}^{n} v_{i,f})^2 - \sum_{i=1}^{n} v_{i,f}^2\right)$$
-        # $$\text{FM} = \sum_{i=1}^{n}\sum_{j=i+1}^{n} \langle v_i, v_j \rangle$$
-        # [batch_size, num_fields, embedding_dim]
-        stacked = torch.stack(feature_emb_list, dim=1)
-        # [batch_size, embedding_dim]
-        summed = stacked.sum(dim=1)
-        # [batch_size, embedding_dim]
-        sum_of_squares = (stacked * stacked).sum(dim=1)
-        # [batch_size, ]
-        logits = logits + 0.5 * (summed * summed - sum_of_squares).sum(dim=1)
-
-        # 3. Deep term
+        # Concatenate and normalize feature embeddings before FM/Deep to prevent logit saturation
         # [batch_size, num_fields * embedding_dim]
-        deep_input = torch.cat(feature_emb_list, dim=-1)
-        # [batch_size, 1]
-        logits = logits + self.deep_head(self.deep_network(deep_input)).squeeze(-1)
+        concat = torch.cat(feature_emb_list, dim=-1)
+        if self.input_bn is not None:
+            concat = self.input_bn(concat)
+        
+        # [batch_size, num_fields, embedding_dim]
+        feature_embs = concat.view(batch_size, self.num_fields, -1)
+
+        # 2. FM second-order term: pair-wise feature interactions
+        stacked = feature_embs                                                          # [B, n, k]
+        summed = stacked.sum(dim=1)                                                     # [B, k]
+        sum_of_squares = (stacked * stacked).sum(dim=1)                                 # [B, k]
+        logits = logits + linear_sum / self.num_fields + 0.5 * (summed * summed - sum_of_squares).sum(dim=1)
+
+        # 3. Deep term: high-order non-linear interactions via MLP
+        deep_input = concat                                                             # [B, n*k]
+        logits = logits + self.deep_head(self.deep_network(deep_input)).squeeze(-1)     # [B, ]
 
         return torch.sigmoid(logits)

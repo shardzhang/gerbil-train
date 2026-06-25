@@ -22,7 +22,7 @@ class DIN(BaseModel):
     def __init__(self, model_cfg: DINModelConfig) -> None:
         super().__init__()
 
-        self.validate_fields(model_cfg)
+        self._validate_fields(model_cfg)
         self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
                              
         self.item_num = model_cfg.target_size
@@ -80,7 +80,7 @@ class DIN(BaseModel):
         for field_name in self.field_names:
             entry = self.fields_cfg[field_name]
             self.field_embedding_dims[field_name] = int(entry.emb_size)
-            self.field_embeddings[field_name] = nn.EmbeddingBag(
+            self.field_embeddings[str(entry.field_index)] = nn.EmbeddingBag(
                 num_embeddings=int(entry.dim),
                 embedding_dim=int(entry.emb_size),
                 mode="sum", 
@@ -104,7 +104,7 @@ class DIN(BaseModel):
         self.reset_parameters()
 
 
-    def validate_fields(self, model_cfg: DINModelConfig) -> None:
+    def _validate_fields(self, model_cfg: DINModelConfig) -> None:
         """Validate the model configuration."""
         fields_cfg = model_cfg.embedding_fields
         if not fields_cfg:
@@ -132,7 +132,8 @@ class DIN(BaseModel):
 
         # Embed plain feature fields
         field_embs: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name in self.field_names:
+            entry = self.fields_cfg[field_name]
             field_emb = embed_one_field(
                 self.field_embeddings[str(entry.field_index)], 
                 feature_bags[field_name]["indices"], 
