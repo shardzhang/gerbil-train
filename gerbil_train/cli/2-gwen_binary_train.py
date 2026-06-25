@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from gerbil_train.utils.config import load_experiment_config, parse_args
 from gerbil_train.utils.run import close_exp_log, create_run_dir, save_run_configs, setup_exp_log
 from gerbil_train.utils.training import build_dataloaders, build_model_config
-from gerbil_train.config.model_config import ModelConfig
+from gerbil_train.config.model_config import BaseModelConfig
 from gerbil_train.config.train_config import TrainConfig
 from gerbil_train.models.gwen import GwENBinaryModel
 from gerbil_train.trainer.gwen_binary_trainer import GwENBinaryTrainer
@@ -24,7 +24,7 @@ def main() -> None:
     args = parse_args(CONFIG_PATH)
     exp_cfg: dict[str, Any] = load_experiment_config(args.config)
     data_cfg: dict[str, Any] = exp_cfg["data"]
-    model_cfg: ModelConfig = build_model_config(exp_cfg, ModelConfig)
+    model_cfg: BaseModelConfig = build_model_config(exp_cfg, BaseModelConfig)
     
     run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_ml1m_binary")
     setup_exp_log(run_dir)

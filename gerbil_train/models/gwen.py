@@ -7,7 +7,7 @@ from typing import Mapping
 import torch
 from torch import Tensor, nn
 
-from gerbil_train.config.model_config import ModelConfig
+from gerbil_train.config.model_config import BaseModelConfig
 from gerbil_train.utils.embedding import embed_one_field
 from gerbil_train.models.layers import FullyConnectedLayer
 from gerbil_train.config.model_config import FieldEntry
@@ -18,7 +18,7 @@ __all__ = ["GwENBaseModel", "GwENBinaryModel", "GwENMulticlassModel"]
 class GwENBaseModel(nn.Module):
     """Shared GwEN implementation parameterized by ``task``. Use ``GwENBinary`` or ``GwENMulticlass``."""
 
-    def __init__(self, config: ModelConfig, task: str = "multiclass") -> None:
+    def __init__(self, config: BaseModelConfig, task: str = "multiclass") -> None:
         super().__init__()
         self.fields_cfg: Mapping[str, FieldEntry] = config.embedding_fields
         if not self.fields_cfg:
@@ -65,7 +65,7 @@ class GwENBaseModel(nn.Module):
             activation=str(mlp_cfg.get("activation", "relu")),
             dropout=float(mlp_cfg.get("dropout", 0.0)),
         )
-        
+
         final_hidden_dim = hidden_dims[-1] if hidden_dims else self.embedding_sum_dim
         if self.task == "binary":
             self.head = nn.Linear(final_hidden_dim, 1)
@@ -159,11 +159,11 @@ class GwENBaseModel(nn.Module):
 
 class GwENBinaryModel(GwENBaseModel):
     """GwEN for binary classification."""
-    def __init__(self, config: ModelConfig) -> None:
+    def __init__(self, config: BaseModelConfig) -> None:
         super().__init__(config, task="binary")
 
 
 class GwENMulticlassModel(GwENBaseModel):
     """GwEN for multi-class classification."""
-    def __init__(self, config: ModelConfig) -> None:
+    def __init__(self, config: BaseModelConfig) -> None:
         super().__init__(config, task="multiclass")

@@ -105,6 +105,11 @@ class FullyConnectedLayer(nn.Module):
                     nn.init.zeros_(m.bias.data)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the fully connected layer.
+        
+        :param x: Input tensor ``[batch_size, seq_len, input_dim]``
+        :return: Output tensor ``[batch_size, seq_len, hidden_dim[-1]]``
+        """
         if self.sigmoid:
             return self.output_layer(self.fc(x))
         return self.fc(x)

@@ -32,7 +32,7 @@ def print_model_structure(model: nn.Module) -> None:
         display = getattr(module, "field_name", name)
         prefix = "    " * depth + ("└── " if is_last else "├── ")
         label = f"{display}  {type(module).__name__}" if display else type(module).__name__
-        params = sum(p.numel() for p in module.parameters(recurse=False))
+        params = sum(p.numel() for p in module.parameters(recurse=True))
         shapes = ", ".join(str(tuple(p.shape)) for p in module.parameters(recurse=False))
         nodes.append((prefix, label, params, shapes))
         children = list(module.named_children())

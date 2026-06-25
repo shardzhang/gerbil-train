@@ -30,7 +30,9 @@ class DIN(nn.Module):
         self._validate_fields(model_cfg)
 
         self.item_num = model_cfg.target_size
+        # Whether to use softmax attention
         self.softmax_attn = model_cfg.softmax_attn
+        # Target merge strategy: "mean" or "proj"
         self.target_merge = model_cfg.target_merge
         self.behavior_fields = behavior_fields
         self.target_fields = target_fields
@@ -40,10 +42,10 @@ class DIN(nn.Module):
         # Target (candidate item) field embeddings
         self.target_embedding_dims: dict[str, int] = {}
         self.target_embeddings = nn.ModuleDict()
-        for tf in target_fields:
-            entry = self.fields_cfg[tf]
-            self.target_embedding_dims[tf] = int(entry.emb_size)
-            self.target_embeddings[tf] = nn.EmbeddingBag(
+        for f_name in target_fields:
+            entry = self.fields_cfg[f_name]
+            self.target_embedding_dims[f_name] = int(entry.emb_size)
+            self.target_embeddings[str(entry.field_index)] = nn.EmbeddingBag(
                 num_embeddings=int(entry.dim),
                 embedding_dim=int(entry.emb_size),
                 mode="sum", 
@@ -56,16 +58,19 @@ class DIN(nn.Module):
         self.attention_units = nn.ModuleDict()
         for bf in behavior_fields:
             entry = self.fields_cfg[bf]
+            # print(f"[DEBUG] {bf}: dim={entry.dim}, emb_size={entry.emb_size}")
             self.behavior_emb_dims[bf] = int(entry.emb_size)
             self.behavior_embeddings[bf] = EmbeddingLayer(
                 item_num=int(entry.dim), 
                 embedding_dim=int(entry.emb_size),
             )
+            lau: dict[str, Any] = model_cfg.local_activation_unit
+            # 各个行为序列特征词表独占，不同享
             self.attention_units[bf] = LocalActivationUnit(
-                hidden_dims=[80, 40], 
-                bias=[True, True],
-                embedding_dim=int(entry.emb_size), 
-                batch_norm=False,
+                hidden_dims=lau.get("hidden_dims", [80, 40]),
+                bias=lau.get("bias", [True, True]),
+                embedding_dim=int(entry.emb_size),
+                batch_norm=lau.get("batch_norm", False),
             )
 
         # When target_merge="proj": concat targets → Linear project to behavior emb_dim
@@ -106,6 +111,7 @@ class DIN(nn.Module):
 
     @staticmethod
     def _validate_fields(model_cfg: DINModelConfig) -> None:
+        """Validate the model configuration."""
         fields_cfg = model_cfg.embedding_fields
         if not fields_cfg:
             raise ValueError("embedding_fields must be a non-empty mapping")
@@ -125,6 +131,7 @@ class DIN(nn.Module):
 
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
+        """Forward pass of the DIN model."""
         first_offsets = feature_bags[self.field_names[0]]["offsets"]
         batch_size = int(first_offsets.size(0))
         device = next(self.parameters()).device
@@ -144,10 +151,10 @@ class DIN(nn.Module):
 
         # Embed target (candidate item) fields
         target_embs: list[Tensor] = []
-        for tf in self.target_fields:
-            bag = feature_bags[tf]
+        for field_name in self.target_fields:
+            bag = feature_bags[field_name]
             target_emb = embed_one_field(
-                self.target_embeddings[tf],
+                self.target_embeddings[str(self.fields_cfg[field_name].field_index)],
                 bag["indices"],
                 bag["offsets"],
                 bag["weights"],
@@ -170,33 +177,44 @@ class DIN(nn.Module):
             
             # Convert variable-length EmbeddingBag to padded sequence for attention
             padded_ids, lengths, max_seq_len = bag_to_padded(indices, offsets)
+            # [batch, max_seq_len, emb_dim]
             seq_emb = self.behavior_embeddings[bf](padded_ids)
+            # [batch, max_seq_len, 1]
             target_exp = target_for_attention.unsqueeze(1).expand(-1, max_seq_len, -1)
+            # [batch, max_seq_len]
             scores = self.attention_units[bf](seq_emb, target_exp).squeeze(-1)
 
             # [batch, max_seq_len] — mask out padding and invalid item IDs
             mask = (torch.arange(max_seq_len, device=device).unsqueeze(0) < lengths.unsqueeze(1)) & (padded_ids < self.item_num)
             if self.softmax_attn:
                 scores = scores.masked_fill(~mask, float("-inf"))
+                # [batch, max_seq_len]
                 attn = torch.softmax(scores, dim=-1)
             else:
                 scores = scores.masked_fill(~mask, 0.0)
                 attn = scores
             
-            # (batch, emb_dim)
+            # [batch, emb_dim]
             interest = (attn.unsqueeze(-1) * seq_emb).sum(dim=1)
             interest_embs.append(interest)
 
+        # [batch, embedding_sum_dim]
         input_emb = torch.cat(field_embs + target_embs + interest_embs, dim=-1)
         if self.input_bn is not None:
             input_emb = self.input_bn(input_emb)
+        
+        # [batch, final_hidden_dim]
         hidden = self.mlp(input_emb)
+        
+        # [batch, 1]
         logit = self.head(hidden)
-        # (batch_size, 1) -> (batch_size,)
+        
+        # [batch, ]
         return torch.sigmoid(logit).squeeze(-1)
 
 
 class LocalActivationUnit(nn.Module):
+    """Local Activation Unit (LAU) for DIN model."""
     def __init__(
         self,
         hidden_dims: list[int] = [80, 40],
@@ -223,23 +241,28 @@ class LocalActivationUnit(nn.Module):
         )
 
     def forward(self, user_behavior: torch.Tensor, queries: torch.Tensor) -> torch.Tensor:
-        """
+        """Forward pass of the LAU.
+
         :param user_behavior: (batch_size, f_num, embed_dim)
         :param queries: (batch_size, f_num, embed_dim)
         :return: (batch_size, f_num, 1)
         """
-        attention_output = self.fc2(self.fc1(
-            torch.cat([
-                queries,
+        batch, seq_len, emb_dim = user_behavior.shape
+        # [batch, seq_len, 4*emb_dim]
+        concat = torch.cat([
+                queries, 
                 user_behavior,
-                queries - user_behavior,
+                queries - user_behavior, 
                 queries * user_behavior,
-            ], dim=-1)
-        ))
-        return attention_output
-
+            ], 
+            dim=-1
+        )  
+        concat_2d = concat.view(-1, 4 * emb_dim)   # [batch*seq_len, 4*emb_dim]
+        output = self.fc2(self.fc1(concat_2d))     # [batch*seq_len, 1]
+        return output.view(batch, seq_len, 1)      # [batch, seq_len, 1]
 
 class EmbeddingLayer(nn.Module):
+    """Embedding layer for DIN model."""
     def __init__(self, item_num: int, embedding_dim: int):
         super(EmbeddingLayer, self).__init__()
         
@@ -253,4 +276,9 @@ class EmbeddingLayer(nn.Module):
                 self.embed.weight[self.embed.padding_idx].zero_()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor: 
+        """Forward pass of the embedding layer.
+        
+        :param x: (batch_size, f_num)
+        :return: (batch_size, f_num, embed_dim)
+        """
         return self.embed(x)

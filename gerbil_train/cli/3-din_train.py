@@ -33,7 +33,7 @@ def main() -> None:
     train_cfg.logging.plot_path = str(run_dir)
     print(f"Training config | seed={train_cfg.seed} | epochs={train_cfg.epochs} | batch_size={train_cfg.data.batch_size}")
     print(f"Run dir: {run_dir}")
-    print(f"Loading GwEN TFRecords from {data_cfg['paths']['tfrecord_root']}")
+    print(f"Loading TFRecords from {data_cfg['paths']['tfrecord_root']}")
 
     train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg)
     model = DIN(model_cfg)

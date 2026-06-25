@@ -4,20 +4,20 @@ import unittest
 
 import torch
 
-from gerbil_train.config.model_config import FieldEntry, ModelConfig
+from gerbil_train.config.model_config import FieldEntry, BaseModelConfig
 from gerbil_train.models.gwen import GwENMulticlassModel as GwEN
 
 
 class GwENModelTests(unittest.TestCase):
     """Unit tests for the GwEN model."""
 
-    def _make_config(self) -> ModelConfig:
+    def _make_config(self) -> BaseModelConfig:
         fields = {
             "user_age": FieldEntry(f_index=2, f_type=1, vocab_size=8, emb_dim=4),
             "user_gender": FieldEntry(f_index=3, f_type=1, vocab_size=3, emb_dim=2),
             "movie_genres": FieldEntry(f_index=103, f_type=1, vocab_size=19, emb_dim=4),
         }
-        return ModelConfig(
+        return BaseModelConfig(
             target_size=10,
             embedding_fields=fields,
             mlp={"hidden_dims": [8, 4], "activation": "relu", "dropout": 0.0, "batch_norm": False},

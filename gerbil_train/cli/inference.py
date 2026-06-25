@@ -21,15 +21,15 @@ from gerbil_train.data.tfrecord_dataset import (
     BatchCollator, BinaryTFRecordDataset, MultiTFRecordDataset,
     collect_tfrecord_part_files, load_target_size, load_field_stats,
 )
-from gerbil_train.config.model_config import ModelConfig, FieldEntry, load_enabled_field_entries
+from gerbil_train.config.model_config import BaseModelConfig, FieldEntry, load_enabled_field_entries
 from gerbil_train.models.gwen import GwENBinaryModel, GwENMulticlassModel
 from gerbil_train.inference import Predictor
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
 MODEL_REGISTRY: dict[str, dict[str, Any]] = {
-    "gwen_binary": {"model": GwENBinaryModel, "config": ModelConfig, "dataset": BinaryTFRecordDataset},
-    "gwen_multiclass": {"model": GwENMulticlassModel, "config": ModelConfig, "dataset": MultiTFRecordDataset},
+    "gwen_binary": {"model": GwENBinaryModel, "config": BaseModelConfig, "dataset": BinaryTFRecordDataset},
+    "gwen_multiclass": {"model": GwENMulticlassModel, "config": BaseModelConfig, "dataset": MultiTFRecordDataset},
 }
 
 

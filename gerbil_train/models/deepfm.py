@@ -7,7 +7,7 @@ from typing import Mapping
 import torch
 from torch import Tensor, nn
 
-from gerbil_train.config.model_config import ModelConfig as DeepFMConfig
+from gerbil_train.config.model_config import BaseModelConfig as DeepFMConfig
 from gerbil_train.utils.embedding import embed_one_field
 from gerbil_train.utils.nn import FullyConnectedLayer
 
