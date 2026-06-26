@@ -97,48 +97,56 @@ embedding:
       field_index: 18
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
     user_rate_std_7day_continue:
       field_index: 19
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
     user_rate_std_15day_continue:
       field_index: 21
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
     user_rate_std_30day_continue:
       field_index: 22
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
     user_avg_rate_continue:
       field_index: 23
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
     user_avg_rate_7day_continue:
       field_index: 24
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
     user_avg_rate_15day_continue:
       field_index: 25
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
     user_avg_rate_30day_continue:
       field_index: 26
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
     user_genres_rate:
@@ -271,6 +279,7 @@ embedding:
       field_index: 357
       field_type: 0
       dim: 2
+      concat_type: direct
       emb_size: 4
       enabled: true
 field_attention:

@@ -10,10 +10,7 @@ from gerbil_train.data.tfrecord_dataset import load_field_specs
 from gerbil_train.utils.config import parse_args
 from gerbil_train.utils.config import load_experiment_config
 
-def build_field_entries(
-    model_cfg_path: str | Path,
-    all_field_specs: list[FieldEntry],
-) -> None:
+def build_field_entries(model_cfg_path: str | Path, all_field_specs: list[FieldEntry]) -> None:
     """从pos_map.txt中读取字段配置，更新模型配置文件中的字段配置。
 
     :param model_cfg_path: Path to the model YAML config file.
@@ -38,13 +35,22 @@ def build_field_entries(
             field_type=spec.field_type, 
             field_name=spec.field_name,
             dim=int(spec.dim),
+            concat_mode=str(ex.get("concat_model", "direct")),
             emb_size=int(ex.get("emb_size", default_emb_size)),
             enabled=bool(ex.get("enabled", True)),
         )
     raw_cfg["embedding"]["fields"] = {
-        n: {"field_index": e.field_index, "field_type": e.field_type, "dim": e.dim, "emb_size": e.emb_size, "enabled": e.enabled}
-        for n, e in sorted(entries.items(), key=lambda x: x[1].field_index)
+        f_name: {
+            "field_index": entry.field_index,
+            "field_type": entry.field_type,
+            "dim": entry.dim,
+            "emb_size": entry.emb_size,
+            "enabled": entry.enabled,
+            **({"concat_type": entry.concat_type} if entry.field_type == 0 else {}),
+        }
+        for f_name, entry in sorted(entries.items(), key=lambda x: x[1].field_index)
     }
+
     with open(model_cfg_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(raw_cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
     print(f"Config written to {model_cfg_path}")

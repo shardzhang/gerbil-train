@@ -4,7 +4,7 @@ epochs: 5
 
 data:
   batch_size: 512
-  num_workers: 4
+  num_workers: 0
   pin_memory: false
   drop_last: true
   prefetch_factor: 4

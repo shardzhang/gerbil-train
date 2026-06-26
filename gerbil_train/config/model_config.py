@@ -14,12 +14,13 @@ class FieldEntry:
     :param emb_size:  Embedding dimension for this field
     :param enabled:  Whether to include this field in the model
     """
-    field_name: str     # 必须唯一
-    field_index: int    # 可以相同，相同时表示词表共享
-    field_type: int     # 0表示连续特征，1表示离散特征
-    dim: int            # 特征维度
-    emb_size: int = -1
-    enabled: bool = True
+    field_name: str             # 必须唯一
+    field_index: int            # 可以相同，相同时表示词表共享
+    field_type: int             # 0表示连续特征，1表示离散特征
+    dim: int                    # 特征维度
+    emb_size: int = -1          # Embedding维度
+    concat_type: str = "emb"    # 连续特征拼接方式. direct: 直接concat, emb: 投影后concat
+    enabled: bool = True        # 是否启用
 
 
 def load_enabled_field_entries(model_cfg: dict[str, Any]) -> tuple[list[FieldEntry], list[str]]:
