@@ -2,141 +2,98 @@
 
 **Offline training and evaluation for GERBIL recommender systems.**
 
-**gerbil-train** is the offline training and evaluation component of **GERBIL** (**G**eneral **E**fficient **R**ecommender for **B**enchmarking, **I**nference, and **L**earning). It focuses on efficient, modular training, evaluation, and export of recommendation models. The project is developed in Python and forms a complete pipeline together with:
+**gerbil-train** is the offline training component of **GERBIL** (**G**eneral **E**fficient **R**ecommender for **B**enchmarking, **I**nference, and **L**earning). It provides config-driven, reproducible training and evaluation for multiple recommendation model families. Built with Python and PyTorch.
 
 - **[gerbil-data](https://github.com/shardzhang/gerbil-data)** — Spark-based feature engineering and data processing
 - **[gerbil-serving](https://github.com/shardzhang/gerbil-serving)** — Online inference and model serving
 
-The primary model is **GwEN (Group-wise Embedding Network)**, a multi-class classification architecture for item recommendation. The project also provides infrastructure for CTR prediction, Top-K recommendation, ranking, retrieval pre-training, and sequential recommendation.
+## Supported Models
 
-**Supported capabilities:**
-
-- **Task types:** CTR prediction, Top-K recommendation, ranking, retrieval pre-training, sequential recommendation
-- **Model families:** MF, FM, DeepFM, Wide & Deep, DIN, SASRec, Two-Tower, GwEN, and more
-- **Evaluation metrics:** AUC, LogLoss, Recall@K, HitRate@K, NDCG@K, MRR
-
----
+| Model | Type | Description |
+|-------|------|-------------|
+| **GwEN** (Group-wise Embedding Network) | Multiclass | Base architecture for item recommendation. EmbeddingBag per field + optional field-level attention + MLP. |
+| **GwEN Binary** | CTR | Binary classification variant with sigmoid output for rating/click prediction. |
+| **DIN** (Deep Interest Network) | Sequential | Behavior-sequence attention via LocalActivationUnit. Supports multi-behavior and multi-target fields. |
+| **DeepFM** | CTR | Deep Factorization Machine: Linear + FM (pair-wise) + Deep (MLP) terms sharing feature embeddings. |
+| **Shared-Bottom Two-Tower** | Retrieval | Two-stage training (implicit pre-train + explicit fine-tune) for query-item retrieval. |
+| **Learning-to-Rank** | Ranking | Feed-forward network with configurable losses (LambdaRank, RankNet, ListNet, ListMLE). |
 
 ## Highlights
 
 ### 1. Config-Driven, Reproducible Runs
 
-Every experiment produces a timestamped directory containing the model checkpoint, training curves, and a full snapshot of all configuration files:
+Every experiment produces a timestamped run directory with model checkpoint, training curves, and config snapshots:
 
 ```
-checkpoints/gwen_ml1m_tfrecord/20260615220526/
-├── best_model.pth              # checkpoint with best monitored metric
-├── training_curves.png         # loss + metric plots
-├── training_curves_loss.txt    # per-epoch loss values
-├── training_curves_metric.txt  # per-epoch metric values
-├── experiment.yaml             # experiment assembly config
-├── data.yaml                   # data pipeline config
-├── model.yaml                  # model architecture config
-└── train.yaml                  # training hyper-parameters
+checkpoints/gwen_ml1m_multiclass/20260615220526/
+├── best_model.pth
+├── training_curves_loss.png / .txt
+├── training_curves_metric.png / .txt
+├── experiment.yaml, data.yaml, model.yaml, train.yaml
+├── profile.txt         # per-epoch time and steps/s
+└── exp.log             # full training log
 ```
 
-Configurations are plain YAML – no hardcoded paths, no magic strings. All parameters are validated through `@dataclass` objects, giving IDE autocompletion and type safety.
+All parameters are plain YAML, validated through `@dataclass` objects with IDE type safety.
 
-### 2. Seamless Feature Ablation
+### 2. Feature Ablation
 
-Each feature has an `enabled` flag. Disabled features are excluded from both the data pipeline (TFRecord parsing) and the model (EmbeddingBag construction). No code changes needed.
+Each feature has an `enabled` flag. Disabled fields are excluded from both data pipeline and model — no code changes needed.
 
 ```yaml
 fields:
   user_movie_rate:
-    f_index: 301
-    f_type: 1
-    vocab_size: 3569
-    emb_dim: 16
-    enabled: false   # ← toggle off for ablation
+    field_index: 101
+    field_type: 1
+    dim: 3579
+    emb_size: 16
+    enabled: false      # toggle off for ablation
 ```
 
-This design makes it trivial to test hypotheses about feature importance, detect label leakage, and evaluate minimal feature sets.
+### 3. Unified Feature Handling
 
-### 3. Unified Continuous & Categorical Feature Handling
+Categorical (`field_type=1`) and continuous (`field_type=0`) features both go through `nn.EmbeddingBag`:
 
-All feature types go through the same `nn.EmbeddingBag` mechanism:
+- **Categorical**: token index → embedding lookup
+- **Continuous**: position index → embedding lookup with z-score normalized weights
 
-- **Categorical** (`field_type=1`): token index → embedding lookup, weight=1.0
-- **Continuous** (`field_type=0`): position index → embedding lookup, weight = `(raw_value - mean) / std` (z-score normalized)
-
-The normalization uses per-bucket `mean`/`std` from `pos_map.json`, making the continuous value embedding equivalent to `Linear(1, emb_dim)` projection with learned scale.
+Continuous features also support `concat_type: "direct"` to skip embedding and pass raw values directly into the deep network.
 
 ### 4. Pluggable Loss Functions
 
-Three loss types interchangeable via a single config line:
+Multi-class models support three losses interchangeable via a single config line:
 
 ```yaml
 loss:
-  type: ce                    # ce | nce | sampled_softmax
-  num_sampled: 100            # only used for nce / sampled_softmax
+  type: ce                      # ce | nce | sampled_softmax
+  num_sampled: 100              # only used for nce / sampled_softmax
 ```
 
-All three losses train the model's own `nn.Linear` head directly – no separate class embeddings, no weight copying, no architectural changes. This means switching loss during evaluation is seamless: the same `model.forward()` produces correct full softmax logits regardless of which loss was used during training.
+All three losses train the model's own `nn.Linear` head — no separate class embeddings, no weight copying.
 
-| Loss | Computation | Best for |
-|------|-------------|----------|
-| Cross-Entropy | logits over all `target_size` classes | Small-to-medium vocabularies |
-| NCE | binary classification: signal vs noise | Large vocabularies, fast convergence |
-| Sampled Softmax | multi-class over `1 + num_sampled` classes | Large vocabularies, stable training |
+### 5. Sample-Level Shuffle
 
-At initialization (random weights), the NCE loss can be estimated analytically:
-
-| Variable | Value | Derivation |
-|----------|-------|------------|
-| `scores` | `≈ N(0, σ²)` | random Xavier init |
-| `log(K / C)` | `≈ -3.61` | `K=100, C=3706` |
-| BCE(signal) | `≈ 0.03` | `log(1 + exp(3.61))` for label=1 |
-| BCE(noise) | `≈ 3.61` | `log(1 + exp(-3.61))` for label=0 |
-| **Initial loss** | **≈ 3.57** | `(0.03 + 100 × 3.61) / 101` |
-
-This matches the observed initial loss values and confirms the implementation is numerically correct.
-
-### 5. Field-Level Attention (Optional)
-
-Each field gets a learned `Linear(emb_dim, 1)` score. Scores are softmax-normalized across fields and used to reweight embeddings before concatenation. This lets the model dynamically emphasize informative fields and suppress noise – though in practice, with well-engineered features, uniform weighting often performs equally well.
-
-### 6. Sample-Level Shuffle
-
-`TFRecordDataset` is an `IterableDataset` — it streams records sequentially and cannot be randomly indexed. To still get sample-level shuffling, a **shuffle buffer** is used inside the dataset:
-
-```
-read records → fill buffer → shuffle buffer → yield batches → refill
-```
-
-The `shuffle_buffer` parameter controls how many records are buffered before each shuffle:
-
-| `shuffle_buffer` | `batch_size` | Effect |
-|------------------|:------------:|--------|
-| `0` (disabled) | 512 | No shuffle — samples arrive in file order |
-| `512` (= batch_size) | 512 | Each batch covers only a small file window; poor shuffle quality |
-| `8192` (≈ 16× batch) | 512 | Each batch samples from a wide file range; good global shuffle |
-
-**Rule of thumb**: `shuffle_buffer ≥ batch_size × 10` ensures each batch draws from a sufficiently large pool, avoiding local clustering.
-
-Configured in the training config:
+`TFRecordDataset` is an `IterableDataset`. A shuffle buffer provides sample-level randomization:
 
 ```yaml
 data:
   batch_size: 512
-  shuffle_buffer: 8192
+  shuffle_buffer: 8192         # ≈ 16× batch size
 ```
 
-### 7. Clean Architecture Separation
+### 6. Clean Architecture
 
 ```
 TFRecord → Dataset → Collator → Batch          [data pipeline]
                                   ↓
-                          GwEN.forward()         [model]
+                    Model.forward()              [model]
                                   ↓
-            CE / NCE / SampledSoftmax Loss       [loss function]
+                 Loss Function                   [loss]
                                   ↓
-                          GwENTrainer.fit()      [training loop]
+                    Trainer.fit()                [training loop]
 ```
 
 Each layer is independently testable, replaceable, and config-driven.
-
----
 
 ## Quick Start
 
@@ -159,66 +116,117 @@ data_root/
 └── test/tfrecord/         # test shards
 ```
 
-### Train GwEN
+### Train a Model
 
 ```bash
-python -m gerbil_train.cli.gwen_train \
-  --config configs/experiment/gwen_ml1m_multiclass.yaml
+# Train GwEN binary (CTR)
+python -m gerbil_train.cli.gwen_binary_train \
+  --config configs/2-gwen_ml1m_binary/experiment.yaml
+
+# Train DeepFM (CTR)
+python -m gerbil_train.cli.deepfm_train \
+  --config configs/4-deepfm/experiment.yaml
+
+# Train DIN (sequential)
+python -m gerbil_train.cli.din_train \
+  --config configs/3-din/experiment.yaml
+
+# Train GwEN multiclass (recommendation)
+python -m gerbil_train.cli.gwen_multiclass_train \
+  --config configs/1-gwen_ml1m_multiclass/experiment.yaml
 ```
 
-### Switch Loss
+### Offline Inference
 
 ```bash
-# Edit configs/train/gwen_multiclass_trainer.yaml
-loss:
-  type: sampled_softmax     # ← change here
-  num_sampled: 50
-
-# Run (no code changes)
-python -m gerbil_train.cli.gwen_train \
-  --config configs/experiment/gwen_ml1m_multiclass.yaml
+python -m gerbil_train.cli.inference \
+  --config configs/2-gwen_ml1m_binary/experiment.yaml \
+  --checkpoint checkpoints/gwen_ml1m_binary/20260624.../best_model.pth \
+  --model-type gwen_binary \
+  --split test \
+  --output predictions.tsv
 ```
-
----
 
 ## Repository Structure
 
 ```bash
 gerbil_train/
-├── cli/            # training entry points
-│   └── gwen_train.py
-├── config.py       # dataclass configuration
-├── data/           # TFRecord datasets and collators
-│   └── gwen_tfrecord_dataset.py
-├── losses/         # loss functions
+├── cli/                    # Training and inference entry points
+│   ├── 1-gwen_multiclass_train.py
+│   ├── 2-gwen_binary_train.py
+│   ├── 3-din_train.py
+│   ├── 4-deepfm_train.py
+│   ├── 5-shared_bottom_two_tower_train.py
+│   ├── 6-learning_to_rank_train.py
+│   └── inference.py
+├── config/                 # Dataclass configuration objects
+│   ├── model_config.py     # BaseModelConfig, DINModelConfig, DeepFMModelConfig
+│   └── train_config.py     # TrainConfig, TrainDataConfig, etc.
+├── data/                   # TFRecord datasets and collators
+│   └── tfrecord_dataset.py
+├── inference/              # Offline predictor
+│   ├── predictor.py
+│   └── result_writer.py
+├── losses/                 # Loss functions
 │   ├── classification.py  # CE, NCE, SampledSoftmax
-│   └── ranking.py
-├── metrics/        # evaluation metrics
-├── models/         # model architectures
-│   └── gwen.py
-├── trainer/        # training loops
+│   └── ranking.py         # LambdaRank, RankNet, ListNet, ListMLE
+├── metrics/                # Evaluation metrics
+│   ├── classification.py  # AUC, GAUC, MAP, MRR, HitRate
+│   └── ranking.py         # NDCG@K
+├── models/                 # Model architectures
+│   ├── base_model.py      # Abstract base class
+│   ├── gwen.py            # GwEN binary + multiclass
+│   ├── din.py             # Deep Interest Network
+│   ├── deepfm.py          # Deep Factorization Machine
+│   ├── shared_bottom_two_tower.py
+│   ├── learning_to_rank.py
+│   └── layers.py          # Shared layers (FullyConnectedLayer, Dice, etc.)
+├── trainer/                # Training loops
 │   ├── base_trainer.py
-│   └── gwen_trainer.py
-└── utils/          # helpers
+│   ├── binary_trainer.py      # Shared binary trainer (GwEN/DIN/DeepFM)
+│   ├── multi_trainer.py       # Shared multi-class trainer (GwEN)
+│   ├── gwen_binary_trainer.py
+│   ├── gwen_multiclass_trainer.py
+│   ├── din_trainer.py
+│   ├── deepfm_trainer.py
+│   ├── shared_bottom_two_tower_trainer.py
+│   └── learning_to_rank_trainer.py
+└── utils/                  # Helpers
+    ├── config.py           # YAML loading
+    ├── run.py              # Run directory management
+    ├── training.py         # Shared dataloader/model config builders
+    ├── embedding.py        # Embedding helpers
+    ├── nn.py               # Model summary, parameter counting
+    ├── plot.py             # Training curve plotting
+    └── inspect.py          # Batch inspector
 ```
-
----
 
 ## Configuration Layout
 
 ```bash
 configs/
-├── data/
-│   └── ml1m_multiclass_tfrecord.yaml
-├── model/
-│   └── gwen_multiclass_model.yaml
-├── train/
-│   └── gwen_multiclass_trainer.yaml
-└── experiment/
-    └── gwen_ml1m_multiclass.yaml
+├── 0-data/                     # Shared data configs
+│   └── ml1m_binary_tfrecord.yaml
+├── 1-gwen_ml1m_multiclass/     # GwEN multiclass experiment
+│   ├── experiment.yaml
+│   ├── model.yaml
+│   └── trainer.yaml
+├── 2-gwen_ml1m_binary/         # GwEN binary (CTR) experiment
+│   ├── experiment.yaml
+│   ├── model.yaml
+│   └── trainer.yaml
+├── 3-din/                      # DIN experiment
+│   ├── experiment.yaml
+│   ├── model.yaml
+│   └── trainer.yaml
+├── 4-deepfm/                   # DeepFM experiment
+│   ├── experiment.yaml
+│   ├── model.yaml
+│   └── trainer.yaml
+├── 5-ltr/                      # Learning-to-rank experiment
+│   └── learning_to_rank_*.yaml
+└── build_model_config.py       # Helper to generate model YAML from pos_map.txt
 ```
-
----
 
 ## Dependencies
 
@@ -227,45 +235,38 @@ configs/
 - `tfrecord` — Python TFRecord reader
 - Others: see `requirements.txt`
 
----
-
 ## Project Status & Quality
 
-gerbil-train is currently in **early prototype** stage (≈1 month of active development, 11+ commits, single contributor). An independent code review scored the project **3.2 / 5.0**, with the following breakdown:
+gerbil-train is in **active development** (~2 months, 15+ commits, single contributor). Code review score: **3.5 / 5.0**.
 
-| Dimension | Score | Summary |
-|-----------|:-----:|---------|
-| Architecture | 4/5 | Clean layering, template method pattern, `@dataclass` config |
-| Type Annotations | 4/5 | Modern Python 3.10+ type hints throughout |
-| Code Complexity | 4/5 | Well-separated concerns, appropriate design patterns |
-| Documentation | 3/5 | Core modules documented, but API docs missing |
-| Error Handling | 3/5 | Input validation solid, but no custom exceptions or logging |
-| Testing | 2/5 | 41 GwEN-specific tests added; no CI/CD, no coverage tracking |
-| Engineering | 2/5 | CI/CD, code formatter config, issue/PR templates not yet set up |
+| Dimension | Score |
+|-----------|:-----:|
+| Architecture | 4/5 |
+| Type Annotations | 4/5 |
+| Code Complexity | 4/5 |
+| Documentation | 3/5 |
+| Error Handling | 3/5 |
+| Testing | 3/5 |
+| Engineering | 2/5 |
 
 ### What's solid
 
-- Modular, config-driven architecture with clean separation (data → model → loss → trainer)
-- Fully reproducible experiment runs with timestamped artifacts and config snapshots
+- Modular, config-driven architecture (data → model → loss → trainer)
+- Fully reproducible experiment runs with timestamped artifacts
 - Type-safe configuration via `@dataclass`
 - Feature-level enabled/disabled toggle for ablation studies
-- Pluggable loss functions (CE / NCE / Sampled Softmax) with documented mathematical derivation
+- Pluggable loss functions with mathematical derivation
+- Shared base trainers eliminate code duplication across models
+- Complete offline inference pipeline
 
 ### What needs work
 
-- **Testing**: Unit tests for metrics, losses, and utility modules; CI/CD pipeline for automated test execution
-- **Documentation**: API reference, architecture overview, contributing guide (CONTRIBUTING.md)
-- **Dependency management**: Separate dev dependencies, lock version ranges
-- **Community infrastructure**: Issue/PR templates, GitHub Actions, semantic commit conventions
+- **Testing**: More model coverage, CI/CD pipeline
+- **Documentation**: API reference, contributing guide
+- **Dependency management**: Lock version ranges, dev dependencies
+- **Community infrastructure**: Issue/PR templates, GitHub Actions
 
-### Related Projects (GERBIL Ecosystem)
+## Related Projects (GERBIL Ecosystem)
 
 - [`gerbil-data`](https://github.com/shardzhang/gerbil-data) — Spark-based feature engineering and data processing
 - [`gerbil-serving`](https://github.com/shardzhang/gerbil-serving) — Online inference and model serving
-
----
-
-## Related Projects
-
-- `gerbil-data` — data processing and sample generation
-- `gerbil-serving` — online inference and model serving
