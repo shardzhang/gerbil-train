@@ -23,13 +23,15 @@ class DIN(BaseModel):
         super().__init__()
 
         self._validate_fields(model_cfg)
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-                             
+        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields              
         self.item_num = model_cfg.target_size
+        
         # Whether to use softmax attention
         self.softmax_attn = model_cfg.softmax_attn
+        
         # Target merge strategy: "mean" or "proj"
         self.target_merge = model_cfg.target_merge
+        
         self.behavior_fields = model_cfg.behavior_fields
         self.target_fields = model_cfg.target_fields
         reserved = set(self.behavior_fields) | set(self.target_fields)
@@ -37,31 +39,33 @@ class DIN(BaseModel):
 
         # 1. Target (candidate item) field embeddings
         self.target_embedding_dims: dict[str, int] = {}
-        self.target_embeddings = nn.ModuleDict()
+        self.target_embedding_bags = nn.ModuleDict()
         for f_name in self.target_fields:
             entry = self.fields_cfg[f_name]
             self.target_embedding_dims[f_name] = int(entry.emb_size)
-            self.target_embeddings[str(entry.field_index)] = nn.EmbeddingBag(
+            bag = nn.EmbeddingBag(
                 num_embeddings=int(entry.dim),
                 embedding_dim=int(entry.emb_size),
                 mode="sum", 
                 include_last_offset=False,
             )
+            bag.field_name = f_name
+            self.target_embedding_bags[str(entry.field_index)] = bag
 
         # 2. Behavior field (user history sequence) embeddings
         self.behavior_emb_dims: dict[str, int] = {}
-        self.behavior_embeddings = nn.ModuleDict()
-        self.attention_units = nn.ModuleDict()
+        self.behavior_embedding_bags = nn.ModuleDict()
+        self.local_activation_units = nn.ModuleDict()
         for bf in self.behavior_fields:
             entry = self.fields_cfg[bf]
             self.behavior_emb_dims[bf] = int(entry.emb_size)
-            self.behavior_embeddings[bf] = EmbeddingLayer(
+            self.behavior_embedding_bags[bf] = EmbeddingLayer(
                 item_num=int(entry.dim), 
                 embedding_dim=int(entry.emb_size),
             )
             lau: dict[str, Any] = model_cfg.local_activation_unit
             # 各个行为序列特征词表独占，不同享
-            self.attention_units[bf] = LocalActivationUnit(
+            self.local_activation_units[bf] = LocalActivationUnit(
                 hidden_dims=lau.get("hidden_dims", [80, 40]),
                 bias=lau.get("bias", [True, True]),
                 embedding_dim=int(entry.emb_size),
@@ -76,16 +80,31 @@ class DIN(BaseModel):
 
         # 3. Plain feature (non-behavior, non-target) field embeddings
         self.field_embedding_dims: dict[str, int] = {}
+        for field_name in self.field_names:
+            entry = self.fields_cfg[field_name]
+            if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
+                self.field_embedding_dims[field_name] = int(entry.emb_size)
+            elif entry.field_type == 0 and entry.concat_type == "direct":
+                self.field_embedding_dims[field_name] = entry.dim
+            else:
+                raise ValueError(f"Unsupported field_type {entry.field_type} or concat_type {entry.concat_type} for field {field_name}")
+
         self.field_embedding_bags = nn.ModuleDict()
         for field_name in self.field_names:
             entry = self.fields_cfg[field_name]
-            self.field_embedding_dims[field_name] = int(entry.emb_size)
-            self.field_embedding_bags[str(entry.field_index)] = nn.EmbeddingBag(
-                num_embeddings=int(entry.dim),
-                embedding_dim=int(entry.emb_size),
-                mode="sum", 
-                include_last_offset=False,
-            )
+            if entry.field_type == 0 and entry.concat_type == "direct":
+                print(f"[debug] Field {field_name}(field_type={entry.field_type}), concat_type={entry.concat_type}, skip embedding")
+                continue
+            key = str(entry.field_index)
+            if key not in self.field_embedding_bags:
+                bag = nn.EmbeddingBag(
+                    num_embeddings=int(entry.dim),
+                    embedding_dim=int(entry.emb_size),
+                    mode="sum", 
+                    include_last_offset=False,
+                )
+                bag.field_name = field_name
+                self.field_embedding_bags[key] = bag
 
         self.embedding_sum_dim = sum(self.field_embedding_dims.values()) + sum(self.behavior_emb_dims.values()) + sum(self.target_embedding_dims.values())
         mlp_cfg: dict[str, Any] = model_cfg.mlp
@@ -116,11 +135,12 @@ class DIN(BaseModel):
             if tf not in fields_cfg:
                 raise ValueError(f"target_field '{tf}' not found in embedding_fields")
 
+
     def reset_parameters(self) -> None:
         # Even without explicit reset, PyTorch nn.EmbeddingBag defaults to Xavier uniform
         for emb in self.field_embedding_bags.values():
             nn.init.xavier_uniform_(emb.weight)
-        for emb in self.target_embeddings.values():
+        for emb in self.target_embedding_bags.values():
             nn.init.xavier_uniform_(emb.weight)
 
 
@@ -134,20 +154,25 @@ class DIN(BaseModel):
         field_embs: list[Tensor] = []
         for field_name in self.field_names:
             entry = self.fields_cfg[field_name]
-            field_emb = embed_one_field(
-                self.field_embedding_bags[str(entry.field_index)], 
-                feature_bags[field_name]["indices"], 
-                feature_bags[field_name]["offsets"], 
-                feature_bags[field_name]["weights"], 
-                device=device
-            )
+            if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
+                field_emb = embed_one_field(
+                    self.field_embedding_bags[str(entry.field_index)], 
+                    feature_bags[field_name]["indices"], 
+                    feature_bags[field_name]["offsets"], 
+                    feature_bags[field_name]["weights"], 
+                    device=device
+                )
+            elif entry.field_type == 0 and entry.concat_type == "direct":
+                field_emb = feature_bags[field_name]["weights"].view(-1, entry.dim)
+            else:
+                raise ValueError(f"Unsupported field_type {entry.field_type} or concat_type {entry.concat_type} for field {field_name}")
             field_embs.append(field_emb)
 
         # Embed target (candidate item) fields
         target_embs: list[Tensor] = []
         for field_name in self.target_fields:
             target_emb = embed_one_field(
-                self.target_embeddings[str(self.fields_cfg[field_name].field_index)],
+                self.target_embedding_bags[str(self.fields_cfg[field_name].field_index)],
                 feature_bags[field_name]["indices"],
                 feature_bags[field_name]["offsets"],
                 feature_bags[field_name]["weights"],
@@ -171,11 +196,11 @@ class DIN(BaseModel):
             # Convert variable-length EmbeddingBag to padded sequence for attention
             padded_ids, lengths, max_seq_len = bag_to_padded(indices, offsets)
             # [batch, max_seq_len, emb_dim]
-            seq_emb = self.behavior_embeddings[bf](padded_ids)
+            seq_emb = self.behavior_embedding_bags[bf](padded_ids)
             # [batch, max_seq_len, 1]
             target_exp = target_for_attention.unsqueeze(1).expand(-1, max_seq_len, -1)
             # [batch, max_seq_len]
-            scores = self.attention_units[bf](seq_emb, target_exp).squeeze(-1)
+            scores = self.local_activation_units[bf](seq_emb, target_exp).squeeze(-1)
 
             # [batch, max_seq_len] — mask out padding and invalid item IDs
             mask = (torch.arange(max_seq_len, device=device).unsqueeze(0) < lengths.unsqueeze(1)) & (padded_ids < self.item_num)
