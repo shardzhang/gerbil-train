@@ -115,8 +115,8 @@ class BinaryClassificationTrainer(BaseTrainer):
         for step, batch in enumerate(train_pbar, start=1):
             batch = self.move_batch_to_device(batch)
             self.inspect_batch(step, batch)
-            sigmoids = self.forward_step(batch)
-            loss = self.compute_loss(sigmoids, batch["targets"].float())
+            model_out = self.forward_step(batch)
+            loss = self.compute_total_loss(model_out, batch)
             self.zero_grad()
             self.backward_step(loss)
             self.clip_gradients()
@@ -136,6 +136,10 @@ class BinaryClassificationTrainer(BaseTrainer):
         """Compute binary cross-entropy loss."""
         import torch.nn.functional as F
         return F.binary_cross_entropy(logits, targets)
+
+    def compute_total_loss(self, outputs: torch.Tensor, batch: dict[str, Any]) -> torch.Tensor:
+        """Compute total loss. Override in subclasses (e.g. DIEN) for auxiliary losses."""
+        return self.compute_loss(outputs, batch["targets"].float())
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         """Log metrics and build message for finalize_epoch."""

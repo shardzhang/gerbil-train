@@ -53,4 +53,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# python3 -m gerbil_train.cli.gwen_binary_train --config configs/2-gwen_ml1m_binary/experiment.yaml
+# python3 -m gerbil_train.cli.2-gwen_binary_train --config configs/2-gwen_ml1m_binary/experiment.yaml

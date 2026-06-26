@@ -1,4 +1,4 @@
-"""Train DIN (Deep Interest Network) model with TFRecord samples."""
+"""Train DIEN (Deep Interest Evolution Network) model with TFRecord samples."""
 
 from __future__ import annotations
 
@@ -11,22 +11,22 @@ from torch.utils.data import DataLoader
 from gerbil_train.utils.config import load_experiment_config, parse_args
 from gerbil_train.utils.run import close_exp_log, create_run_dir, save_run_configs, setup_exp_log
 from gerbil_train.utils.training import build_dataloaders, build_model_config
-from gerbil_train.config.model_config import DINModelConfig
+from gerbil_train.config.model_config import DIENModelConfig
 from gerbil_train.config.train_config import TrainConfig
-from gerbil_train.models.din import DIN
-from gerbil_train.trainer.din_trainer import DINTrainer
+from gerbil_train.models.dien import DIEN
+from gerbil_train.trainer.dien_trainer import DIENTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs/3-din/experiment.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs/8-dien/experiment.yaml"
 
 
 def main() -> None:
     args = parse_args(CONFIG_PATH)
     exp_cfg: dict[str, Any] = load_experiment_config(args.config)
     data_cfg: dict[str, Any] = exp_cfg["data"]
-    model_cfg: DINModelConfig = build_model_config(exp_cfg, DINModelConfig)
-    
-    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "din")
+    model_cfg: DIENModelConfig = build_model_config(exp_cfg, DIENModelConfig)
+
+    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "dien")
     setup_exp_log(run_dir)
     train_cfg: TrainConfig = TrainConfig.from_dict(exp_cfg["train"])
     train_cfg.checkpoint.path = str(run_dir)
@@ -36,11 +36,11 @@ def main() -> None:
     print(f"Loading TFRecords from {data_cfg['paths']['tfrecord_root']}")
 
     train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg)
-    model = DIN(model_cfg)
+    model = DIEN(model_cfg)
     if train_cfg.compile.enabled:
         model = torch.compile(model, mode=train_cfg.compile.mode)
         print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
-    trainer = DINTrainer(model, train_cfg, data_cfg)
+    trainer = DIENTrainer(model, train_cfg, data_cfg)
     trainer.fit(train_loader, validation_loader, test_loader)
 
     if test_loader is not None:
@@ -53,4 +53,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# python3 -m gerbil_train.cli.3-din_train --config configs/3-din/experiment.yaml
+# python3 -m gerbil_train.cli.6-dien_train --config configs/6-dien/experiment.yaml

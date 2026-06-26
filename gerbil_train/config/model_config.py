@@ -95,11 +95,50 @@ class DINModelConfig(BaseModelConfig):
         )
 
 @dataclass
+class DIENModelConfig(DINModelConfig):
+    interest_extractor: dict[str, Any] = field(default_factory=dict)
+    aux_net: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "DIENModelConfig":
+        return cls(
+            target_size=int(model_cfg.get("target_size", 0)),
+            embedding_fields={field.field_name: field for field in field_entries},
+            behavior_fields=list(model_cfg.get("behavior_fields", [])),
+            target_fields=list(model_cfg.get("target_fields", [])),
+            softmax_attn=bool(model_cfg.get("softmax_attn", False)),
+            target_merge=str(model_cfg.get("target_merge", "mean")),
+            local_activation_unit=dict(model_cfg.get("local_activation_unit", {})),
+            interest_extractor=dict(model_cfg.get("interest_extractor", {})),
+            aux_net=dict(model_cfg.get("aux_net", {})),
+            mlp=dict(model_cfg.get("mlp", {})),
+            field_attention=dict(model_cfg.get("field_attention", {})),
+            field_stats=dict(model_cfg.get("field_stats", {})),
+        )
+
+
+@dataclass
 class DeepFMModelConfig(BaseModelConfig):
     output: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "DeepFMModelConfig":
+        return cls(
+            target_size=int(model_cfg.get("target_size", 0)),
+            embedding_fields={field.field_name: field for field in field_entries},
+            output=dict(model_cfg.get("output", {})),
+            mlp=dict(model_cfg.get("mlp", {})),
+            field_attention=dict(model_cfg.get("field_attention", {})),
+            field_stats=dict(model_cfg.get("field_stats", {})),
+        )
+
+
+@dataclass
+class WideAndDeepModelConfig(BaseModelConfig):
+    output: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "WideAndDeepModelConfig":
         return cls(
             target_size=int(model_cfg.get("target_size", 0)),
             embedding_fields={field.field_name: field for field in field_entries},
