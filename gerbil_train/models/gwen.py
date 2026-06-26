@@ -21,38 +21,51 @@ class GwENBaseModel(BaseModel):
 
     def __init__(self, config: BaseModelConfig, task: str = "multiclass") -> None:
         super().__init__()
-        self.fields_cfg: Mapping[str, FieldEntry] = config.embedding_fields
+        
+        self.fields_entry: Mapping[str, FieldEntry] = config.embedding_fields
         self._validate_fields(config)
-
+        
+        # task can be "binary" or "multiclass"
         self.task = task
+        
         # dict[field_name, dim]
         self.field_embedding_dims: dict[str, int] = {}
+        for field_name, entry in self.fields_entry.items():
+            if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
+                self.field_embedding_dims[field_name] = entry.emb_size  # EmbeddingBag → emb_size 维
+            elif entry.field_type == 0 and entry.concat_type == "direct":
+                self.field_embedding_dims[field_name] = entry.dim       # 直接 concat → dim维
+            else:
+                raise ValueError(f"Unsupported field_type {entry.field_type} or concat_type {entry.concat_type} for field {field_name}")
+            
         # dict[str(field_index), nn.EmbeddingBag], 支持词表共享
-        self.field_embeddings: nn.ModuleDict = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
-            vocab_size = int(entry.dim)
-            embedding_size = int(entry.emb_size)
-            self.field_embedding_dims[field_name] = embedding_size
-            key = str(entry.field_index)
-            if key in self.field_embeddings:
+        self.field_embedding_bags: nn.ModuleDict = nn.ModuleDict()
+        for field_name, entry in self.fields_entry.items():
+            if entry.field_type == 0 and entry.concat_type == "direct":
+                continue  # direct concat fields do not require embedding bags
+
+            if str(entry.field_index) in self.field_embedding_bags:
                 print(f"Field {field_name} (field_index={entry.field_index})共享词表")
                 continue
+            
             bag = nn.EmbeddingBag(
-                num_embeddings=vocab_size,
-                embedding_dim=embedding_size,
+                num_embeddings=entry.dim,
+                embedding_dim=entry.emb_size,
                 mode="sum",
                 include_last_offset=False,
             )
             bag.field_name = field_name
-            self.field_embeddings[key] = bag
+            self.field_embedding_bags[str(entry.field_index)] = bag
 
+        # Field-level attention
         self.enable_attention = bool(config.field_attention.get("enabled", False))
         if self.enable_attention:
             self.field_attention = nn.ModuleDict({
                 field_name: nn.Linear(self.field_embedding_dims[field_name], 1, bias=False)
-                for field_name in self.fields_cfg.keys()
+                for field_name in self.fields_entry.keys()
             })
 
+        # MLP for final prediction
         self.embedding_sum_dim = sum(self.field_embedding_dims.values())
         mlp_cfg = config.mlp
         hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
@@ -78,12 +91,16 @@ class GwENBaseModel(BaseModel):
             raise ValueError(f"Unsupported task: {task}")
         self.reset_parameters()
 
+
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:
+        """Validate that the embedding fields are properly configured."""
         if not model_cfg.embedding_fields:
             raise ValueError("embedding_fields must be a non-empty mapping")
 
+
     def reset_parameters(self) -> None:
-        for embedding in self.field_embeddings.values():
+        """Reset model parameters."""
+        for embedding in self.field_embedding_bags.values():
             nn.init.xavier_uniform_(embedding.weight)
         if self.enable_attention:
             for linear in self.field_attention.values():
@@ -97,11 +114,6 @@ class GwENBaseModel(BaseModel):
         nn.init.zeros_(self.head.bias)
 
 
-    def _embed_one_field(self, field_index: int, indices: Tensor, offsets: Tensor,
-                         weights: Tensor, *, batch_size: int, device: torch.device) -> Tensor:
-        return embed_one_field(self.field_embeddings[str(field_index)], indices, offsets, weights, device=device)
-
-
     def encode(self, feature_bags: Mapping[int, Mapping[str, Tensor]]) -> Tensor:
         """Encode input features into dense representations.
 
@@ -110,37 +122,48 @@ class GwENBaseModel(BaseModel):
         if not isinstance(feature_bags, Mapping) or not feature_bags:
             raise ValueError("feature_bags must be a non-empty mapping")
 
-        first_field_name = next(iter(self.fields_cfg.keys()))
+        first_field_name = next(iter(self.fields_entry.keys()))
         first_offsets = feature_bags[first_field_name]["offsets"]
         batch_size = int(first_offsets.size(0))
         device = next(self.parameters()).device
 
         field_embeddings: dict[int, Tensor] = {}
-        for field_name, cfg in self.fields_cfg.items():
+        for field_name, entry in self.fields_entry.items():
             if field_name not in feature_bags:
                 raise ValueError(f"Missing feature bag for field {field_name}")
+            
             if not isinstance(feature_bags[field_name], Mapping):
                 raise ValueError(f"feature_bags[{field_name}] must be a mapping")
-            field_embeddings[field_name] = self._embed_one_field(
-                cfg.field_index,
-                feature_bags[field_name]["indices"],
-                feature_bags[field_name]["offsets"],
-                feature_bags[field_name]["weights"],
-                batch_size=batch_size,
-                device=device,
-            )
+            
+            # categorical or continuous with embedding
+            if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
+                # [batch_size, emb_szie]
+                field_embeddings[field_name] = embed_one_field(
+                    self.field_embedding_bags[str(entry.field_index)], 
+                    feature_bags[field_name]["indices"],
+                    feature_bags[field_name]["offsets"],
+                    feature_bags[field_name]["weights"],
+                    device=device,
+                )
+                # print(f"[debug] field {field_name} embedding shape: {self.field_embeddings[str(entry.field_index)].weight.shape}")
+            elif entry.field_type == 0 and entry.concat_type == "direct":
+                # [batch_size, dim]
+                field_embeddings[field_name] = feature_bags[field_name]["weights"].view(-1, entry.dim)
+                # print(f"[debug] field {field_name} direct concat field_embedding.shape: {field_embeddings[field_name].shape}")
+            else:
+                raise ValueError(f"Unsupported field_type {entry.field_type} or concat_type {entry.concat_type} for field {field_name}")
 
         if self.enable_attention:
             field_scores = torch.cat(
-                [self.field_attention[fn](field_embeddings[fn]) for fn in self.fields_cfg.keys()], dim=-1,
+                [self.field_attention[fn](field_embeddings[fn]) for fn in self.fields_entry.keys()], dim=-1,
             )
             field_weights = torch.softmax(field_scores, dim=-1)
             weighted_embeddings = [
-                field_embeddings[fn] * field_weights[:, i].unsqueeze(-1) for i, fn in enumerate(self.fields_cfg.keys())
+                field_embeddings[fn] * field_weights[:, i].unsqueeze(-1) for i, fn in enumerate(self.fields_entry.keys())
             ]
             input_emb = torch.cat(weighted_embeddings, dim=-1)
         else:
-            input_emb = torch.cat([field_embeddings[fn] for fn in self.fields_cfg.keys()], dim=-1)
+            input_emb = torch.cat([field_embeddings[fn] for fn in self.fields_entry.keys()], dim=-1)
 
         # [batch, embedding_sum_dim]
         if self.input_bn is not None:

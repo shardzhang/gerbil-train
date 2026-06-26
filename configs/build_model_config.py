@@ -35,7 +35,7 @@ def build_field_entries(model_cfg_path: str | Path, all_field_specs: list[FieldE
             field_type=spec.field_type, 
             field_name=spec.field_name,
             dim=int(spec.dim),
-            concat_mode=str(ex.get("concat_model", "direct")),
+            concat_type=str(ex.get("concat_type", "direct")),
             emb_size=int(ex.get("emb_size", default_emb_size)),
             enabled=bool(ex.get("enabled", True)),
         )
@@ -44,9 +44,9 @@ def build_field_entries(model_cfg_path: str | Path, all_field_specs: list[FieldE
             "field_index": entry.field_index,
             "field_type": entry.field_type,
             "dim": entry.dim,
+            **({"concat_type": entry.concat_type} if entry.field_type == 0 else {}),
             "emb_size": entry.emb_size,
             "enabled": entry.enabled,
-            **({"concat_type": entry.concat_type} if entry.field_type == 0 else {}),
         }
         for f_name, entry in sorted(entries.items(), key=lambda x: x[1].field_index)
     }

@@ -102,7 +102,7 @@ embedding:
       field_index: 18
       field_type: 0
       dim: 2
-      concat_type: direct
+      concat_type: emb
       emb_size: 16
       enabled: true
     user_rate_std_7day_continue:

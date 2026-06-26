@@ -28,21 +28,26 @@ class DeepFM(BaseModel):
         self.num_fields = len(self.field_names)
 
         self.linear_embeddings = nn.ModuleDict()
-        self.feature_embeddings = nn.ModuleDict()
+        self.feature_embedding_bags = nn.ModuleDict()
         for _, entry in self.fields_cfg.items():
             key = str(entry.field_index)
-            # Linear embedding: vocab → 1, used for the 1st-order term
-            self.linear_embeddings[key] = nn.EmbeddingBag(
+            # 1. Linear embedding: vocab → 1, used for the 1st-order term
+            linear_bag = nn.EmbeddingBag(
                 num_embeddings=entry.dim,
                 embedding_dim=1,
                 mode="sum",
             )
-            # Feature embedding: vocab → k, shared by FM 2nd-order and Deep terms
-            self.feature_embeddings[key] = nn.EmbeddingBag(
+            linear_bag.field_name = entry.field_name + "_fm"
+            self.linear_embeddings[key] = linear_bag
+        
+            # 2. Feature embedding: vocab → k, shared by FM 2nd-order and Deep terms
+            feature_bag = nn.EmbeddingBag(
                 num_embeddings=entry.dim,
                 embedding_dim=entry.emb_size,
                 mode="sum",
             )
+            feature_bag.field_name = entry.field_name + "_deep"
+            self.feature_embedding_bags[key] = feature_bag
 
         mlp_cfg = model_cfg.mlp
         # BatchNorm on concatenated feature embeddings to prevent logit saturation from mode="sum"
@@ -81,7 +86,7 @@ class DeepFM(BaseModel):
             nn.init.zeros_(self.deep_head.bias)
         for emb in self.linear_embeddings.values():
             nn.init.xavier_uniform_(emb.weight)
-        for emb in self.feature_embeddings.values():
+        for emb in self.feature_embedding_bags.values():
             nn.init.xavier_uniform_(emb.weight)
 
 
@@ -112,7 +117,7 @@ class DeepFM(BaseModel):
             linear_sum = linear_sum + linear_emb.squeeze(-1)
 
             feature_emb = embed_one_field(
-                self.feature_embeddings[key],
+                self.feature_embedding_bags[key],
                 feature_bags[field_name]["indices"],
                 feature_bags[field_name]["offsets"],
                 feature_bags[field_name]["weights"],

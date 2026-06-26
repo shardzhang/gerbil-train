@@ -230,13 +230,13 @@ class TFRecordDataset(IterableDataset):
                 field_values: dict[str, list[float]] = {}
                 for f_spec in self.field_specs:
                     indices, values = self._extract_field_values(features, f_spec.field_name)
+                    # z-score normalization for continuous features if field_stats is provided
                     if f_spec.field_type == 0 and self.field_stats is not None:
                         pos_stats = self.field_stats.get(f_spec.field_name)
-                        if pos_stats:
-                            values = [
-                                (v - pos_stats.get(idx, (0.0, 1.0))[0]) / pos_stats.get(idx, (0.0, 1.0))[1]
-                                for idx, v in zip(indices, values)
-                            ]
+                        values = [
+                            (v - pos_stats.get(idx, (0.0, 1.0))[0]) / pos_stats.get(idx, (0.0, 1.0))[1]
+                            for idx, v in zip(indices, values)
+                        ]
                     field_indices[f_spec.field_name] = indices
                     field_values[f_spec.field_name] = values
 
@@ -282,7 +282,7 @@ class MultiTFRecordDataset(TFRecordDataset):
         raise ValueError("Target feature exists but has no values")
 
 class RatingTFRecordDataset(TFRecordDataset):
-    """TFRecord dataset for binary CTR classification."""
+    """TFRecord dataset for rating prediction."""
     def _extract_target(self, example: example_pb2.Example) -> float:
         target_feature = example.features.feature.get("target")
         if target_feature is None:

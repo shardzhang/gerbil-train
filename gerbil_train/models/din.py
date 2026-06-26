@@ -76,11 +76,11 @@ class DIN(BaseModel):
 
         # 3. Plain feature (non-behavior, non-target) field embeddings
         self.field_embedding_dims: dict[str, int] = {}
-        self.field_embeddings = nn.ModuleDict()
+        self.field_embedding_bags = nn.ModuleDict()
         for field_name in self.field_names:
             entry = self.fields_cfg[field_name]
             self.field_embedding_dims[field_name] = int(entry.emb_size)
-            self.field_embeddings[str(entry.field_index)] = nn.EmbeddingBag(
+            self.field_embedding_bags[str(entry.field_index)] = nn.EmbeddingBag(
                 num_embeddings=int(entry.dim),
                 embedding_dim=int(entry.emb_size),
                 mode="sum", 
@@ -118,7 +118,7 @@ class DIN(BaseModel):
 
     def reset_parameters(self) -> None:
         # Even without explicit reset, PyTorch nn.EmbeddingBag defaults to Xavier uniform
-        for emb in self.field_embeddings.values():
+        for emb in self.field_embedding_bags.values():
             nn.init.xavier_uniform_(emb.weight)
         for emb in self.target_embeddings.values():
             nn.init.xavier_uniform_(emb.weight)
@@ -135,7 +135,7 @@ class DIN(BaseModel):
         for field_name in self.field_names:
             entry = self.fields_cfg[field_name]
             field_emb = embed_one_field(
-                self.field_embeddings[str(entry.field_index)], 
+                self.field_embedding_bags[str(entry.field_index)], 
                 feature_bags[field_name]["indices"], 
                 feature_bags[field_name]["offsets"], 
                 feature_bags[field_name]["weights"], 

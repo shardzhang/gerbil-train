@@ -80,6 +80,7 @@ def build_model_config(exp_cfg: dict[str, Any], config_class: type) -> Any:
     print(f"Disabled fields: {disabled_field_names}")
 
     model_cfg = config_class.from_dict(model_raw, enabled_field_entries)
+    # print(f"[debug] model_cfg: {model_cfg}")
     pos_map_json = Path(data_cfg["paths"]["nn_pos_map_json"])
     field_stats = load_field_stats(pos_map_json)
     target_size = load_target_size(pos_map_json)

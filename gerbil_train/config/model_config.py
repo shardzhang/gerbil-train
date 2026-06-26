@@ -18,8 +18,8 @@ class FieldEntry:
     field_index: int            # 可以相同，相同时表示词表共享
     field_type: int             # 0表示连续特征，1表示离散特征
     dim: int                    # 特征维度
-    emb_size: int = -1          # Embedding维度
     concat_type: str = "emb"    # 连续特征拼接方式. direct: 直接concat, emb: 投影后concat
+    emb_size: int = -1          # Embedding维度
     enabled: bool = True        # 是否启用
 
 
@@ -29,6 +29,7 @@ def load_enabled_field_entries(model_cfg: dict[str, Any]) -> tuple[list[FieldEnt
     Supports both old format (``embedding_fields``) and new format (``embedding.fields``).
     """
     fields = model_cfg.get("embedding_fields") or model_cfg.get("embedding", {}).get("fields", {})
+    # print(f"[debug] fields: {fields}")
     enabled_field_entries: list[FieldEntry] = []
     disabled_field_names: list[str] = []
     for field_name, field_entry in fields.items():
@@ -38,6 +39,7 @@ def load_enabled_field_entries(model_cfg: dict[str, Any]) -> tuple[list[FieldEnt
                 field_type=field_entry["field_type"],
                 field_name=field_name,
                 dim=field_entry["dim"],
+                concat_type=field_entry.get("concat_type", "emb"),
                 emb_size=field_entry["emb_size"],
                 enabled=field_entry["enabled"],
             ))
