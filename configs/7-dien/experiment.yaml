@@ -2,5 +2,5 @@ name: dien_ml1m
 description: DIEN (Deep Interest Evolution Network) on MovieLens 1M TFRecord samples.
 
 data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/6-dien/model.yaml
-train: configs/6-dien/trainer.yaml
+model: configs/7-dien/model.yaml
+train: configs/7-dien/trainer.yaml

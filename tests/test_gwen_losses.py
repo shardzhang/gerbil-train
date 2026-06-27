@@ -105,16 +105,22 @@ class SampledSoftmaxLossTests(unittest.TestCase):
         """Works when class_bias is provided."""
         bias = torch.randn(self.num_classes)
         loss = sampled_softmax_loss(
-            self.hidden, self.class_weight, self.targets,
-            num_sampled=5, class_bias=bias,
+            self.hidden, 
+            self.class_weight, 
+            self.targets,
+            num_sampled=5, 
+            class_bias=bias,
         )
         self.assertTrue(torch.isfinite(loss).item())
 
     def test_sampled_softmax_without_bias(self) -> None:
         """Works when class_bias is None."""
         loss = sampled_softmax_loss(
-            self.hidden, self.class_weight, self.targets,
-            num_sampled=5, class_bias=None,
+            self.hidden, 
+            self.class_weight, 
+            self.targets,
+            num_sampled=5, 
+            class_bias=None,
         )
         self.assertTrue(torch.isfinite(loss).item())
 

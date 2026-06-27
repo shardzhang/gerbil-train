@@ -17,7 +17,7 @@ from gerbil_train.models.dien import DIEN
 from gerbil_train.trainer.dien_trainer import DIENTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs/8-dien/experiment.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs/7-dien/experiment.yaml"
 
 
 def main() -> None:

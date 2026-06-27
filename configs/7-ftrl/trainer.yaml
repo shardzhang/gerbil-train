@@ -1,44 +1,41 @@
 seed: 42
 device: cpu
-epochs: 5
+epochs: 1
 
 data:
   batch_size: 512
-  num_workers: 4
+  num_workers: 0
   pin_memory: false
   drop_last: true
   prefetch_factor: 4
+  shuffle_buffer: 0
 
 compile:
   enabled: false
   mode: default
 
-loss:
-  type: sampled_softmax     # ce, nce, sampled_softmax
-  num_sampled: 500
-
 optimizer:
-  type: adam
-  lr: 0.001
-  weight_decay: 0.00001
+  type: ftrl
+  lr: 0.1
+  beta: 1.0
+  lambda1: 1.0
+  lambda2: 1.0
 
 scheduler:
   enabled: false
-  mode: max
-  factor: 0.5
-  patience: 2
 
 checkpoint:
-  monitor: val_hit@1
+  monitor: val_gauc
   mode: max
-
-early_stop:
-  enabled: false
 
 logging:
   verbose: true
 
+early_stop:
+  enabled: false
+
 evaluation: {}
+
 inspector:
   enabled: false
   log_first: 3

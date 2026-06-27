@@ -32,11 +32,7 @@ class BinaryClassificationTrainer(BaseTrainer):
         early_stop_cfg = train_cfg.early_stop
         logging_cfg = train_cfg.logging
 
-        optimizer = optim.Adam(
-            model.parameters(),
-            lr=float(optimizer_cfg.lr or 1e-3),
-            weight_decay=float(optimizer_cfg.weight_decay or 0.0),
-        )
+        optimizer = self._create_optimizer(model, optimizer_cfg)
 
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
@@ -86,6 +82,15 @@ class BinaryClassificationTrainer(BaseTrainer):
                 log_first=train_cfg.inspector.log_first,
                 log_every=train_cfg.inspector.log_every,
             ))
+
+    def _create_optimizer(self, model: nn.Module, cfg: Any) -> optim.Optimizer:
+        """Create optimizer. Override in subclasses (e.g. FTRL) for different optimizers."""
+        from torch import optim as optim_mod
+        return optim_mod.Adam(
+            model.parameters(),
+            lr=float(cfg.lr or 1e-3),
+            weight_decay=float(cfg.weight_decay or 0.0),
+        )
 
     def fit(self, train_loader: DataLoader, validation_loader: DataLoader | None, test_loader: DataLoader | None = None) -> None:
         """Run the full training lifecycle with the given data loaders."""

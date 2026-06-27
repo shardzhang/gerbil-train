@@ -17,7 +17,7 @@ from gerbil_train.models.din import DIN
 from gerbil_train.trainer.din_trainer import DINTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs/3-din/experiment.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs/7-din/experiment.yaml"
 
 
 def main() -> None:
