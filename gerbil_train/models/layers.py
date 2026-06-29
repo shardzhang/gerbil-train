@@ -97,7 +97,9 @@ class FullyConnectedLayer(nn.Module):
             self.output_layer = nn.Sigmoid()
         self.reset_parameters()
 
+
     def reset_parameters(self) -> None:
+        """Reset model parameters."""
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 nn.init.xavier_normal_(m.weight.data, gain=1.0)
@@ -106,7 +108,7 @@ class FullyConnectedLayer(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass of the fully connected layer.
-        
+
         :param x: Input tensor ``[batch_size, seq_len, input_dim]``
         :return: Output tensor ``[batch_size, seq_len, hidden_dim[-1]]``
         """

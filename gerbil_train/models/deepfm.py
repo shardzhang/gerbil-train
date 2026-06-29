@@ -57,13 +57,13 @@ class DeepFM(BaseModel):
 
             # Feature embedding: vocab → k, shared by FM 2nd-order and Deep terms
             if str(entry.field_index) not in self.deep_embedding_bags:
-                feature_bag = nn.EmbeddingBag(
+                bag = nn.EmbeddingBag(
                     num_embeddings=entry.dim,
                     embedding_dim=entry.emb_size,
                     mode="sum",
                 )
-                feature_bag.field_name = f"{field_name}_deep"
-                self.deep_embedding_bags[str(entry.field_index)] = feature_bag
+                bag.field_name = f"{field_name}_deep"
+                self.deep_embedding_bags[str(entry.field_index)] = bag
 
         # 2.1 EmbeddingBag for linear terms
         self.linear_embedding_bags = nn.ModuleDict()
@@ -74,13 +74,13 @@ class DeepFM(BaseModel):
 
             # Linear embedding: vocab → 1, used for the 1st-order term
             if str(entry.field_index) not in self.linear_embedding_bags:
-                linear_bag = nn.EmbeddingBag(
+                bag = nn.EmbeddingBag(
                     num_embeddings=entry.dim,
                     embedding_dim=1,
                     mode="sum",
                 )
-                linear_bag.field_name = f"{field_name}_linear"
-                self.linear_embedding_bags[str(entry.field_index)] = linear_bag
+                bag.field_name = f"{field_name}_linear"
+                self.linear_embedding_bags[str(entry.field_index)] = bag
 
         # 2.2 EmbeddingBag for FM terms
         self.fm_embedding_bags = nn.ModuleDict()
@@ -91,9 +91,9 @@ class DeepFM(BaseModel):
 
             # Feature embedding: vocab → k, shared by FM 2nd-order and Deep terms
             if str(entry.field_index) not in self.fm_embedding_bags:
-                feature_bag = self.deep_embedding_bags[str(entry.field_index)]
-                feature_bag.field_name = f"{field_name}_fm"
-                self.fm_embedding_bags[str(entry.field_index)] = feature_bag
+                bag = self.deep_embedding_bags[str(entry.field_index)]
+                bag.field_name = f"{field_name}_fm"
+                self.fm_embedding_bags[str(entry.field_index)] = bag
 
 
         # Deep network

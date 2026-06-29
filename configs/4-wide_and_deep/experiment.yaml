@@ -2,5 +2,5 @@ name: wide_and_deep_ml1m
 description: Wide & Deep on MovieLens 1M TFRecord samples.
 
 data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/3-wide_and_deep/model.yaml
-train: configs/3-wide_and_deep/trainer.yaml
+model: configs/4-wide_and_deep/model.yaml
+train: configs/4-wide_and_deep/trainer.yaml

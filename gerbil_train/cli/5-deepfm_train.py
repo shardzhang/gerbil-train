@@ -1,4 +1,5 @@
-"""Train DIEN (Deep Interest Evolution Network) model with TFRecord samples."""
+"""Train a DeepFM model on TFRecord samples."""
+
 
 from __future__ import annotations
 
@@ -11,22 +12,22 @@ from torch.utils.data import DataLoader
 from gerbil_train.utils.config import load_experiment_config, parse_args
 from gerbil_train.utils.run import close_exp_log, create_run_dir, save_run_configs, setup_exp_log
 from gerbil_train.utils.training import build_dataloaders, build_model_config
-from gerbil_train.config.model_config import DIENModelConfig
+from gerbil_train.config.model_config import DeepFMModelConfig
 from gerbil_train.config.train_config import TrainConfig
-from gerbil_train.models.dien import DIEN
-from gerbil_train.trainer.dien_trainer import DIENTrainer
+from gerbil_train.models.deepfm import DeepFM
+from gerbil_train.trainer.deepfm_trainer import DeepFMTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs/7-dien/experiment.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs/5-deepfm/experiment.yaml"
 
 
 def main() -> None:
     args = parse_args(CONFIG_PATH)
     exp_cfg: dict[str, Any] = load_experiment_config(args.config)
     data_cfg: dict[str, Any] = exp_cfg["data"]
-    model_cfg: DIENModelConfig = build_model_config(exp_cfg, DIENModelConfig)
-
-    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "dien")
+    model_cfg: DeepFMModelConfig = build_model_config(exp_cfg, DeepFMModelConfig)
+    
+    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "deepfm")
     setup_exp_log(run_dir)
     train_cfg: TrainConfig = TrainConfig.from_dict(exp_cfg["train"])
     train_cfg.checkpoint.path = str(run_dir)
@@ -36,11 +37,11 @@ def main() -> None:
     print(f"Loading TFRecords from {data_cfg['paths']['tfrecord_root']}")
 
     train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg)
-    model = DIEN(model_cfg)
+    model = DeepFM(model_cfg)
     if train_cfg.compile.enabled:
         model = torch.compile(model, mode=train_cfg.compile.mode)
         print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
-    trainer = DIENTrainer(model, train_cfg, data_cfg)
+    trainer = DeepFMTrainer(model, train_cfg, data_cfg)
     trainer.fit(train_loader, validation_loader, test_loader)
 
     if test_loader is not None:
@@ -53,4 +54,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# python3 -m gerbil_train.cli.6-dien_train --config configs/6-dien/experiment.yaml
+# python3 -m gerbil_train.cli.5-deepfm_train --config configs/5-deepfm/experiment.yaml

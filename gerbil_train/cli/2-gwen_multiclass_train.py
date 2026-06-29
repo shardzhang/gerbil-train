@@ -1,7 +1,6 @@
-"""Train DIN (Deep Interest Network) model with TFRecord samples."""
+"""Train GwEN (Group-wise Embedding Network) with TFRecord samples."""
 
 from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 
@@ -11,22 +10,24 @@ from torch.utils.data import DataLoader
 from gerbil_train.utils.config import load_experiment_config, parse_args
 from gerbil_train.utils.run import close_exp_log, create_run_dir, save_run_configs, setup_exp_log
 from gerbil_train.utils.training import build_dataloaders, build_model_config
-from gerbil_train.config.model_config import DINModelConfig
+from gerbil_train.data.tfrecord_dataset import MultiTFRecordDataset
+from gerbil_train.config.model_config import BaseModelConfig
 from gerbil_train.config.train_config import TrainConfig
-from gerbil_train.models.din import DIN
-from gerbil_train.trainer.din_trainer import DINTrainer
+from gerbil_train.models.gwen import GwENMulticlassModel
+
+from gerbil_train.trainer.gwen_multiclass_trainer import GwENMultiTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs/7-din/experiment.yaml"
+CONFIG_PATH: Path = PROJECT_ROOT / "configs/1-gwen_ml1m_multiclass/experiment.yaml"
 
 
 def main() -> None:
     args = parse_args(CONFIG_PATH)
     exp_cfg: dict[str, Any] = load_experiment_config(args.config)
     data_cfg: dict[str, Any] = exp_cfg["data"]
-    model_cfg: DINModelConfig = build_model_config(exp_cfg, DINModelConfig)
+    model_cfg: BaseModelConfig = build_model_config(exp_cfg, BaseModelConfig)
     
-    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "din")
+    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "gwen_multiclass")
     setup_exp_log(run_dir)
     train_cfg: TrainConfig = TrainConfig.from_dict(exp_cfg["train"])
     train_cfg.checkpoint.path = str(run_dir)
@@ -35,12 +36,12 @@ def main() -> None:
     print(f"Run dir: {run_dir}")
     print(f"Loading TFRecords from {data_cfg['paths']['tfrecord_root']}")
 
-    train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg)
-    model = DIN(model_cfg)
+    train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg, MultiTFRecordDataset)
+    model = GwENMulticlassModel(model_cfg)
     if train_cfg.compile.enabled:
         model = torch.compile(model, mode=train_cfg.compile.mode)
         print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
-    trainer = DINTrainer(model, train_cfg, data_cfg)
+    trainer = GwENMultiTrainer(model, train_cfg, data_cfg)
     trainer.fit(train_loader, validation_loader, test_loader)
 
     if test_loader is not None:
@@ -53,4 +54,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# python3 -m gerbil_train.cli.5-din_train --config configs/5-din/experiment.yaml
+# python3 -m gerbil_train.cli.2-gwen_multiclass_train --config configs/2-gwen_ml1m_multiclass/experiment.yaml

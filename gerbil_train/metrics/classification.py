@@ -2,7 +2,7 @@
 
 Typical examples include:
     - Hit@K: whether the true class is in the top-K predictions
-    - AUC: 随机抽一个正样本、一个负样本，模型把正样本排在前面的概率的期望值
+    - AUC: Area Under Receiver Operator Characteristic Curve (AUC) 随机抽一个正样本、一个负样本，模型把正样本排在前面的概率的期望值
     - GAUC: 对每个用户，随机抽一个正样本、一个负样本，模型把正样本排在前面的概率的期望值的期望值
     - AP: 平均精度
     - MAP: 平均平均精度，即对每个用户，取平均精度的期望值

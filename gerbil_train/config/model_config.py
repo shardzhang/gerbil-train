@@ -21,6 +21,8 @@ class FieldEntry:
     concat_type: str = "emb"    # 连续特征拼接方式. direct: 直接concat, emb: 投影后concat
     emb_size: int = -1          # Embedding维度
     enabled: bool = True        # 是否启用
+    wide: bool = True           # 是否进入Wide部分（仅W&D/DeepFM模型使用）
+    deep: bool = True           # 是否进入Deep部分（仅W&D/DeepFM模型使用）
 
 
 def load_enabled_field_entries(model_cfg: dict[str, Any]) -> tuple[list[FieldEntry], list[str]]:
@@ -42,6 +44,8 @@ def load_enabled_field_entries(model_cfg: dict[str, Any]) -> tuple[list[FieldEnt
                 concat_type=field_entry.get("concat_type", "emb"),
                 emb_size=field_entry["emb_size"],
                 enabled=field_entry["enabled"],
+                wide=bool(field_entry.get("wide", True)),
+                deep=bool(field_entry.get("deep", True)),
             ))
         else:
             print(f"Disabled field {field_name}")
