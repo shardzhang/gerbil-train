@@ -325,6 +325,7 @@ class BaseTrainer:
                 raise ValueError("metric is required for ReduceLROnPlateau")
             self.scheduler.step(metric) # loss 不降时衰减 LR
             return
+        
         # StepLR, CosineAnnealingLR, etc. do not require a metric
         self.scheduler.step() # 按固定 epoch 步长衰减 LR
 

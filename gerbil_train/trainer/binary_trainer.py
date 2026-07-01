@@ -131,10 +131,10 @@ class BinaryClassificationTrainer(BaseTrainer):
             self.inspect_batch(step, batch)
             model_out = self.forward_step(batch)
             loss = self.compute_total_loss(model_out, batch)
-            self.zero_grad()
-            self.backward_step(loss)
-            self.clip_gradients()
-            self.optimizer_step()
+            self.zero_grad()              # clean the gradient
+            self.backward_step(loss)      # compute the gradient
+            self.clip_gradients()         # clip the gradients
+            self.optimizer_step()         # update the parameters
             total_loss += float(loss.item())
             total_steps += 1
             train_pbar.set_postfix(loss=f"{total_loss / step:.4f}")
