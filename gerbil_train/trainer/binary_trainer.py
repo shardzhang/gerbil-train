@@ -39,6 +39,8 @@ class BinaryClassificationTrainer(BaseTrainer):
         logging_cfg = train_cfg.logging
 
         optimizer = self._create_optimizer(model, optimizer_cfg)
+        self._initial_lr = float(optimizer.param_groups[0].get("lr", optimizer_cfg.lr))
+        self._scheduler_cfg = scheduler_cfg
 
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
@@ -139,6 +141,7 @@ class BinaryClassificationTrainer(BaseTrainer):
             total_steps += 1
             train_pbar.set_postfix(loss=f"{total_loss / step:.4f}")
             self.global_step += 1
+            self.update_learning_rate(self.global_step)
         avg_loss = total_loss / max(total_steps, 1)
         return {"loss": avg_loss}
 

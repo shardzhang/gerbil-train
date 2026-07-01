@@ -34,11 +34,14 @@ class MultiClassClassificationTrainer(BaseTrainer):
         early_stop_cfg = train_cfg.early_stop
         logging_cfg = train_cfg.logging
 
+        lr = optimizer_cfg.lr
         optimizer = optim.Adam(
             model.parameters(),
-            lr=optimizer_cfg.lr,
+            lr=lr,
             weight_decay=optimizer_cfg.weight_decay,
         )
+        self._initial_lr = float(lr)
+        self._scheduler_cfg = scheduler_cfg
 
         scheduler = None
         if scheduler_cfg.enabled:
@@ -135,6 +138,7 @@ class MultiClassClassificationTrainer(BaseTrainer):
             total_steps += 1
             train_pbar.set_postfix(loss=f"{total_loss / step:.4f}")
             self.global_step += 1
+            self.update_learning_rate(self.global_step)
         avg_loss = total_loss / max(total_steps, 1)
         return {"loss": avg_loss}
 

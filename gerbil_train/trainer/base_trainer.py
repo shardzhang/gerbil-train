@@ -87,6 +87,9 @@ class BaseTrainer:
         self._profile_path: Path | None = None
         self._epoch_start_time: float = 0.0
 
+        self._initial_lr: float = 0.0
+        self._scheduler_cfg: Any = None
+
         if self.best_checkpoint_path is not None:
             self.set_profile_path(self.best_checkpoint_path)
 
@@ -329,6 +332,30 @@ class BaseTrainer:
         # StepLR, CosineAnnealingLR, etc. do not require a metric
         self.scheduler.step() # 按固定 epoch 步长衰减 LR
 
+
+    def update_learning_rate(self, step: int) -> None:
+        """Linear warmup followed by exponential decay.
+        Call this after each optimization step (from ``train_one_epoch``).
+
+        :param step: Current global step (0-indexed)
+        """
+        if not hasattr(self, "_scheduler_cfg"):
+            return
+        warmup_steps = self._scheduler_cfg.warmup_steps
+        decay_rate = self._scheduler_cfg.decay_rate
+        lr_min = self._scheduler_cfg.learning_rate_min
+        if warmup_steps <= 0 and decay_rate <= 0:
+            return
+
+        import math
+        lr = self._initial_lr
+        if warmup_steps > 0:
+            lr = lr * min((step + 1.0) / warmup_steps, 1.0)
+        if decay_rate > 0 and step >= warmup_steps:
+            lr = self._initial_lr * math.exp(decay_rate * (warmup_steps - step - 1.0) / max(warmup_steps, 1))
+        lr = max(lr, lr_min)
+        for group in self.optimizer.param_groups:
+            group["lr"] = lr
 
     def on_evaluate_start(self) -> None:
         """Hook called before evaluation starts."""

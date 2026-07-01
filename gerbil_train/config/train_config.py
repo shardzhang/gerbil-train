@@ -27,6 +27,9 @@ class TrainSchedulerConfig:
     mode: str = "max"
     factor: float = 0.5
     patience: int = 1
+    warmup_steps: int = 0
+    decay_rate: float = 0.0
+    learning_rate_min: float = 0.0
 
 
 @dataclass
