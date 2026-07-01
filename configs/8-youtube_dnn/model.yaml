@@ -1,0 +1,17 @@
+task: multiclass
+behavior_fields:
+  - user_movie_rate
+embedding:
+  default_emb_size: 16
+  fields: {}
+
+mlp:
+  hidden_dims:
+  - 256
+  - 128
+  activation: relu
+  dropout: 0.1
+  batch_norm: true
+  input_batch_norm: true
+field_attention:
+  enabled: false

@@ -151,3 +151,23 @@ class WideAndDeepModelConfig(BaseModelConfig):
             field_attention=dict(model_cfg.get("field_attention", {})),
             field_stats=dict(model_cfg.get("field_stats", {})),
         )
+
+
+@dataclass
+class YouTubeDNNModelConfig(BaseModelConfig):
+    behavior_fields: list[str] = field(default_factory=list)
+    example_age_field: str = ""
+    head_bias: bool = False
+
+    @classmethod
+    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "YouTubeDNNModelConfig":
+        return cls(
+            target_size=int(model_cfg.get("target_size", 0)),
+            embedding_fields={field.field_name: field for field in field_entries},
+            behavior_fields=list(model_cfg.get("behavior_fields", [])),
+            example_age_field=str(model_cfg.get("example_age_field", "")),
+            head_bias=bool(model_cfg.get("head_bias", False)),
+            mlp=dict(model_cfg.get("mlp", {})),
+            field_attention=dict(model_cfg.get("field_attention", {})),
+            field_stats=dict(model_cfg.get("field_stats", {})),
+        )
