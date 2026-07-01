@@ -26,6 +26,12 @@ class BinaryClassificationTrainer(BaseTrainer):
     ``forward_step`` / ``compute_loss``.
     """
     def __init__(self, model: nn.Module, train_cfg: TrainConfig, data_cfg: dict[str, Any] | None = None) -> None:
+        """Initialize the binary classification trainer.
+
+        :param model: PyTorch model to train (should output logits or probabilities)
+        :param train_cfg: Training configuration (optimizer, scheduler, checkpointing, etc)
+        :param data_cfg: fixme. Optional data configuration (used to compute total training samples) 
+        """
         optimizer_cfg = train_cfg.optimizer
         scheduler_cfg = train_cfg.scheduler
         checkpoint_cfg = train_cfg.checkpoint
@@ -83,14 +89,15 @@ class BinaryClassificationTrainer(BaseTrainer):
                 log_every=train_cfg.inspector.log_every,
             ))
 
-    def _create_optimizer(self, model: nn.Module, cfg: Any) -> optim.Optimizer:
+
+    def _create_optimizer(self, model: nn.Module, optimizer_cfg: Any) -> optim.Optimizer:
         """Create optimizer. Override in subclasses (e.g. FTRL) for different optimizers."""
-        from torch import optim as optim_mod
-        return optim_mod.Adam(
+        return torch.optim.Adam(
             model.parameters(),
-            lr=float(cfg.lr or 1e-3),
-            weight_decay=float(cfg.weight_decay or 0.0),
+            lr=float(optimizer_cfg.lr or 1e-3),
+            weight_decay=float(optimizer_cfg.weight_decay or 0.0),
         )
+
 
     def fit(self, train_loader: DataLoader, validation_loader: DataLoader | None, test_loader: DataLoader | None = None) -> None:
         """Run the full training lifecycle with the given data loaders."""
@@ -100,13 +107,15 @@ class BinaryClassificationTrainer(BaseTrainer):
 
         self.train_loss_history.clear()
         self.val_loss_history.clear()
+
         self.val_auc_history.clear()
-        self.val_ap_history.clear()
         self.val_gauc_history.clear()
+        self.val_ap_history.clear()
         self.val_map_history.clear()
         self.val_mrr_history.clear()
 
         super().fit_epochs()
+
 
     def train_one_epoch(self, epoch: int) -> dict[str, float]:
         """Train for one epoch and return average loss."""
@@ -133,18 +142,22 @@ class BinaryClassificationTrainer(BaseTrainer):
         avg_loss = total_loss / max(total_steps, 1)
         return {"loss": avg_loss}
 
+
     def forward_step(self, batch: dict[str, Any]) -> torch.Tensor:
         """Forward pass: return sigmoid probabilities."""
         return self.model(batch["feature_bags"])
+
 
     def compute_loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         """Compute binary cross-entropy loss."""
         import torch.nn.functional as F
         return F.binary_cross_entropy(logits, targets)
 
+
     def compute_total_loss(self, outputs: torch.Tensor, batch: dict[str, Any]) -> torch.Tensor:
         """Compute total loss. Override in subclasses (e.g. DIEN) for auxiliary losses."""
         return self.compute_loss(outputs, batch["targets"].float())
+
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         """Log metrics and build message for finalize_epoch."""
@@ -162,10 +175,10 @@ class BinaryClassificationTrainer(BaseTrainer):
             self.val_loss_history.append(float(val_loss))
         if val_auc is not None:
             self.val_auc_history.append(float(val_auc))
-        if val_ap is not None:
-            self.val_ap_history.append(float(val_ap))
         if val_gauc is not None:
             self.val_gauc_history.append(float(val_gauc))
+        if val_ap is not None:
+            self.val_ap_history.append(float(val_ap))
         if val_map is not None:
             self.val_map_history.append(float(val_map))
         if val_mrr is not None:
@@ -185,6 +198,7 @@ class BinaryClassificationTrainer(BaseTrainer):
         if val_mrr is not None:
             message += f" | mrr: {val_mrr:.4f}"
         self.finalize_epoch(epoch, metrics, message)
+
 
     @torch.no_grad()
     def validate(self, epoch: int | None = None) -> dict[str, float]:
@@ -232,6 +246,7 @@ class BinaryClassificationTrainer(BaseTrainer):
                 result["mrr"] = round(mrr_score(valid_uids, valid_labels, valid_scores, weighted=True), 4)
         return result
 
+
     @torch.no_grad()
     def evaluate(self, dataloader: DataLoader | None = None) -> dict[str, float]:
         """Evaluate on test set: AUC, AP, GAUC, MAP, MRR."""
@@ -275,6 +290,7 @@ class BinaryClassificationTrainer(BaseTrainer):
                 result["test_mrr"] = round(mrr_score(valid_uids, valid_labels, valid_scores, weighted=True), 4)
         return result
 
+
     def save_training_artifacts(self) -> None:
         """Save loss and metric curves after training completes."""
         if self.plot_path is None:
@@ -284,7 +300,9 @@ class BinaryClassificationTrainer(BaseTrainer):
         self.plot_loss_curve()
         self.plot_metric_curve()
 
+
     def plot_loss_curve(self) -> None:
+        """Plot training and validation loss curves."""
         if self.plot_path is None or not self.train_loss_history:
             return
         from matplotlib import pyplot as plt
@@ -299,7 +317,11 @@ class BinaryClassificationTrainer(BaseTrainer):
         plt.savefig(self.plot_path.with_name(f"{self.plot_path.stem}_loss.png"))
         plt.close()
 
+
     def plot_metric_curve(self) -> None:
+        """ Plot validation metric curve (AUC) after training completes.
+        fixme: add gauc
+        """
         if self.plot_path is None or not self.val_auc_history:
             return
         from matplotlib import pyplot as plt
