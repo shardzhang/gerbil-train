@@ -142,7 +142,8 @@ class DeepFM(BaseModel):
         batch_size = int(first_offsets.size(0))
         device = next(self.parameters()).device
 
-        # ── 1. Wide (linear) term: fields with wide=True ──
+        # 1. Linear term (1st-order): sum of per-field linear embeddings
+        # w_0 + Σ w_i · x_i , where w_i = EmbeddingBag(vocab → 1)
         linear_sum = torch.zeros(batch_size, device=device)
         for field_name, entry in self.wide_fields.items():
             if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
@@ -156,7 +157,9 @@ class DeepFM(BaseModel):
                 linear_sum = linear_sum + linear_emb.squeeze(-1)
         linear_logit = linear_sum / max(len(self.wide_field_names), 1)
 
-        # ── 2. FM term: categorical fields with deep=True ──
+        # 2. FM second-order term: pair-wise feature interactions
+        # FM = 0.5 * ((Σ v)² - Σ(v²)) = Σ_{i<j} ⟨v_i, v_j⟩
+        # where v_i is the feature embedding for field i.
         fm_emb_list: list[Tensor] = []
         for field_name, entry in self.fm_fields.items():
             feature_emb = embed_one_field(
@@ -179,7 +182,8 @@ class DeepFM(BaseModel):
         else:
             fm_logits = torch.zeros(batch_size, device=device)
 
-        # ── 3. Deep term: fields with deep=True ──
+        # 3. Deep term: high-order non-linear interactions via MLP
+        # Deep = MLP(concat(v_1, ..., v_n))
         deep_emb_list: list[Tensor] = []
         for field_name, entry in self.deep_fields.items():
             cat_emb = entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb")

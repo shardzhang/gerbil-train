@@ -29,7 +29,6 @@ class WideAndDeep(BaseModel):
     - ``wide=True, deep=False``: only Wide (linear)
     - ``wide=False, deep=True``: only Deep (MLP)
     """
-
     def __init__(self, model_cfg: WideAndDeepModelConfig) -> None:
         super().__init__()
         self._validate_fields(model_cfg)
@@ -109,6 +108,7 @@ class WideAndDeep(BaseModel):
             raise ValueError("embedding_fields must be a non-empty mapping")
 
     def reset_parameters(self) -> None:
+        """initialize model parameters"""
         nn.init.zeros_(self.bias)
         if self.deep_head is not None:
             nn.init.xavier_uniform_(self.deep_head.weight)
@@ -119,6 +119,10 @@ class WideAndDeep(BaseModel):
             nn.init.xavier_uniform_(emb.weight)
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
+        """Forward pass of the Wide and Deep model.
+        
+        :return: Predicted scores for each sample in the batch.
+        """ 
         first_offsets = feature_bags[next(iter(self.fields_cfg.keys()))]["offsets"]
         batch_size = int(first_offsets.size(0))
         device = next(self.parameters()).device
