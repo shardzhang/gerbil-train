@@ -132,11 +132,11 @@ class BinaryClassificationTrainer(BaseTrainer):
             self.backward_step(loss)      # compute the gradient
             self.clip_gradients()         # clip the gradients
             self.optimizer_step()         # update the parameters
+            self.scheduler_step(self.global_step)
             total_loss += float(loss.item())
             total_steps += 1
             train_pbar.set_postfix(loss=f"{total_loss / step:.4f}")
             self.global_step += 1
-            self.update_learning_rate(self.global_step)
         avg_loss = total_loss / max(total_steps, 1)
         return {"loss": avg_loss}
 

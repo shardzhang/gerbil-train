@@ -127,11 +127,11 @@ class MultiClassClassificationTrainer(BaseTrainer):
             self.backward_step(loss)
             self.clip_gradients()
             self.optimizer_step()
+            self.scheduler_step(self.global_step)
             total_loss += float(loss.item())
             total_steps += 1
             train_pbar.set_postfix(loss=f"{total_loss / step:.4f}")
             self.global_step += 1
-            self.update_learning_rate(self.global_step)
         avg_loss = total_loss / max(total_steps, 1)
         return {"loss": avg_loss}
 

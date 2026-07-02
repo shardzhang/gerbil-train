@@ -15,6 +15,7 @@
 | **GwEN Binary** | CTR | Binary classification variant with sigmoid output. |
 | **FM** (Factorization Machine) | CTR | Linear (1st-order) + FM (2nd-order pair-wise) terms, no Deep MLP. |
 | **DeepFM** | CTR | Linear + FM + Deep (MLP) sharing feature embeddings. Per-field wide/deep control. |
+| **xDeepFM** | CTR | Linear + **CIN** (Compressed Interaction Network) + Deep. Explicit multi-order vector-wise interactions. |
 | **Wide & Deep** | CTR | Linear (Wide) + MLP (Deep), per-field wide/deep control. |
 | **DIN** (Deep Interest Network) | Sequential | Behavior-sequence attention via LocalActivationUnit. Multi-behavior and multi-target support. |
 | **DIEN** (Deep Interest Evolution Network) | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss support. |
@@ -73,7 +74,26 @@ loss:
 
 FTRL-Proximal optimizer with per-coordinate learning rates and exact L1 sparsity.
 
-### 7. Clean Architecture
+### 7. Step-Level LR Scheduling (`warmup_exp_decay` / `warmup_cos_decay`)
+
+Three scheduler types via a single config line:
+
+```yaml
+scheduler:
+  type: warmup_exp_decay       # warmup_exp_decay | warmup_cos_decay | none
+  warmup_steps: 5000
+  decay_rate: -0.333            # for warmup_exp_decay
+  total_steps: 100000           # for warmup_cos_decay (total training steps)
+  learning_rate_min: 1e-7
+```
+
+| Type | LR Schedule |
+|------|------------|
+| `warmup_exp_decay` | Linear warmup → exponential decay: `lr = base × exp(decay_rate × (step - warmup) / warmup)` |
+| `warmup_cos_decay` | Linear warmup → cosine decay: `lr = lr_min + 0.5 × (base - lr_min) × (1 + cos(π × progress))` |
+| `none` | Fixed learning rate, no scheduling |
+
+### 8. Clean Architecture
 
 ```
 TFRecord → Dataset → Collator → Batch    → Model.forward() → Loss → Trainer.fit()
@@ -108,6 +128,7 @@ data_root/
 # CTR Models
 python -m gerbil_train.cli.2-gwen_binary_train --config configs/2-gwen_ml1m_binary/experiment.yaml
 python -m gerbil_train.cli.5-deepfm_train      --config configs/5-deepfm/experiment.yaml
+python -m gerbil_train.cli.5-xdeepfm_train     --config configs/5-xdeepfm/experiment.yaml
 python -m gerbil_train.cli.4-wide_and_deep_train --config configs/4-wide_and_deep/experiment.yaml
 python -m gerbil_train.cli.9-fm_train           --config configs/9-fm/experiment.yaml
 python -m gerbil_train.cli.7-ftrl_train         --config configs/7-ftrl/experiment.yaml
@@ -138,7 +159,7 @@ python -m gerbil_train.cli.inference \
 gerbil_train/
 ├── cli/                    # Training and inference entry points (numbered)
 │   ├── 2-gwen_multiclass_train.py / 2-gwen_binary_train.py
-│   ├── 4-wide_and_deep_train.py / 5-deepfm_train.py
+│   ├── 4-wide_and_deep_train.py / 5-deepfm_train.py / 5-xdeepfm_train.py
 │   ├── 7-din_train.py / 7-dien_train.py
 │   ├── 8-youtube_dnn_train.py
 │   ├── 9-fm_train.py / 7-ftrl_train.py
@@ -163,6 +184,7 @@ gerbil_train/
 │   ├── gwen.py            # GwEN binary + multiclass
 │   ├── fm.py              # Factorization Machine
 │   ├── deepfm.py          # Deep Factorization Machine
+│   ├── xdeepfm.py         # eXtreme Deep Factorization Machine
 │   ├── wide_and_deep.py   # Wide & Deep
 │   ├── din.py             # Deep Interest Network
 │   ├── dien.py            # Deep Interest Evolution Network
@@ -179,7 +201,7 @@ gerbil_train/
 │   ├── multi_trainer.py   # Shared multi-class trainer
 │   ├── gwen_binary_trainer.py / gwen_multiclass_trainer.py
 │   ├── din_trainer.py / dien_trainer.py
-│   ├── deepfm_trainer.py / fm_trainer.py
+│   ├── deepfm_trainer.py / fm_trainer.py / xdeepfm_trainer.py
 │   ├── wide_and_deep_trainer.py / ftrl_trainer.py
 │   ├── youtube_dnn_trainer.py
 │   ├── shared_bottom_two_tower_trainer.py
@@ -195,7 +217,7 @@ gerbil_train/
 configs/
 ├── 0-data/                     # Shared data configs
 ├── 2-gwen_ml1m_{binary,multiclass}/
-├── 4-wide_and_deep/ 5-deepfm/
+├── 4-wide_and_deep/ 5-deepfm/ 5-xdeepfm/
 ├── 7-din/ 7-dien/
 ├── 8-youtube_dnn/ 9-fm/
 ├── 7-ftrl/

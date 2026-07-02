@@ -317,12 +317,14 @@ class BaseTrainer:
         self.optimizer.step()
 
 
-    def update_learning_rate(self, step: int) -> None:
+    def scheduler_step(self, step: int) -> None:
         """Step-level learning rate scheduling via ``_scheduler_cfg.type``.
 
         - ``warmup_exp_decay``: linear warmup + exponential decay
         - ``warmup_cos_decay``: linear warmup + cosine decay
 
+        - exp decay: 起始下降快，后期趋平，适合快速收敛到最优区域
+        - cos decay: 平滑下降，无突变，在 Transformer 和推荐模型中更常用
         :param step: Current global step (0-indexed)
         """
         if not hasattr(self, "_scheduler_cfg"):

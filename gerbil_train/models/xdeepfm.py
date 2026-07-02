@@ -22,7 +22,7 @@ class CIN(nn.Module):
     """Compressed Interaction Network from the xDeepFM paper.
 
     Computes explicit feature interactions at multiple orders via
-    convolution on outer products of field embeddings.
+    outer products of field embeddings reduced by linear layers.
 
     Input:  X_0 — field embeddings ``[batch, num_fields, emb_dim]``
     Output: pooled features ``[batch, sum(layer_units)]``
@@ -34,9 +34,12 @@ class CIN(nn.Module):
         self.emb_dim = emb_dim
         self.layer_units = layer_units
 
-        self.conv_layers = nn.ModuleList()
+        # Each layer: Linear(H_k * m → H_{k+1}) reduces the interaction dimension
+        self.filters = nn.ModuleList()
+        prev = num_fields  # H_0 = 1 channel (X_0 itself), interacting with X_0 (m fields)
         for h in layer_units:
-            self.conv_layers.append(nn.Conv1d(emb_dim, h, 1, bias=True))
+            self.filters.append(nn.Linear(prev * num_fields, h, bias=True))
+            prev = h
 
     def forward(self, X_0: Tensor) -> Tensor:
         """Forward pass of CIN.
@@ -44,17 +47,17 @@ class CIN(nn.Module):
         :param X_0: Field embeddings ``[batch, num_fields, emb_dim]``
         :return: Pooled features ``[batch, sum(layer_units)]``
         """
-        X_k = X_0  # [batch, m, d] at layer 0
+        X_k = X_0  # [batch, m, d]
         out: list[Tensor] = []
-        for conv in self.conv_layers:
+        for fc in self.filters:
             # Outer product: [batch, H_k, m, d]
             Z = X_k.unsqueeze(2) * X_0.unsqueeze(1)
             batch, H_k, m, d = Z.shape
-            Z = Z.view(batch, H_k * m, d)                 # [batch, H_k*m, d]
-            X_k = conv(Z.transpose(1, 2))                  # [batch, h, d]
-            X_k = X_k.transpose(1, 2)                      # [batch, h, d]
-            out.append(X_k.sum(dim=1))                     # [batch, h]
-        return torch.cat(out, dim=-1)                      # [batch, Σh]
+            Z = Z.permute(0, 3, 1, 2).reshape(batch, d, -1)  # [batch, d, H_k*m]
+            Z = fc(Z)                                          # [batch, d, h]
+            X_k = Z.transpose(1, 2)                            # [batch, h, d]
+            out.append(X_k.sum(dim=-1))                        # [batch, h]
+        return torch.cat(out, dim=-1)                          # [batch, Σh]
 
 
 class xDeepFM(BaseModel):
