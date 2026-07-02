@@ -9,29 +9,30 @@
 
 ## 支持的模型
 
-| 模型 | 类型 | 说明 |
-|------|------|------|
-| **FM**（因子分解机） | CTR | Linear(一阶) + FM(二阶交叉)，无 Deep MLP |
-| **FTRL** | CTR | FTRL-Proximal 在线学习优化器 |
-| **GwEN**（分组嵌入网络） | 多分类 | 基础推荐架构，EmbeddingBag + 可选 field 级注意力 + MLP |
-| **GwEN 二分类** | CTR | 二分类变体，sigmoid 输出 |
-| **YouTubeDNN** | 多分类 | Behavior `mode="mean"`，example age，`encode()` 推理 |
-| **AFM**（注意力因子分解机） | CTR | FM + 每对特征交叉可学习的注意力权重 |
-| **NFM**（神经因子分解机） | CTR | Bi-Interaction 池化 → MLP，比 DeepFM 更参数高效 |
-| **PNN**（乘积神经网络） | CTR | Linear + Product Layer（内积交叉）+ MLP |
-| **Wide & Deep** | CTR | Linear(Wide) + MLP(Deep)，per-field wide/deep 控制 |
-| **DeepFM**（深度因子分解机） | CTR | Linear + FM + Deep 共享特征嵌入，per-field wide/deep 控制 |
-| **xDeepFM**（极深因子分解机） | CTR | Linear + **CIN**（压缩交互网络）+ Deep，显式多阶向量级特征交叉 |
-| **DCN**（深度交叉网络） | CTR | Cross Network（显式有界交叉）+ Deep MLP |
-| **DCNv2**（深度交叉网络 V2） | CTR | 全 d×d 矩阵交叉层，支持低秩近似 |
-| **FiBiNet**（特征重要性双线性交互网络） | CTR | SENET 特征加权 + 双线性交互 + MLP |
-| **AutoInt**（自动特征交叉） | CTR | Multi-head self-attention（Transformer）建模特征交互 |
-| **DIEN**（深度兴趣演化网络） | 序列推荐 | GRU + AUGRU 行为演化建模 |
-| **DSIN**（深度会话兴趣网络） | 序列推荐 | 会话分割 + Bi-LSTM + 跨会话自注意力 + 注意力池化 |
-| **MIMN**（多通道兴趣记忆网络） | 序列推荐 | 多槽记忆网络 + Bi-LSTM + 目标感知记忆读取 |
-| **DIN**（深度兴趣网络） | 序列推荐 | LocalActivationUnit 行为序列注意力 |
-| **双塔模型**（Two-Tower） | 检索 | 两阶段训练（隐式 + 显式） |
-| **Learning-to-Rank** | 排序 | 多种排序损失（LambdaRank, RankNet 等） |
+| 模型 | 类型 | 说明 | 论文 |
+|------|------|------|------|
+| **FM** | CTR | Linear(一阶) + FM(二阶交叉)，无 Deep MLP | [Rendle 2010](https://doi.org/10.1109/ICDM.2010.127) |
+| **FTRL** | CTR | FTRL-Proximal 在线学习优化器 | [McMahan 2013](https://doi.org/10.1145/2487575.2488200) |
+| **GwEN** | 多分类 | EmbeddingBag + 可选 field 级注意力 + MLP | — |
+| **GwEN 二分类** | CTR | 二分类变体，sigmoid 输出 | — |
+| **YouTubeDNN** | 多分类 | Behavior `mode="mean"`，example age，`encode()` 推理 | [Covington 2016](https://doi.org/10.1145/2959100.2959190) |
+| **AFM** | CTR | FM + 每对特征交叉可学习的注意力权重 | [Xiao 2017](https://doi.org/10.24963/ijcai.2017/435) |
+| **NFM** | CTR | Bi-Interaction 池化 → MLP | [He 2017](https://doi.org/10.1145/3038912.3052569) |
+| **PNN** | CTR | Linear + Product Layer（内积交叉）+ MLP | [Qu 2016](https://doi.org/10.1145/2988450.2988456) |
+| **Wide & Deep** | CTR | Linear(Wide) + MLP(Deep)，per-field 控制 | [Cheng 2016](https://doi.org/10.1145/2988450.2988454) |
+| **DeepFM** | CTR | Linear + FM + Deep 共享特征嵌入 | [Guo 2017](https://doi.org/10.24963/ijcai.2017/239) |
+| **xDeepFM** | CTR | Linear + **CIN**（压缩交互网络）+ Deep | [Lian 2018](https://doi.org/10.1145/3219819.3220023) |
+| **DCN** | CTR | Cross Network（有界交叉）+ Deep MLP | [Wang 2017](https://doi.org/10.1145/3124749.3124754) |
+| **DCNv2** | CTR | 全 d×d 矩阵交叉层，支持低秩近似 | [Wang 2021](https://doi.org/10.1145/3459637.3481951) |
+| **FiBiNet** | CTR | SENET 特征加权 + 双线性交互 + MLP | [Huang 2019](https://arxiv.org/abs/1905.09433) |
+| **AutoInt** | CTR | Multi-head self-attention 建模特征交互 | [Song 2019](https://doi.org/10.1145/3357384.3357925) |
+| **DIN** | 序列推荐 | LocalActivationUnit 行为序列注意力 | [Zhou 2018](https://doi.org/10.1145/3178876.3186047) |
+| **DIEN** | 序列推荐 | GRU + AUGRU 行为演化建模 | [Zhou 2019](https://doi.org/10.1145/3292500.3330698) |
+| **DSIN** | 序列推荐 | 会话分割 + Bi-LSTM + 自注意力 | [Feng 2019](https://doi.org/10.1145/3292500.3330855) |
+| **MIMN** | 序列推荐 | 多槽记忆网络 + Bi-LSTM | [Pi 2019](https://doi.org/10.1145/3357384.3357817) |
+| **SIM** | 序列推荐 | GSU 检索 + ESU 多头交叉注意力 | [Pi 2020](https://doi.org/10.1145/3394486.3403235) |
+| **双塔模型** | 检索 | 两阶段训练（隐式 + 显式） | [Yi 2019](https://doi.org/10.1145/3298689.3346996) |
+| **LTR** | 排序 | 多种排序损失（LambdaRank, RankNet 等） | [Burges 2005](https://doi.org/10.1145/1102351.1102363) |
 
 ## 项目亮点
 

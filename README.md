@@ -9,29 +9,30 @@
 
 ## Supported Models
 
-| Model | Type | Description |
-|-------|------|-------------|
-| **FM** (Factorization Machine) | CTR | Linear (1st-order) + FM (2nd-order pair-wise) terms, no Deep MLP. |
-| **FTRL** (Follow The Regularized Leader) | CTR | Linear model with FTRL-Proximal optimizer (per-coordinate LR + L1 sparsity). |
-| **GwEN** (Group-wise Embedding Network) | Multiclass | EmbeddingBag per field + optional field-level attention + MLP for item recommendation. |
-| **GwEN Binary** | CTR | Binary classification variant with sigmoid output. |
-| **YouTubeDNN** | Multiclass | Behavior `mode="mean"`, example age, bias-free head, `encode()` for ANN serving. |
-| **AFM** (Attentional FM) | CTR | FM with learned attention weights per feature pair via attention MLP. |
-| **NFM** (Neural FM) | CTR | Bi-Interaction Pooling (k-dim vector) + Deep MLP. More parameter-efficient than DeepFM. |
-| **PNN** (Product-based Neural Network) | CTR | Linear + Product Layer (pair-wise inner products) + MLP. |
-| **Wide & Deep** | CTR | Linear (Wide) + MLP (Deep), per-field wide/deep control. |
-| **DeepFM** | CTR | Linear + FM + Deep (MLP) sharing feature embeddings. Per-field wide/deep control. |
-| **xDeepFM** | CTR | Linear + **CIN** (Compressed Interaction Network) + Deep. Explicit multi-order vector-wise interactions. |
-| **DCN** (Deep & Cross Network) | CTR | Cross Network (explicit bounded-degree interactions) + Deep MLP. |
-| **DCNv2** (Deep & Cross Network V2) | CTR | Full d×d matrix cross layers with optional low-rank approximation. |
-| **FiBiNet** (Feature Importance & Bilinear Interaction) | CTR | SENET feature weighting + bilinear interaction + MLP. |
-| **AutoInt** (Automatic Feature Interaction) | CTR | Multi-head self-attention (Transformer) over feature fields. Stacked interacting layers. |
-| **DIEN** (Deep Interest Evolution Network) | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss support. |
-| **DSIN** (Deep Session Interest Network) | Sequential | Session division + Bi-LSTM + self-attention across sessions + attention pooling. |
-| **MIMN** (Multi-channel Interest with Moment Network) | Sequential | Multi-slot memory network + Bi-LSTM + target-aware memory read. |
-| **DIN** (Deep Interest Network) | Sequential | Behavior-sequence attention via LocalActivationUnit. Multi-behavior and multi-target support. |
-| **Shared-Bottom Two-Tower** | Retrieval | Two-stage training (implicit pre-train + explicit fine-tune). |
-| **Learning-to-Rank** | Ranking | Feed-forward network with configurable losses (LambdaRank, RankNet, ListNet, ListMLE). |
+| Model | Type | Description | Paper |
+|-------|------|-------------|-------|
+| **FM** | CTR | Linear (1st-order) + FM (2nd-order pair-wise) terms, no Deep MLP. | [Rendle 2010](https://doi.org/10.1109/ICDM.2010.127) |
+| **FTRL** | CTR | Linear model with FTRL-Proximal optimizer (per-coordinate LR + L1 sparsity). | [McMahan 2013](https://doi.org/10.1145/2487575.2488200) |
+| **GwEN** | Multiclass | EmbeddingBag per field + optional field-level attention + MLP. | — |
+| **GwEN Binary** | CTR | Binary classification variant with sigmoid output. | — |
+| **YouTubeDNN** | Multiclass | Behavior `mode="mean"`, example age, bias-free head, `encode()` for ANN serving. | [Covington 2016](https://doi.org/10.1145/2959100.2959190) |
+| **AFM** | CTR | FM with learned attention weights per feature pair via attention MLP. | [Xiao 2017](https://doi.org/10.24963/ijcai.2017/435) |
+| **NFM** | CTR | Bi-Interaction Pooling (k-dim vector) + Deep MLP. | [He 2017](https://doi.org/10.1145/3038912.3052569) |
+| **PNN** | CTR | Linear + Product Layer (pair-wise inner products) + MLP. | [Qu 2016](https://doi.org/10.1145/2988450.2988456) |
+| **Wide & Deep** | CTR | Linear (Wide) + MLP (Deep), per-field wide/deep control. | [Cheng 2016](https://doi.org/10.1145/2988450.2988454) |
+| **DeepFM** | CTR | Linear + FM + Deep sharing feature embeddings. Per-field wide/deep control. | [Guo 2017](https://doi.org/10.24963/ijcai.2017/239) |
+| **xDeepFM** | CTR | Linear + **CIN** (Compressed Interaction Network) + Deep. | [Lian 2018](https://doi.org/10.1145/3219819.3220023) |
+| **DCN** | CTR | Cross Network (explicit bounded-degree interactions) + Deep MLP. | [Wang 2017](https://doi.org/10.1145/3124749.3124754) |
+| **DCNv2** | CTR | Full d×d matrix cross layers with optional low-rank approximation. | [Wang 2021](https://doi.org/10.1145/3459637.3481951) |
+| **FiBiNet** | CTR | SENET feature weighting + bilinear interaction + MLP. | [Huang 2019](https://arxiv.org/abs/1905.09433) |
+| **AutoInt** | CTR | Multi-head self-attention (Transformer) over feature fields. | [Song 2019](https://doi.org/10.1145/3357384.3357925) |
+| **DIN** | Sequential | Behavior-sequence attention via LocalActivationUnit. | [Zhou 2018](https://doi.org/10.1145/3178876.3186047) |
+| **DIEN** | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss. | [Zhou 2019](https://doi.org/10.1145/3292500.3330698) |
+| **DSIN** | Sequential | Session division + Bi-LSTM + self-attention across sessions. | [Feng 2019](https://doi.org/10.1145/3292500.3330855) |
+| **MIMN** | Sequential | Multi-slot memory network + Bi-LSTM + target-aware memory read. | [Pi 2019](https://doi.org/10.1145/3357384.3357817) |
+| **SIM** | Sequential | GSU (top-K retrieval) + ESU (multi-head cross-attention). Long sequences. | [Pi 2020](https://doi.org/10.1145/3394486.3403235) |
+| **Two-Tower** | Retrieval | Two-stage training (implicit pre-train + explicit fine-tune). | [Yi 2019](https://doi.org/10.1145/3298689.3346996) |
+| **Learning-to-Rank** | Ranking | Feed-forward network with configurable ranking losses. | [Burges 2005](https://doi.org/10.1145/1102351.1102363) |
 
 ## Highlights
 

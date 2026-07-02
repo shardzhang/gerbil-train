@@ -1,0 +1,6 @@
+name: sim_ml1m
+description: SIM (Search-based Interest Model) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/11-sim/model.yaml
+train: configs/11-sim/trainer.yaml
