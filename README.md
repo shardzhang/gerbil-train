@@ -24,8 +24,11 @@
 | **xDeepFM** | CTR | Linear + **CIN** (Compressed Interaction Network) + Deep. Explicit multi-order vector-wise interactions. |
 | **DCN** (Deep & Cross Network) | CTR | Cross Network (explicit bounded-degree interactions) + Deep MLP. |
 | **DCNv2** (Deep & Cross Network V2) | CTR | Full d×d matrix cross layers with optional low-rank approximation. |
+| **FiBiNet** (Feature Importance & Bilinear Interaction) | CTR | SENET feature weighting + bilinear interaction + MLP. |
 | **AutoInt** (Automatic Feature Interaction) | CTR | Multi-head self-attention (Transformer) over feature fields. Stacked interacting layers. |
 | **DIEN** (Deep Interest Evolution Network) | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss support. |
+| **DSIN** (Deep Session Interest Network) | Sequential | Session division + Bi-LSTM + self-attention across sessions + attention pooling. |
+| **MIMN** (Multi-channel Interest with Moment Network) | Sequential | Multi-slot memory network + Bi-LSTM + target-aware memory read. |
 | **DIN** (Deep Interest Network) | Sequential | Behavior-sequence attention via LocalActivationUnit. Multi-behavior and multi-target support. |
 | **Shared-Bottom Two-Tower** | Retrieval | Two-stage training (implicit pre-train + explicit fine-tune). |
 | **Learning-to-Rank** | Ranking | Feed-forward network with configurable losses (LambdaRank, RankNet, ListNet, ListMLE). |
@@ -142,6 +145,7 @@ python -m gerbil_train.cli.3-afm_train           --config configs/3-afm/experime
 python -m gerbil_train.cli.3-nfm_train           --config configs/3-nfm/experiment.yaml
 python -m gerbil_train.cli.3-pnn_train           --config configs/3-pnn/experiment.yaml
 python -m gerbil_train.cli.6-autoint_train       --config configs/6-autoint/experiment.yaml
+python -m gerbil_train.cli.6-fibinet_train       --config configs/6-fibinet/experiment.yaml
 python -m gerbil_train.cli.6-dcn_train           --config configs/6-dcn/experiment.yaml
 python -m gerbil_train.cli.6-dcnv2_train         --config configs/6-dcnv2/experiment.yaml
 python -m gerbil_train.cli.1-ftrl_train         --config configs/1-ftrl/experiment.yaml
@@ -149,6 +153,7 @@ python -m gerbil_train.cli.1-ftrl_train         --config configs/1-ftrl/experime
 # Sequential Models
 python -m gerbil_train.cli.7-din_train          --config configs/7-din/experiment.yaml
 python -m gerbil_train.cli.7-dien_train         --config configs/7-dien/experiment.yaml
+python -m gerbil_train.cli.7-dsin_train         --config configs/7-dsin/experiment.yaml
 
 # Multi-class Models
 python -m gerbil_train.cli.2-gwen_multiclass_train --config configs/2-gwen_ml1m_multiclass/experiment.yaml
@@ -224,6 +229,23 @@ gerbil_train/
     ├── embedding.py / nn.py / plot.py / inspect.py
 ```
 
+## Documentation
+
+| Document | Description |
+|----------|------------|
+| `docs/2-gwen.md` | GwEN architecture, formulas, configuration |
+| `docs/5-deepfm.md` | DeepFM Linear + FM + Deep |
+| `docs/5-xdeepfm.md` | xDeepFM with CIN (Compressed Interaction Network) |
+| `docs/7-din.md` | DIN attention mechanism and interest pooling |
+| `docs/7-dien.md` | DIEN GRU + AUGRU |
+| `docs/1-fm.md` | Factorization Machine |
+| `docs/4-wide_and_deep.md` | Wide & Deep per-field tower control |
+| `docs/2-youtube_dnn.md` | YouTube DNN with encode() for ANN serving |
+| `docs/1-ftrl.md` | FTRL online learning algorithm |
+| `docs/99-shared_bottom_two_tower.md` | Two-stage retrieval training |
+| `docs/feature_leakage_ctr.md` | CTR feature leakage analysis |
+| `docs/feature_leakage_in_multiclass.md` | Multi-class feature leakage analysis |
+
 ## Configuration Layout
 
 ```bash
@@ -247,7 +269,7 @@ configs/
 
 ## Project Status & Quality
 
-gerbil-train is in **active development** (~3 months, 25+ commits, single contributor). **66 unit tests**, all passing.
+gerbil-train is in **active development** (50+ commits, single contributor). **100 unit tests**, all passing.
 
 | Dimension | Score |
 |-----------|:-----:|
@@ -257,7 +279,7 @@ gerbil-train is in **active development** (~3 months, 25+ commits, single contri
 | Documentation | 3/5 |
 | Error Handling | 3/5 |
 | Testing | 3/5 |
-| Engineering | 2/5 |
+| Engineering | **3/5** |
 
 ### What's solid
 
@@ -269,14 +291,16 @@ gerbil-train is in **active development** (~3 months, 25+ commits, single contri
 - Shared base trainers eliminate code duplication
 - FTRL-Proximal optimizer with per-coordinate LR
 - Per-field wide/deep tower control
+- Step-level LR scheduling (warmup + exp/cosine decay)
 - Complete offline inference pipeline
+- Custom exception hierarchy (8 classes)
+- CI/CD via GitHub Actions (Python 3.10/3.11, push/PR)
 
 ### What needs work
 
-- **Testing**: More model coverage, CI/CD pipeline
 - **Documentation**: API reference, contributing guide
-- **Dependency management**: Lock version ranges
-- **Community infrastructure**: Issue/PR templates, GitHub Actions
+- **Community infrastructure**: Issue/PR templates
+- **Code formatting**: .editorconfig, black/ruff config
 
 ## Related Projects (GERBIL Ecosystem)
 

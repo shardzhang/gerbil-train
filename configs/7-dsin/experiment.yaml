@@ -1,0 +1,6 @@
+name: dsin_ml1m
+description: DSIN (Deep Session Interest Network) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/7-dsin/model.yaml
+train: configs/7-dsin/trainer.yaml

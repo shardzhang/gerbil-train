@@ -1,0 +1,6 @@
+name: mimn_ml1m
+description: MIMN (Multi-channel Interest with Moment Network) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/10-mimn/model.yaml
+train: configs/10-mimn/trainer.yaml
