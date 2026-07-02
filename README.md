@@ -18,7 +18,7 @@
 | **YouTubeDNN** | Multiclass | Behavior `mode="mean"`, example age, bias-free head, `encode()` for ANN serving. | [Covington 2016](https://doi.org/10.1145/2959100.2959190) |
 | **AFM** | CTR | FM with learned attention weights per feature pair via attention MLP. | [Xiao 2017](https://doi.org/10.24963/ijcai.2017/435) |
 | **NFM** | CTR | Bi-Interaction Pooling (k-dim vector) + Deep MLP. | [He 2017](https://doi.org/10.1145/3038912.3052569) |
-| **PNN** | CTR | Linear + Product Layer (pair-wise inner products) + MLP. | [Qu 2016](https://doi.org/10.1145/2988450.2988456) |
+| **PNN** | CTR | Linear + Product Layer (pair-wise inner products) + MLP. | [Qu 2016](https://doi.org/10.1109/icdm.2016.0151) |
 | **Wide & Deep** | CTR | Linear (Wide) + MLP (Deep), per-field wide/deep control. | [Cheng 2016](https://doi.org/10.1145/2988450.2988454) |
 | **DeepFM** | CTR | Linear + FM + Deep sharing feature embeddings. Per-field wide/deep control. | [Guo 2017](https://doi.org/10.24963/ijcai.2017/239) |
 | **xDeepFM** | CTR | Linear + **CIN** (Compressed Interaction Network) + Deep. | [Lian 2018](https://doi.org/10.1145/3219819.3220023) |
@@ -26,11 +26,13 @@
 | **DCNv2** | CTR | Full d×d matrix cross layers with optional low-rank approximation. | [Wang 2021](https://doi.org/10.1145/3459637.3481951) |
 | **FiBiNet** | CTR | SENET feature weighting + bilinear interaction + MLP. | [Huang 2019](https://arxiv.org/abs/1905.09433) |
 | **AutoInt** | CTR | Multi-head self-attention (Transformer) over feature fields. | [Song 2019](https://doi.org/10.1145/3357384.3357925) |
-| **DIN** | Sequential | Behavior-sequence attention via LocalActivationUnit. | [Zhou 2018](https://doi.org/10.1145/3178876.3186047) |
-| **DIEN** | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss. | [Zhou 2019](https://doi.org/10.1145/3292500.3330698) |
-| **DSIN** | Sequential | Session division + Bi-LSTM + self-attention across sessions. | [Feng 2019](https://doi.org/10.1145/3292500.3330855) |
-| **MIMN** | Sequential | Multi-slot memory network + Bi-LSTM + target-aware memory read. | [Pi 2019](https://doi.org/10.1145/3357384.3357817) |
-| **SIM** | Sequential | GSU (top-K retrieval) + ESU (multi-head cross-attention). Long sequences. | [Pi 2020](https://doi.org/10.1145/3394486.3403235) |
+| **DIN** | Sequential | Behavior-sequence attention via LocalActivationUnit. | [Zhou 2018](https://doi.org/10.1145/3219819.3219823) |
+| **DIEN** | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss. | [Zhou 2019](https://doi.org/10.1609/aaai.v33i01.33015941) |
+| **DSIN** | Sequential | Session division + Bi-LSTM + self-attention across sessions. | [Feng 2019](https://doi.org/10.24963/ijcai.2019/319) |
+| **MIMN** | Sequential | Multi-slot memory network + Bi-LSTM + target-aware memory read. | [Pi 2019](https://doi.org/10.1145/3292500.3330666) |
+| **SIM** | Sequential | GSU (top-K retrieval) + ESU (multi-head cross-attention). Long sequences. | [Pi 2020](https://doi.org/10.1145/3340531.3412744) |
+| **MIND** | Sequential | Dynamic routing (CapsNet) extracts K interest capsules. Label-aware attention selects relevant interest. | [Li 2019](https://arxiv.org/abs/1904.08030) |
+| **BST** | Sequential | Transformer encoder (self-attention) captures pairwise item-item interactions. | [Chen 2019](https://arxiv.org/abs/1905.06874) |
 | **Two-Tower** | Retrieval | Two-stage training (implicit pre-train + explicit fine-tune). | [Yi 2019](https://doi.org/10.1145/3298689.3346996) |
 | **Learning-to-Rank** | Ranking | Feed-forward network with configurable ranking losses. | [Burges 2005](https://doi.org/10.1145/1102351.1102363) |
 

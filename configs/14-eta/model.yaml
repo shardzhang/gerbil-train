@@ -16,8 +16,8 @@ target_fields:
 softmax_attn: false
 target_merge: mean
 interest_extractor:
-  top_k: 20
-  esu_heads: 4
+  num_tables: 4
+  num_bits: 4
 
 local_activation_unit:
   hidden_dims:
@@ -401,6 +401,7 @@ embedding:
       concat_type: direct
       emb_size: 4
       enabled: true
+
 mlp:
   hidden_dims:
   - 256

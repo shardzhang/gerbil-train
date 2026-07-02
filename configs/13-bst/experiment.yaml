@@ -1,0 +1,6 @@
+name: bst_ml1m
+description: BST (Behavior Sequence Transformer) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/13-bst/model.yaml
+train: configs/13-bst/trainer.yaml

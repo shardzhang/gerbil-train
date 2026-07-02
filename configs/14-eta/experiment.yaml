@@ -1,0 +1,6 @@
+name: eta_ml1m
+description: ETA (End-to-end Target Attention) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/14-eta/model.yaml
+train: configs/14-eta/trainer.yaml

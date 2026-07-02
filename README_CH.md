@@ -18,7 +18,7 @@
 | **YouTubeDNN** | 多分类 | Behavior `mode="mean"`，example age，`encode()` 推理 | [Covington 2016](https://doi.org/10.1145/2959100.2959190) |
 | **AFM** | CTR | FM + 每对特征交叉可学习的注意力权重 | [Xiao 2017](https://doi.org/10.24963/ijcai.2017/435) |
 | **NFM** | CTR | Bi-Interaction 池化 → MLP | [He 2017](https://doi.org/10.1145/3038912.3052569) |
-| **PNN** | CTR | Linear + Product Layer（内积交叉）+ MLP | [Qu 2016](https://doi.org/10.1145/2988450.2988456) |
+| **PNN** | CTR | Linear + Product Layer（内积交叉）+ MLP | [Qu 2016](https://doi.org/10.1109/icdm.2016.0151) |
 | **Wide & Deep** | CTR | Linear(Wide) + MLP(Deep)，per-field 控制 | [Cheng 2016](https://doi.org/10.1145/2988450.2988454) |
 | **DeepFM** | CTR | Linear + FM + Deep 共享特征嵌入 | [Guo 2017](https://doi.org/10.24963/ijcai.2017/239) |
 | **xDeepFM** | CTR | Linear + **CIN**（压缩交互网络）+ Deep | [Lian 2018](https://doi.org/10.1145/3219819.3220023) |
@@ -26,11 +26,13 @@
 | **DCNv2** | CTR | 全 d×d 矩阵交叉层，支持低秩近似 | [Wang 2021](https://doi.org/10.1145/3459637.3481951) |
 | **FiBiNet** | CTR | SENET 特征加权 + 双线性交互 + MLP | [Huang 2019](https://arxiv.org/abs/1905.09433) |
 | **AutoInt** | CTR | Multi-head self-attention 建模特征交互 | [Song 2019](https://doi.org/10.1145/3357384.3357925) |
-| **DIN** | 序列推荐 | LocalActivationUnit 行为序列注意力 | [Zhou 2018](https://doi.org/10.1145/3178876.3186047) |
-| **DIEN** | 序列推荐 | GRU + AUGRU 行为演化建模 | [Zhou 2019](https://doi.org/10.1145/3292500.3330698) |
-| **DSIN** | 序列推荐 | 会话分割 + Bi-LSTM + 自注意力 | [Feng 2019](https://doi.org/10.1145/3292500.3330855) |
-| **MIMN** | 序列推荐 | 多槽记忆网络 + Bi-LSTM | [Pi 2019](https://doi.org/10.1145/3357384.3357817) |
-| **SIM** | 序列推荐 | GSU 检索 + ESU 多头交叉注意力 | [Pi 2020](https://doi.org/10.1145/3394486.3403235) |
+| **DIN** | 序列推荐 | LocalActivationUnit 行为序列注意力 | [Zhou 2018](https://doi.org/10.1145/3219819.3219823) |
+| **DIEN** | 序列推荐 | GRU + AUGRU 行为演化建模 | [Zhou 2019](https://doi.org/10.1609/aaai.v33i01.33015941) |
+| **DSIN** | 序列推荐 | 会话分割 + Bi-LSTM + 自注意力 | [Feng 2019](https://doi.org/10.24963/ijcai.2019/319) |
+| **MIMN** | 序列推荐 | 多槽记忆网络 + Bi-LSTM | [Pi 2019](https://doi.org/10.1145/3292500.3330666) |
+| **SIM** | 序列推荐 | GSU 检索 + ESU 多头交叉注意力 | [Pi 2020](https://doi.org/10.1145/3340531.3412744) |
+| **MIND** | 序列推荐 | 动态路由(CapsNet)提取K个兴趣胶囊, 标签感知注意力选择 | [Li 2019](https://arxiv.org/abs/1904.08030) |
+| **BST** | 序列推荐 | Transformer编码器(自注意力)建模成对物品交互 | [Chen 2019](https://arxiv.org/abs/1905.06874) |
 | **双塔模型** | 检索 | 两阶段训练（隐式 + 显式） | [Yi 2019](https://doi.org/10.1145/3298689.3346996) |
 | **LTR** | 排序 | 多种排序损失（LambdaRank, RankNet 等） | [Burges 2005](https://doi.org/10.1145/1102351.1102363) |
 
