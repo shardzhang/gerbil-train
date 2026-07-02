@@ -22,6 +22,8 @@
 | **Wide & Deep** | CTR | Linear(Wide) + MLP(Deep)，per-field wide/deep 控制 |
 | **DeepFM**（深度因子分解机） | CTR | Linear + FM + Deep 共享特征嵌入，per-field wide/deep 控制 |
 | **xDeepFM**（极深因子分解机） | CTR | Linear + **CIN**（压缩交互网络）+ Deep，显式多阶向量级特征交叉 |
+| **DCN**（深度交叉网络） | CTR | Cross Network（显式有界交叉）+ Deep MLP |
+| **DCNv2**（深度交叉网络 V2） | CTR | 全 d×d 矩阵交叉层，支持低秩近似 |
 | **AutoInt**（自动特征交叉） | CTR | Multi-head self-attention（Transformer）建模特征交互 |
 | **DIEN**（深度兴趣演化网络） | 序列推荐 | GRU + AUGRU 行为演化建模 |
 | **DIN**（深度兴趣网络） | 序列推荐 | LocalActivationUnit 行为序列注意力 |
@@ -92,6 +94,8 @@ python -m gerbil_train.cli.3-afm_train           --config configs/3-afm/experime
 python -m gerbil_train.cli.3-nfm_train           --config configs/3-nfm/experiment.yaml
 python -m gerbil_train.cli.3-pnn_train           --config configs/3-pnn/experiment.yaml
 python -m gerbil_train.cli.6-autoint_train       --config configs/6-autoint/experiment.yaml
+python -m gerbil_train.cli.6-dcn_train           --config configs/6-dcn/experiment.yaml
+python -m gerbil_train.cli.6-dcnv2_train         --config configs/6-dcnv2/experiment.yaml
 python -m gerbil_train.cli.5-xdeepfm_train       --config configs/5-xdeepfm/experiment.yaml
 python -m gerbil_train.cli.4-wide_and_deep_train --config configs/4-wide_and_deep/experiment.yaml
 python -m gerbil_train.cli.1-ftrl_train          --config configs/1-ftrl/experiment.yaml
@@ -144,6 +148,8 @@ gerbil_train/
 | `docs/3-pnn.md` | PNN Product Layer + MLP |
 | `docs/5-deepfm.md` | DeepFM Linear + FM + Deep |
 | `docs/5-xdeepfm.md` | xDeepFM Linear + CIN + Deep |
+| `docs/6-dcn.md` | DCN Cross Network + Deep MLP |
+| `docs/6-dcnv2.md` | DCNv2 全矩阵交叉 + 低秩近似 |
 | `docs/6-autoint.md` | AutoInt Transformer 自注意力 |
 | `docs/7-dien.md` | DIEN GRU + AUGRU |
 | `docs/7-din.md` | DIN 注意力机制和兴趣池化 |

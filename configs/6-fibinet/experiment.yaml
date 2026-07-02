@@ -1,0 +1,6 @@
+name: fibinet_ml1m
+description: FiBiNet (Feature Importance and Bilinear Interaction Network) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/6-fibinet/model.yaml
+train: configs/6-fibinet/trainer.yaml

@@ -69,7 +69,7 @@ class MultiClassClassificationTrainer(BaseTrainer):
         self.validation_loader: DataLoader | None = None
         self.test_loader: DataLoader | None = None
 
-        self.plot_path = Path(logging_cfg.plot_path)
+        self.plot_path = Path(logging_cfg.plot_path) if logging_cfg.plot_path is not None else None
         self.train_loss_history: list[float] = []
         self.val_loss_history: list[float] = []
         self.val_hit1_history: list[float] = []

@@ -22,6 +22,8 @@
 | **Wide & Deep** | CTR | Linear (Wide) + MLP (Deep), per-field wide/deep control. |
 | **DeepFM** | CTR | Linear + FM + Deep (MLP) sharing feature embeddings. Per-field wide/deep control. |
 | **xDeepFM** | CTR | Linear + **CIN** (Compressed Interaction Network) + Deep. Explicit multi-order vector-wise interactions. |
+| **DCN** (Deep & Cross Network) | CTR | Cross Network (explicit bounded-degree interactions) + Deep MLP. |
+| **DCNv2** (Deep & Cross Network V2) | CTR | Full d×d matrix cross layers with optional low-rank approximation. |
 | **AutoInt** (Automatic Feature Interaction) | CTR | Multi-head self-attention (Transformer) over feature fields. Stacked interacting layers. |
 | **DIEN** (Deep Interest Evolution Network) | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss support. |
 | **DIN** (Deep Interest Network) | Sequential | Behavior-sequence attention via LocalActivationUnit. Multi-behavior and multi-target support. |
@@ -140,6 +142,8 @@ python -m gerbil_train.cli.3-afm_train           --config configs/3-afm/experime
 python -m gerbil_train.cli.3-nfm_train           --config configs/3-nfm/experiment.yaml
 python -m gerbil_train.cli.3-pnn_train           --config configs/3-pnn/experiment.yaml
 python -m gerbil_train.cli.6-autoint_train       --config configs/6-autoint/experiment.yaml
+python -m gerbil_train.cli.6-dcn_train           --config configs/6-dcn/experiment.yaml
+python -m gerbil_train.cli.6-dcnv2_train         --config configs/6-dcnv2/experiment.yaml
 python -m gerbil_train.cli.1-ftrl_train         --config configs/1-ftrl/experiment.yaml
 
 # Sequential Models
