@@ -318,34 +318,40 @@ class BaseTrainer:
 
 
     def update_learning_rate(self, step: int) -> None:
-        """Linear warmup followed by exponential decay.
-        Call this after each optimization step (from ``train_one_epoch``).
+        """Step-level learning rate scheduling via ``_scheduler_cfg.type``.
 
-        LR 变化过程：
-        step < warmup_steps:   lr = base_lr x (step + 1) / warmup_steps        # 线性上升
-        step ≥ warmup_steps:   lr = base_lr x exp(decay_rate x (warmup - step - 1) / warmup)  # 指数衰减
-        lr = max(lr, learning_rate_min)
+        - ``warmup_exp_decay``: linear warmup + exponential decay
+        - ``warmup_cos_decay``: linear warmup + cosine decay
 
         :param step: Current global step (0-indexed)
         """
         if not hasattr(self, "_scheduler_cfg"):
             return
 
-        warmup_steps = self._scheduler_cfg.warmup_steps
-        decay_rate = self._scheduler_cfg.decay_rate
-        lr_min = self._scheduler_cfg.learning_rate_min
-        if warmup_steps <= 0 and decay_rate <= 0:
+        cfg = self._scheduler_cfg
+        warmup = cfg.warmup_steps
+        lr_min = cfg.learning_rate_min
+        if cfg.type not in ("warmup_exp_decay", "warmup_cos_decay"):
             return
 
+        # Phase 1: linear warmup (shared by both types)
         lr = self._initial_lr
-        if warmup_steps > 0:
-            lr = lr * min((step + 1.0) / warmup_steps, 1.0)
-        
-        if decay_rate < 0 and step >= warmup_steps:
-            lr = self._initial_lr * math.exp(decay_rate * (step + 1 - warmup_steps) / max(warmup_steps, 1))
-        
+        if warmup > 0 and step < warmup:
+            lr = lr * (step + 1.0) / warmup
+            for group in self.optimizer.param_groups:
+                group["lr"] = lr
+            return
+
+        # Phase 2: decay after warmup
+        if cfg.type == "warmup_exp_decay":
+            if cfg.decay_rate < 0:
+                lr = self._initial_lr * math.exp(cfg.decay_rate * (step + 1 - warmup) / max(warmup, 1))
+        elif cfg.type == "warmup_cos_decay":
+            total = max(cfg.total_steps, warmup + 1)
+            progress = (step - warmup) / (total - warmup)
+            lr = lr_min + 0.5 * (self._initial_lr - lr_min) * (1 + math.cos(math.pi * max(0, min(progress, 1))))
+
         lr = max(lr, lr_min)
-        
         for group in self.optimizer.param_groups:
             group["lr"] = lr
 

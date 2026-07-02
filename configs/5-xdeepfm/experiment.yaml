@@ -1,0 +1,6 @@
+name: xdeepfm_ml1m
+description: xDeepFM (eXtreme Deep Factorization Machine with CIN) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/5-xdeepfm/model.yaml
+train: configs/5-xdeepfm/trainer.yaml
