@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import time
+
 from pathlib import Path
 from typing import Any
+
+import math
 
 import torch
 from torch import nn
 from torch.optim import Optimizer
-from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
+from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader
 
 from gerbil_train.utils.nn import count_parameters, print_model_structure
@@ -27,7 +30,7 @@ class BaseTrainer:
         *,
         model: nn.Module,
         optimizer: Optimizer,
-        scheduler: LRScheduler | ReduceLROnPlateau | None,
+        scheduler: LRScheduler | None,
         device: torch.device | str,
         gradient_clip_norm: float | None,
         monitor: str,
@@ -57,7 +60,7 @@ class BaseTrainer:
         """
         self.model: nn.Module = model
         self.optimizer: Optimizer = optimizer
-        self.scheduler: LRScheduler | ReduceLROnPlateau | None = scheduler
+        self.scheduler: LRScheduler | None = scheduler
         self.device: torch.device = torch.device(device)
         self.gradient_clip_norm: float | None = gradient_clip_norm
         # 不同任务的monitor不同，例如分类任务是auc/gauc，回归任务是mse等
@@ -236,11 +239,8 @@ class BaseTrainer:
 
 
     def on_validation_end(self, metrics: dict[str, float]) -> None:
-        """Hook called after validation ends to step the scheduler based on monitored metric. """
-        monitored = metrics.get(self.monitor)
-        if monitored is not None:
-            self.scheduler_step(monitored)
-
+        """Hook called after validation ends. LR is updated per-step via update_learning_rate()."""
+        pass
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         """ Hook called after each epoch ends.
@@ -317,45 +317,38 @@ class BaseTrainer:
         self.optimizer.step()
 
 
-    def scheduler_step(self, metric: float | None = None) -> None:
-        """Advance the learning rate scheduler.
-        :param metric: Metric required by ``ReduceLROnPlateau``
-        """
-        if self.scheduler is None:
-            return
-        if isinstance(self.scheduler, ReduceLROnPlateau):
-            if metric is None:
-                raise ValueError("metric is required for ReduceLROnPlateau")
-            self.scheduler.step(metric) # loss 不降时衰减 LR
-            return
-        
-        # StepLR, CosineAnnealingLR, etc. do not require a metric
-        self.scheduler.step() # 按固定 epoch 步长衰减 LR
-
-
     def update_learning_rate(self, step: int) -> None:
         """Linear warmup followed by exponential decay.
         Call this after each optimization step (from ``train_one_epoch``).
+
+        LR 变化过程：
+        step < warmup_steps:   lr = base_lr x (step + 1) / warmup_steps        # 线性上升
+        step ≥ warmup_steps:   lr = base_lr x exp(decay_rate x (warmup - step - 1) / warmup)  # 指数衰减
+        lr = max(lr, learning_rate_min)
 
         :param step: Current global step (0-indexed)
         """
         if not hasattr(self, "_scheduler_cfg"):
             return
+
         warmup_steps = self._scheduler_cfg.warmup_steps
         decay_rate = self._scheduler_cfg.decay_rate
         lr_min = self._scheduler_cfg.learning_rate_min
         if warmup_steps <= 0 and decay_rate <= 0:
             return
 
-        import math
         lr = self._initial_lr
         if warmup_steps > 0:
             lr = lr * min((step + 1.0) / warmup_steps, 1.0)
-        if decay_rate > 0 and step >= warmup_steps:
-            lr = self._initial_lr * math.exp(decay_rate * (warmup_steps - step - 1.0) / max(warmup_steps, 1))
+        
+        if decay_rate < 0 and step >= warmup_steps:
+            lr = self._initial_lr * math.exp(decay_rate * (step + 1 - warmup_steps) / max(warmup_steps, 1))
+        
         lr = max(lr, lr_min)
+        
         for group in self.optimizer.param_groups:
             group["lr"] = lr
+
 
     def on_evaluate_start(self) -> None:
         """Hook called before evaluation starts."""

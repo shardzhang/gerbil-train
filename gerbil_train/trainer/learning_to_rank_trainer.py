@@ -51,13 +51,6 @@ class LearningToRankTrainer(BaseTrainer):
         )
 
         scheduler = None
-        if scheduler_cfg.enabled:
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer,
-                mode=str(scheduler_cfg.mode),
-                factor=float(scheduler_cfg.factor),
-                patience=int(scheduler_cfg.patience),
-            )
 
         device = config.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -209,15 +202,6 @@ class LearningToRankTrainer(BaseTrainer):
 
         self.on_validation_end(metrics)
         return metrics
-
-    def on_validation_end(self, metrics: dict[str, float]) -> None:
-        """Advance the scheduler after validation.
-
-        :param metrics: Validation metrics for the current epoch
-        """
-        ndcg = metrics.get("ndcg")
-        if ndcg is not None:
-            self.scheduler_step(ndcg)
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:
         """Record epoch history, log TensorBoard scalars, and print progress.

@@ -42,12 +42,7 @@ class BinaryClassificationTrainer(BaseTrainer):
         self._initial_lr = float(optimizer.param_groups[0].get("lr", optimizer_cfg.lr))
         self._scheduler_cfg = scheduler_cfg
 
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode=str(scheduler_cfg.mode),
-            factor=float(scheduler_cfg.factor),
-            patience=int(scheduler_cfg.patience),
-        ) if scheduler_cfg.enabled else None
+        scheduler = None
 
         super().__init__(
             model=model,

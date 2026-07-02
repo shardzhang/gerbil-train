@@ -44,13 +44,6 @@ class MultiClassClassificationTrainer(BaseTrainer):
         self._scheduler_cfg = scheduler_cfg
 
         scheduler = None
-        if scheduler_cfg.enabled:
-            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer,
-                mode=scheduler_cfg.mode,
-                factor=scheduler_cfg.factor,
-                patience=scheduler_cfg.patience,
-            )
 
         super().__init__(
             model=model,

@@ -23,13 +23,15 @@ class TrainOptimizerConfig:
 
 @dataclass
 class TrainSchedulerConfig:
-    enabled: bool = False
-    mode: str = "max"
-    factor: float = 0.5
-    patience: int = 1
-    warmup_steps: int = 0
-    decay_rate: float = 0.0
-    learning_rate_min: float = 0.0
+    """Learning rate scheduler configuration.
+
+    - ``type='warmup_decay'``: step-level linear warmup + exponential decay via ``update_learning_rate()``
+    - ``type='none'``: fixed learning rate, no scheduling
+    """
+    type: str = "none"              # "warmup_decay" | "none"
+    warmup_steps: int = 0           # linear warmup steps (0=disabled, only for type=warmup_decay)
+    decay_rate: float = 0.0         # exponential decay rate (negative, 0.0=disabled, only for type=warmup_decay)
+    learning_rate_min: float = 0.0  # minimum learning rate floor (only for type=warmup_decay)
 
 
 @dataclass
