@@ -1,0 +1,6 @@
+name: pnn_ml1m
+description: PNN (Product-based Neural Network) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/3-pnn/model.yaml
+train: configs/3-pnn/trainer.yaml

@@ -2,5 +2,5 @@ name: ftrl_ml1m
 description: FTRL linear model on MovieLens 1M TFRecord samples.
 
 data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/7-ftrl/model.yaml
-train: configs/7-ftrl/trainer.yaml
+model: configs/1-ftrl/model.yaml
+train: configs/1-ftrl/trainer.yaml

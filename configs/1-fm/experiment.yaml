@@ -2,5 +2,5 @@ name: fm_ml1m
 description: FM (Factorization Machine) on MovieLens 1M TFRecord samples.
 
 data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/9-fm/model.yaml
-train: configs/9-fm/trainer.yaml
+model: configs/1-fm/model.yaml
+train: configs/1-fm/trainer.yaml

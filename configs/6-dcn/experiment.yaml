@@ -1,0 +1,6 @@
+name: dcn_ml1m
+description: DCN (Deep & Cross Network) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/6-dcn/model.yaml
+train: configs/6-dcn/trainer.yaml

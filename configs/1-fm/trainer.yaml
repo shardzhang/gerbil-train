@@ -1,6 +1,6 @@
 seed: 42
 device: cpu
-epochs: 3
+epochs: 5
 
 data:
   batch_size: 512
@@ -24,12 +24,12 @@ scheduler:
   mode: max
   factor: 0.5
   patience: 2
-  warmup_steps: 0         # 线性warmup步数(0=禁用)
-  decay_rate: 0           # exponential decay rate(负值, 0=禁用)
-  learning_rate_min: 1e-6 # LR 下限
+  warmup_steps: 0
+  decay_rate: 0
+  learning_rate_min: 1e-6
 
 checkpoint:
-  monitor: val_gauc
+  monitor: val_auc
   mode: max
 
 logging:

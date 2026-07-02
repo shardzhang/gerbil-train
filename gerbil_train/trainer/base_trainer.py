@@ -68,7 +68,7 @@ class BaseTrainer:
         # 不同任务的monitor_mode不同，例如分类任务是auc/gauc的max，回归任务是mse的min
         self.monitor_mode: str = monitor_mode
         self.patience: int = patience
-        self.best_checkpoint_path: Path | None = Path(best_checkpoint_path)
+        self.best_checkpoint_path: Path | None = Path(best_checkpoint_path) if best_checkpoint_path is not None else None
         # best_metric是monitor的具体值
         self.best_metric: float | None = best_metric
         self.wait: int = wait
@@ -327,14 +327,12 @@ class BaseTrainer:
         - cos decay: 平滑下降，无突变，在 Transformer 和推荐模型中更常用
         :param step: Current global step (0-indexed)
         """
-        if not hasattr(self, "_scheduler_cfg"):
+        cfg = getattr(self, "_scheduler_cfg", None)
+        if cfg is None or cfg.type not in ("warmup_exp_decay", "warmup_cos_decay"):
             return
 
-        cfg = self._scheduler_cfg
         warmup = cfg.warmup_steps
         lr_min = cfg.learning_rate_min
-        if cfg.type not in ("warmup_exp_decay", "warmup_cos_decay"):
-            return
 
         # Phase 1: linear warmup (shared by both types)
         lr = self._initial_lr

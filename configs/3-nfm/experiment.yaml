@@ -1,0 +1,6 @@
+name: nfm_ml1m
+description: NFM (Neural Factorization Machine) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/3-nfm/model.yaml
+train: configs/3-nfm/trainer.yaml

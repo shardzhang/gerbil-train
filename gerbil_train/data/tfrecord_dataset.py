@@ -13,6 +13,7 @@ from tfrecord.reader import tfrecord_iterator
 from torch.utils.data import IterableDataset, get_worker_info
 
 from gerbil_train.config.model_config import FieldEntry
+from gerbil_train.exceptions import DataError
 
 
 __all__ = [

@@ -1,0 +1,6 @@
+name: afm_ml1m
+description: AFM (Attentional Factorization Machine) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/3-afm/model.yaml
+train: configs/3-afm/trainer.yaml

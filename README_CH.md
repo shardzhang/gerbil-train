@@ -11,16 +11,20 @@
 
 | 模型 | 类型 | 说明 |
 |------|------|------|
+| **FM**（因子分解机） | CTR | Linear(一阶) + FM(二阶交叉)，无 Deep MLP |
+| **FTRL** | CTR | FTRL-Proximal 在线学习优化器 |
 | **GwEN**（分组嵌入网络） | 多分类 | 基础推荐架构，EmbeddingBag + 可选 field 级注意力 + MLP |
 | **GwEN 二分类** | CTR | 二分类变体，sigmoid 输出 |
-| **FM**（因子分解机） | CTR | Linear(一阶) + FM(二阶交叉)，无 Deep MLP |
+| **YouTubeDNN** | 多分类 | Behavior `mode="mean"`，example age，`encode()` 推理 |
+| **AFM**（注意力因子分解机） | CTR | FM + 每对特征交叉可学习的注意力权重 |
+| **NFM**（神经因子分解机） | CTR | Bi-Interaction 池化 → MLP，比 DeepFM 更参数高效 |
+| **PNN**（乘积神经网络） | CTR | Linear + Product Layer（内积交叉）+ MLP |
+| **Wide & Deep** | CTR | Linear(Wide) + MLP(Deep)，per-field wide/deep 控制 |
 | **DeepFM**（深度因子分解机） | CTR | Linear + FM + Deep 共享特征嵌入，per-field wide/deep 控制 |
 | **xDeepFM**（极深因子分解机） | CTR | Linear + **CIN**（压缩交互网络）+ Deep，显式多阶向量级特征交叉 |
-| **Wide & Deep** | CTR | Linear(Wide) + MLP(Deep)，per-field wide/deep 控制 |
-| **DIN**（深度兴趣网络） | 序列推荐 | LocalActivationUnit 行为序列注意力 |
+| **AutoInt**（自动特征交叉） | CTR | Multi-head self-attention（Transformer）建模特征交互 |
 | **DIEN**（深度兴趣演化网络） | 序列推荐 | GRU + AUGRU 行为演化建模 |
-| **YouTubeDNN** | 多分类 | Behavior `mode="mean"`，example age，`encode()` 推理 |
-| **FTRL** | CTR | FTRL-Proximal 在线学习优化器 |
+| **DIN**（深度兴趣网络） | 序列推荐 | LocalActivationUnit 行为序列注意力 |
 | **双塔模型**（Two-Tower） | 检索 | 两阶段训练（隐式 + 显式） |
 | **Learning-to-Rank** | 排序 | 多种排序损失（LambdaRank, RankNet 等） |
 
@@ -84,16 +88,20 @@ pip install -r requirements.txt
 ```bash
 # CTR 模型
 python -m gerbil_train.cli.5-deepfm_train        --config configs/5-deepfm/experiment.yaml
+python -m gerbil_train.cli.3-afm_train           --config configs/3-afm/experiment.yaml
+python -m gerbil_train.cli.3-nfm_train           --config configs/3-nfm/experiment.yaml
+python -m gerbil_train.cli.3-pnn_train           --config configs/3-pnn/experiment.yaml
+python -m gerbil_train.cli.6-autoint_train       --config configs/6-autoint/experiment.yaml
 python -m gerbil_train.cli.5-xdeepfm_train       --config configs/5-xdeepfm/experiment.yaml
 python -m gerbil_train.cli.4-wide_and_deep_train --config configs/4-wide_and_deep/experiment.yaml
-python -m gerbil_train.cli.7-ftrl_train          --config configs/7-ftrl/experiment.yaml
+python -m gerbil_train.cli.1-ftrl_train          --config configs/1-ftrl/experiment.yaml
 
 # 序列模型
 python -m gerbil_train.cli.7-din_train           --config configs/7-din/experiment.yaml
 python -m gerbil_train.cli.7-dien_train          --config configs/7-dien/experiment.yaml
 
 # 多分类模型
-python -m gerbil_train.cli.8-youtube_dnn_train   --config configs/8-youtube_dnn/experiment.yaml
+python -m gerbil_train.cli.2-youtube_dnn_train   --config configs/2-youtube_dnn/experiment.yaml
 ```
 
 ### 离线推理
@@ -117,7 +125,7 @@ gerbil_train/
 ├── inference/     # 离线推理
 ├── losses/        # 损失函数（CE/NCE/SampledSoftmax + 排序损失）
 ├── metrics/       # 评估指标（AUC/GAUC/MAP/MRR/NDCG）
-├── models/        # 12 个模型（GwEN/FM/DeepFM/xDeepFM/W&D/DIN/DIEN/YouTubeDNN/FTRL/双塔/LTR）
+├── models/        # 16 个模型（FM/FTRL/GwEN/GwEN Binary/YouTubeDNN/AFM/NFM/PNN/W&D/DeepFM/xDeepFM/AutoInt/DIEN/DIN/双塔/LTR）
 ├── optimizers/    # FTRL-Proximal 优化器
 ├── trainer/       # 12 个训练器（共享 binary/multi 基类）
 └── utils/         # 辅助工具
@@ -129,12 +137,16 @@ gerbil_train/
 
 | 文档 | 说明 |
 |------|------|
-| `docs/gwen.md` | GwEN 架构、公式、配置 |
-| `docs/deepfm.md` | DeepFM Linear + FM + Deep |
-| `docs/xdeepfm.md` | xDeepFM Linear + CIN + Deep |
-| `docs/din.md` | DIN 注意力机制和兴趣池化 |
-| `docs/dien.md` | DIEN GRU + AUGRU |
-| `docs/ftrl.md` | FTRL 在线学习算法 |
+| `docs/1-ftrl.md` | FTRL 在线学习算法 |
+| `docs/2-gwen.md` | GwEN 架构、公式、配置 |
+| `docs/3-afm.md` | AFM 注意力因子分解机 |
+| `docs/3-nfm.md` | NFM Bi-Interaction + Deep MLP |
+| `docs/3-pnn.md` | PNN Product Layer + MLP |
+| `docs/5-deepfm.md` | DeepFM Linear + FM + Deep |
+| `docs/5-xdeepfm.md` | xDeepFM Linear + CIN + Deep |
+| `docs/6-autoint.md` | AutoInt Transformer 自注意力 |
+| `docs/7-dien.md` | DIEN GRU + AUGRU |
+| `docs/7-din.md` | DIN 注意力机制和兴趣池化 |
 
 ## 项目状态
 

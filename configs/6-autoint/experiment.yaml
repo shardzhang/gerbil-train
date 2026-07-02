@@ -1,0 +1,6 @@
+name: autoint_ml1m
+description: AutoInt (Automatic Feature Interaction) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/6-autoint/model.yaml
+train: configs/6-autoint/trainer.yaml

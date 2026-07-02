@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from gerbil_train.exceptions import ConfigError
+
 
 @dataclass
 class FieldEntry:
@@ -63,6 +65,10 @@ class BaseModelConfig:
     field_attention: dict[int, Any] = field(default_factory=dict)
     # dict[field_name, dict[field_index, tuple[mean, std]]]
     field_stats: dict[str, dict[int, tuple[float, float]]] = field(default_factory=dict)
+    # AFM attention network config
+    afm_attention: dict[str, Any] = field(default_factory=dict)
+    # AutoInt multi-head self-attention config
+    auto_attention: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "BaseModelConfig":
@@ -72,6 +78,8 @@ class BaseModelConfig:
             mlp=dict(model_cfg.get("mlp", {})),
             field_attention=dict(model_cfg.get("field_attention", {})),
             field_stats=dict(model_cfg.get("field_stats", {})),
+            afm_attention=dict(model_cfg.get("afm_attention", {})),
+            auto_attention=dict(model_cfg.get("auto_attention", {})),
         )
 
 

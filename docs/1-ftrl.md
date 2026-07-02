@@ -80,7 +80,7 @@ FTRL 适合：
 
 ```bash
 python -m gerbil_train.cli.ftrl_train \
-  --config configs/7-ftrl/experiment.yaml
+  --config configs/1-ftrl/experiment.yaml
 ```
 
 ## 参考

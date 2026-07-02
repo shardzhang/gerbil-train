@@ -1,4 +1,4 @@
-"""Train FM (Factorization Machine) model on TFRecord samples."""
+"""Train YouTubeDNN (multi-class) model on TFRecord samples."""
 
 from __future__ import annotations
 
@@ -11,22 +11,23 @@ from torch.utils.data import DataLoader
 from gerbil_train.utils.config import load_experiment_config, parse_args
 from gerbil_train.utils.run import close_exp_log, create_run_dir, save_run_configs, setup_exp_log
 from gerbil_train.utils.training import build_dataloaders, build_model_config
-from gerbil_train.config.model_config import BaseModelConfig
+from gerbil_train.config.model_config import YouTubeDNNModelConfig
 from gerbil_train.config.train_config import TrainConfig
-from gerbil_train.models.fm import FM
-from gerbil_train.trainer.fm_trainer import FMTrainer
+from gerbil_train.data.tfrecord_dataset import MultiTFRecordDataset
+from gerbil_train.models.youtube_dnn import YouTubeDNN
+from gerbil_train.trainer.youtube_dnn_trainer import YouTubeDNNTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs/9-fm/experiment.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs/2-youtube_dnn/experiment.yaml"
 
 
 def main() -> None:
     args = parse_args(CONFIG_PATH)
     exp_cfg: dict[str, Any] = load_experiment_config(args.config)
     data_cfg: dict[str, Any] = exp_cfg["data"]
-    model_cfg: BaseModelConfig = build_model_config(exp_cfg, BaseModelConfig)
+    model_cfg: YouTubeDNNModelConfig = build_model_config(exp_cfg, YouTubeDNNModelConfig)
 
-    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "fm")
+    run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "youtube_dnn")
     setup_exp_log(run_dir)
     train_cfg: TrainConfig = TrainConfig.from_dict(exp_cfg["train"])
     train_cfg.checkpoint.path = str(run_dir)
@@ -35,12 +36,14 @@ def main() -> None:
     print(f"Run dir: {run_dir}")
     print(f"Loading TFRecords from {data_cfg['paths']['tfrecord_root']}")
 
-    train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg)
-    model = FM(model_cfg)
+    train_loader, validation_loader, test_loader = build_dataloaders(
+        data_cfg, model_cfg, train_cfg, dataset_cls=MultiTFRecordDataset,
+    )
+    model = YouTubeDNN(model_cfg)
     if train_cfg.compile.enabled:
         model = torch.compile(model, mode=train_cfg.compile.mode)
         print(f"Model compiled with torch.compile (mode={train_cfg.compile.mode})")
-    trainer = FMTrainer(model, train_cfg, data_cfg)
+    trainer = YouTubeDNNTrainer(model, train_cfg, data_cfg)
     trainer.fit(train_loader, validation_loader, test_loader)
 
     if test_loader is not None:
@@ -53,4 +56,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# python3 -m gerbil_train.cli.9-fm_train --config configs/9-fm/experiment.yaml
+# python3 -m gerbil_train.cli.2-youtube_dnn_train --config configs/2-youtube_dnn/experiment.yaml

@@ -11,16 +11,20 @@
 
 | Model | Type | Description |
 |-------|------|-------------|
+| **FM** (Factorization Machine) | CTR | Linear (1st-order) + FM (2nd-order pair-wise) terms, no Deep MLP. |
+| **FTRL** (Follow The Regularized Leader) | CTR | Linear model with FTRL-Proximal optimizer (per-coordinate LR + L1 sparsity). |
 | **GwEN** (Group-wise Embedding Network) | Multiclass | EmbeddingBag per field + optional field-level attention + MLP for item recommendation. |
 | **GwEN Binary** | CTR | Binary classification variant with sigmoid output. |
-| **FM** (Factorization Machine) | CTR | Linear (1st-order) + FM (2nd-order pair-wise) terms, no Deep MLP. |
+| **YouTubeDNN** | Multiclass | Behavior `mode="mean"`, example age, bias-free head, `encode()` for ANN serving. |
+| **AFM** (Attentional FM) | CTR | FM with learned attention weights per feature pair via attention MLP. |
+| **NFM** (Neural FM) | CTR | Bi-Interaction Pooling (k-dim vector) + Deep MLP. More parameter-efficient than DeepFM. |
+| **PNN** (Product-based Neural Network) | CTR | Linear + Product Layer (pair-wise inner products) + MLP. |
+| **Wide & Deep** | CTR | Linear (Wide) + MLP (Deep), per-field wide/deep control. |
 | **DeepFM** | CTR | Linear + FM + Deep (MLP) sharing feature embeddings. Per-field wide/deep control. |
 | **xDeepFM** | CTR | Linear + **CIN** (Compressed Interaction Network) + Deep. Explicit multi-order vector-wise interactions. |
-| **Wide & Deep** | CTR | Linear (Wide) + MLP (Deep), per-field wide/deep control. |
-| **DIN** (Deep Interest Network) | Sequential | Behavior-sequence attention via LocalActivationUnit. Multi-behavior and multi-target support. |
+| **AutoInt** (Automatic Feature Interaction) | CTR | Multi-head self-attention (Transformer) over feature fields. Stacked interacting layers. |
 | **DIEN** (Deep Interest Evolution Network) | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss support. |
-| **YouTubeDNN** | Multiclass | Behavior `mode="mean"`, example age, bias-free head, `encode()` for ANN serving. |
-| **FTRL** (Follow The Regularized Leader) | CTR | Linear model with FTRL-Proximal optimizer (per-coordinate LR + L1 sparsity). |
+| **DIN** (Deep Interest Network) | Sequential | Behavior-sequence attention via LocalActivationUnit. Multi-behavior and multi-target support. |
 | **Shared-Bottom Two-Tower** | Retrieval | Two-stage training (implicit pre-train + explicit fine-tune). |
 | **Learning-to-Rank** | Ranking | Feed-forward network with configurable losses (LambdaRank, RankNet, ListNet, ListMLE). |
 
@@ -130,8 +134,13 @@ python -m gerbil_train.cli.2-gwen_binary_train --config configs/2-gwen_ml1m_bina
 python -m gerbil_train.cli.5-deepfm_train      --config configs/5-deepfm/experiment.yaml
 python -m gerbil_train.cli.5-xdeepfm_train     --config configs/5-xdeepfm/experiment.yaml
 python -m gerbil_train.cli.4-wide_and_deep_train --config configs/4-wide_and_deep/experiment.yaml
-python -m gerbil_train.cli.9-fm_train           --config configs/9-fm/experiment.yaml
-python -m gerbil_train.cli.7-ftrl_train         --config configs/7-ftrl/experiment.yaml
+
+python -m gerbil_train.cli.1-fm_train            --config configs/1-fm/experiment.yaml
+python -m gerbil_train.cli.3-afm_train           --config configs/3-afm/experiment.yaml
+python -m gerbil_train.cli.3-nfm_train           --config configs/3-nfm/experiment.yaml
+python -m gerbil_train.cli.3-pnn_train           --config configs/3-pnn/experiment.yaml
+python -m gerbil_train.cli.6-autoint_train       --config configs/6-autoint/experiment.yaml
+python -m gerbil_train.cli.1-ftrl_train         --config configs/1-ftrl/experiment.yaml
 
 # Sequential Models
 python -m gerbil_train.cli.7-din_train          --config configs/7-din/experiment.yaml
@@ -139,7 +148,7 @@ python -m gerbil_train.cli.7-dien_train         --config configs/7-dien/experime
 
 # Multi-class Models
 python -m gerbil_train.cli.2-gwen_multiclass_train --config configs/2-gwen_ml1m_multiclass/experiment.yaml
-python -m gerbil_train.cli.8-youtube_dnn_train     --config configs/8-youtube_dnn/experiment.yaml
+python -m gerbil_train.cli.2-youtube_dnn_train     --config configs/2-youtube_dnn/experiment.yaml
 ```
 
 ### Offline Inference
@@ -161,8 +170,8 @@ gerbil_train/
 │   ├── 2-gwen_multiclass_train.py / 2-gwen_binary_train.py
 │   ├── 4-wide_and_deep_train.py / 5-deepfm_train.py / 5-xdeepfm_train.py
 │   ├── 7-din_train.py / 7-dien_train.py
-│   ├── 8-youtube_dnn_train.py
-│   ├── 9-fm_train.py / 7-ftrl_train.py
+│   ├── 2-youtube_dnn_train.py
+│   ├── 1-fm_train.py / 1-ftrl_train.py
 │   ├── 99-shared_bottom_two_tower_train.py / 99-learning_to_rank_train.py
 │   └── inference.py
 ├── config/                 # Dataclass configuration objects
@@ -219,9 +228,9 @@ configs/
 ├── 2-gwen_ml1m_{binary,multiclass}/
 ├── 4-wide_and_deep/ 5-deepfm/ 5-xdeepfm/
 ├── 7-din/ 7-dien/
-├── 8-youtube_dnn/ 9-fm/
-├── 7-ftrl/
-├── 99-ltr/ 99-sbtt/
+├── 2-youtube_dnn/
+├── 1-ftrl/
+├── 99-eval/ 99-ltr/ 99-sbtt/
 └── build_model_config.py       # Helper to generate model YAML from pos_map.txt
 ```
 
