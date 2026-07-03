@@ -1,10 +1,10 @@
-"""ETA (End-to-end Target Attention) for CTR prediction.
+"""SASRec (Self-Attentive Sequential Recommendation) for CTR prediction.
 
-ETA uses locality-sensitive hashing (LSH) to constrain target attention to
-only behavior items sharing a hash bucket with the target, enabling efficient
-long-sequence modeling.
+SASRec uses causal (left-to-right) Transformer self-attention to model
+user behavior sequences. Unlike BST, it does not append the target item;
+interest is extracted solely from past behavior via causal masking.
 
-Reference: (CIKM 2021, DOI unknown — paper not indexed in CrossRef)
+Reference: https://arxiv.org/abs/1808.09781 (ICDM 2018)
 """
 
 from __future__ import annotations
@@ -13,45 +13,16 @@ from typing import Mapping, Any
 
 import torch
 from torch import Tensor, nn
-import torch.nn.functional as F
 
 from gerbil_train.config.model_config import DIENModelConfig, FieldEntry
 from gerbil_train.utils.embedding import bag_to_padded, embed_one_field, to_device
 from gerbil_train.models.layers import FullyConnectedLayer
 from gerbil_train.models.base_model import BaseModel
 
-__all__ = ["ETA"]
+__all__ = ["SASRec"]
 
 
-class HashEncoder(nn.Module):
-    """Multi-table hash encoder with straight-through gradient estimator.
-
-    Projects input embeddings into m binary hash codes, each of k bits.
-    During training, uses straight-through estimator for differentiable hashing.
-    """
-
-    def __init__(self, input_dim: int, num_tables: int = 4, num_bits: int = 4):
-        super().__init__()
-        self.num_tables = num_tables
-        self.num_bits = num_bits
-        self.projections = nn.Parameter(torch.randn(num_tables, input_dim, num_bits) * 0.1)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Hash input to binary codes.
-
-        :param x: [*, input_dim]
-        :return: [*, num_tables, num_bits] with values in {-1, 1}
-        """
-        scores = torch.einsum("...d,tdu->...tu", x, self.projections)
-        bits = torch.sign(scores)
-        if self.training:
-            bits = scores + (bits - scores).detach()
-        return bits
-
-
-class ETA(BaseModel):
-    """End-to-end Target Attention for CTR prediction."""
-
+class SASRec(BaseModel):
     def __init__(self, model_cfg: DIENModelConfig) -> None:
         super().__init__()
         self._validate_fields(model_cfg)
@@ -91,20 +62,20 @@ class ETA(BaseModel):
                     num_embeddings=int(entry.dim), embedding_dim=int(entry.emb_size), mode="sum",
                 )
 
-        # ETA config
-        eta_cfg: dict[str, Any] = model_cfg.interest_extractor
-        num_tables = int(eta_cfg.get("num_tables", 4))
-        num_bits = int(eta_cfg.get("num_bits", 4))
+        # SASRec config
+        sasrec_cfg: dict[str, Any] = model_cfg.interest_extractor
+        num_heads = int(sasrec_cfg.get("num_heads", 4))
+        num_layers = int(sasrec_cfg.get("num_layers", 2))
+        ffn_hidden = int(sasrec_cfg.get("ffn_hidden", self.emb_size * 2))
+        dropout = float(sasrec_cfg.get("dropout", 0.1))
 
-        self.hash_encoder = HashEncoder(self.emb_size, num_tables=num_tables, num_bits=num_bits)
+        self.pos_embedding = nn.Embedding(500, self.emb_size)
 
-        # Activation Unit (same as DIN)
-        au_hidden = dict(model_cfg.local_activation_unit).get("hidden_dims", [32, 16])
-        self.activation_unit = nn.Sequential(
-            nn.Linear(self.emb_size * 3, int(au_hidden[0])), nn.ReLU(),
-            nn.Linear(int(au_hidden[0]), int(au_hidden[1])), nn.ReLU(),
-            nn.Linear(int(au_hidden[1]), 1),
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=self.emb_size, nhead=num_heads, dim_feedforward=ffn_hidden,
+            dropout=dropout, batch_first=True,
         )
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
         # MLP
         plain_dim = sum(int(self.fields_cfg[fn].emb_size) for fn in self.field_names)
@@ -164,8 +135,6 @@ class ETA(BaseModel):
             )
             target_embs.append(emb)
         target_concat = torch.cat(target_embs, dim=-1) if target_embs else torch.zeros(batch_size, 0, device=device)
-        target_for_eta = (torch.stack(target_embs, dim=0).mean(dim=0) if target_embs
-                          else torch.zeros(batch_size, self.emb_size, device=device))
 
         # 3. Behavior sequence
         bf = self.behavior_fields[0]
@@ -174,33 +143,24 @@ class ETA(BaseModel):
         padded_ids, lengths, _ = bag_to_padded(indices, offsets)
         seq_emb = self.behavior_embeddings[bf](padded_ids)
 
-        # 4. Hash-constrained attention
         B, T, d = seq_emb.shape
+
+        # 4. Positional encoding
+        pos_ids = torch.arange(T, device=device).unsqueeze(0).expand(B, -1)
+        seq_emb = seq_emb + self.pos_embedding(pos_ids)
+
+        # 5. Causal Transformer
         pad_mask = torch.arange(T, device=device).unsqueeze(0) >= lengths.unsqueeze(1)
+        causal_mask = torch.triu(torch.full((T, T), True, device=device), diagonal=1)
+        transformer_out = self.transformer(seq_emb, mask=causal_mask, src_key_padding_mask=pad_mask)
 
-        # Hash behavior items and target
-        seq_hash = self.hash_encoder(seq_emb)
-        tgt_hash = self.hash_encoder(target_for_eta)
+        # 6. Take output at last valid position as interest
+        last_idx = (lengths - 1).clamp(min=0)
+        all_pad = lengths == 0
+        interest = transformer_out[torch.arange(B), last_idx]
+        interest = torch.where(all_pad.unsqueeze(-1), torch.zeros_like(interest), interest)
 
-        # Hash match: items sharing at least one complete table match with target
-        match = (seq_hash == tgt_hash.unsqueeze(1)).all(dim=-1)
-        any_match = match.any(dim=-1)
-
-        # Activation unit: DIN-style attention
-        target_tile = target_for_eta.unsqueeze(1).expand(-1, T, -1)
-        cat_emb = torch.cat([seq_emb, target_tile, seq_emb * target_tile], dim=-1)
-        raw_scores = self.activation_unit(cat_emb).squeeze(-1)
-
-        # Mask: padding OR no hash match
-        attention_mask = pad_mask | ~any_match
-        scores = raw_scores.masked_fill(attention_mask, float("-inf"))
-        scores_safe = torch.where(attention_mask.all(dim=-1, keepdim=True),
-                                  torch.zeros_like(scores), scores)
-        attn = F.softmax(scores_safe, dim=-1)
-
-        interest = (attn.unsqueeze(-1) * seq_emb).sum(dim=1)
-
-        # 5. Concat -> MLP
+        # 7. Concat -> MLP
         combined = torch.cat([plain_concat, target_concat, interest], dim=-1)
         hidden = self.mlp(combined)
         logit = self.head(hidden).squeeze(-1)

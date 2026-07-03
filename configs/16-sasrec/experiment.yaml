@@ -1,0 +1,6 @@
+name: sasrec_ml1m
+description: SASRec (Self-Attentive Sequential Recommendation) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/16-sasrec/model.yaml
+train: configs/16-sasrec/trainer.yaml

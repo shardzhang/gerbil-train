@@ -31,8 +31,11 @@
 | **DSIN** | 序列推荐 | 会话分割 + Bi-LSTM + 自注意力 | [Feng 2019](https://doi.org/10.24963/ijcai.2019/319) |
 | **MIMN** | 序列推荐 | 多槽记忆网络 + Bi-LSTM | [Pi 2019](https://doi.org/10.1145/3292500.3330666) |
 | **SIM** | 序列推荐 | GSU 检索 + ESU 多头交叉注意力 | [Pi 2020](https://doi.org/10.1145/3340531.3412744) |
-| **MIND** | 序列推荐 | 动态路由(CapsNet)提取K个兴趣胶囊, 标签感知注意力选择 | [Li 2019](https://arxiv.org/abs/1904.08030) |
-| **BST** | 序列推荐 | Transformer编码器(自注意力)建模成对物品交互 | [Chen 2019](https://arxiv.org/abs/1905.06874) |
+| **MIND** | 序列推荐 | 动态路由(CapsNet)提取K个兴趣胶囊, 标签感知注意力选择 | [Li 2019](https://doi.org/10.1145/3357384.3357814) |
+| **BST** | 序列推荐 | Transformer编码器(自注意力)建模成对物品交互 | [Chen 2019](https://doi.org/10.1145/3326937.3341261) |
+| **SDIM** | 序列推荐 | Gumbel-Sigmoid概率语义掩码, 过滤无关行为 | [Fan 2022](https://doi.org/10.1145/3511808.3557082) |
+| **BERT4Rec** | 序列推荐 | Cloze任务(掩码语言模型)序列推荐 | [Sun 2019](https://doi.org/10.1145/3357384.3357895) |
+| **SASRec** | 序列推荐 | 因果Transformer(从左到右), 仅从最后行为提取兴趣 | [Kang 2018](https://arxiv.org/abs/1808.09781) |
 | **双塔模型** | 检索 | 两阶段训练（隐式 + 显式） | [Yi 2019](https://doi.org/10.1145/3298689.3346996) |
 | **LTR** | 排序 | 多种排序损失（LambdaRank, RankNet 等） | [Burges 2005](https://doi.org/10.1145/1102351.1102363) |
 

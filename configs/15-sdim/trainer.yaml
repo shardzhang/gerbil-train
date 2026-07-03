@@ -1,0 +1,46 @@
+seed: 42
+device: cpu
+epochs: 5
+
+data:
+  batch_size: 512
+  num_workers: 0
+  pin_memory: false
+  drop_last: true
+  prefetch_factor: 4
+  shuffle_buffer: 8192
+
+compile:
+  enabled: false
+  mode: default
+
+optimizer:
+  type: adam
+  lr: 0.001
+  weight_decay: 0.00001
+
+scheduler:
+  enabled: true
+  mode: max
+  factor: 0.5
+  patience: 2
+  warmup_steps: 0
+  decay_rate: 0
+  learning_rate_min: 1e-6
+
+checkpoint:
+  monitor: val_auc
+  mode: max
+
+logging:
+  verbose: true
+
+early_stop:
+  enabled: false
+
+evaluation: {}
+
+inspector:
+  enabled: false
+  log_first: 3
+  log_every: 0

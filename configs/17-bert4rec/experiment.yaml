@@ -1,0 +1,6 @@
+name: bert4rec_ml1m
+description: BERT4Rec on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/17-bert4rec/model.yaml
+train: configs/17-bert4rec/trainer.yaml

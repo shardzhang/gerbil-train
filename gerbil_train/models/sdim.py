@@ -1,10 +1,9 @@
-"""ETA (End-to-end Target Attention) for CTR prediction.
+"""SDIM (Semantic Deep Interest Model) for CTR prediction.
 
-ETA uses locality-sensitive hashing (LSH) to constrain target attention to
-only behavior items sharing a hash bucket with the target, enabling efficient
-long-sequence modeling.
+SDIM learns a probabilistic semantic mask over behavior sequences, filtering
+out target-irrelevant items via a Gumbel-Sigmoid reparameterized gate.
 
-Reference: (CIKM 2021, DOI unknown — paper not indexed in CrossRef)
+Reference: KDD 2022
 """
 
 from __future__ import annotations
@@ -20,38 +19,57 @@ from gerbil_train.utils.embedding import bag_to_padded, embed_one_field, to_devi
 from gerbil_train.models.layers import FullyConnectedLayer
 from gerbil_train.models.base_model import BaseModel
 
-__all__ = ["ETA"]
+__all__ = ["SDIM"]
 
 
-class HashEncoder(nn.Module):
-    """Multi-table hash encoder with straight-through gradient estimator.
+def gumbel_sigmoid(logits: Tensor, tau: float = 1.0, hard: bool = False) -> Tensor:
+    """Gumbel-Sigmoid relaxation for Bernoulli sampling.
 
-    Projects input embeddings into m binary hash codes, each of k bits.
-    During training, uses straight-through estimator for differentiable hashing.
+    :param logits: [*] unscaled logits
+    :param tau: temperature
+    :param hard: if True, use straight-through estimator
+    :return: [*] samples in [0, 1]
     """
+    gumbel_noise = -(-torch.rand_like(logits).log()).log()
+    y = (logits + gumbel_noise) / tau
+    y_soft = torch.sigmoid(y)
+    if hard:
+        y_hard = (y_soft > 0.5).to(logits.dtype)
+        return y_hard + y_soft.detach() - y_soft
+    return y_soft
 
-    def __init__(self, input_dim: int, num_tables: int = 4, num_bits: int = 4):
+
+class SemanticMask(nn.Module):
+    """Probabilistic semantic gate over behavior items."""
+
+    def __init__(self, emb_dim: int, hidden_dims: list[int] = None):
         super().__init__()
-        self.num_tables = num_tables
-        self.num_bits = num_bits
-        self.projections = nn.Parameter(torch.randn(num_tables, input_dim, num_bits) * 0.1)
+        if hidden_dims is None:
+            hidden_dims = [64, 32]
+        layers = []
+        inp = emb_dim * 4
+        for h in hidden_dims:
+            layers.extend([nn.Linear(inp, h), nn.ReLU()])
+            inp = h
+        layers.append(nn.Linear(inp, 1))
+        self.mlp = nn.Sequential(*layers)
 
-    def forward(self, x: Tensor) -> Tensor:
-        """Hash input to binary codes.
+    def forward(self, target: Tensor, behavior: Tensor, gumbel_tau: float = 1.0, gumbel_hard: bool = False) -> Tensor:
+        """Compute mask for each behavior item.
 
-        :param x: [*, input_dim]
-        :return: [*, num_tables, num_bits] with values in {-1, 1}
+        :param target: [B, d]
+        :param behavior: [B, T, d]
+        :return: mask [B, T] in [0, 1]
         """
-        scores = torch.einsum("...d,tdu->...tu", x, self.projections)
-        bits = torch.sign(scores)
+        target_tile = target.unsqueeze(1).expand_as(behavior)
+        cat_feat = torch.cat([target_tile, behavior, target_tile * behavior, target_tile - behavior], dim=-1)
+        logits = self.mlp(cat_feat).squeeze(-1)
         if self.training:
-            bits = scores + (bits - scores).detach()
-        return bits
+            return gumbel_sigmoid(logits, tau=gumbel_tau, hard=gumbel_hard)
+        return torch.sigmoid(logits)
 
 
-class ETA(BaseModel):
-    """End-to-end Target Attention for CTR prediction."""
-
+class SDIM(BaseModel):
     def __init__(self, model_cfg: DIENModelConfig) -> None:
         super().__init__()
         self._validate_fields(model_cfg)
@@ -63,7 +81,6 @@ class ETA(BaseModel):
         self.field_names = [n for n in self.fields_cfg if n not in reserved]
         self.emb_size = int(self.fields_cfg[self.behavior_fields[0]].emb_size)
 
-        # Target embeddings
         self.target_embedding_bags = nn.ModuleDict()
         for f_name in self.target_fields:
             entry = self.fields_cfg[f_name]
@@ -73,7 +90,6 @@ class ETA(BaseModel):
                     num_embeddings=int(entry.dim), embedding_dim=int(entry.emb_size), mode="sum",
                 )
 
-        # Behavior embeddings
         self.behavior_embeddings = nn.ModuleDict()
         for bf in self.behavior_fields:
             entry = self.fields_cfg[bf]
@@ -81,7 +97,6 @@ class ETA(BaseModel):
                 num_embeddings=int(entry.dim) + 1, embedding_dim=int(entry.emb_size), padding_idx=int(entry.dim),
             )
 
-        # Plain field embeddings
         self.field_embedding_bags = nn.ModuleDict()
         for field_name in self.field_names:
             entry = self.fields_cfg[field_name]
@@ -91,22 +106,13 @@ class ETA(BaseModel):
                     num_embeddings=int(entry.dim), embedding_dim=int(entry.emb_size), mode="sum",
                 )
 
-        # ETA config
-        eta_cfg: dict[str, Any] = model_cfg.interest_extractor
-        num_tables = int(eta_cfg.get("num_tables", 4))
-        num_bits = int(eta_cfg.get("num_bits", 4))
+        sdim_cfg: dict[str, Any] = model_cfg.interest_extractor
+        mask_hidden = list(sdim_cfg.get("mask_hidden", [64, 32]))
+        self.gumbel_tau = float(sdim_cfg.get("gumbel_tau", 1.0))
+        self.gumbel_hard = bool(sdim_cfg.get("gumbel_hard", False))
 
-        self.hash_encoder = HashEncoder(self.emb_size, num_tables=num_tables, num_bits=num_bits)
+        self.semantic_mask = SemanticMask(self.emb_size, hidden_dims=mask_hidden)
 
-        # Activation Unit (same as DIN)
-        au_hidden = dict(model_cfg.local_activation_unit).get("hidden_dims", [32, 16])
-        self.activation_unit = nn.Sequential(
-            nn.Linear(self.emb_size * 3, int(au_hidden[0])), nn.ReLU(),
-            nn.Linear(int(au_hidden[0]), int(au_hidden[1])), nn.ReLU(),
-            nn.Linear(int(au_hidden[1]), 1),
-        )
-
-        # MLP
         plain_dim = sum(int(self.fields_cfg[fn].emb_size) for fn in self.field_names)
         target_dim = sum(int(self.fields_cfg[tf].emb_size) for tf in self.target_fields)
         mlp_input_dim = plain_dim + target_dim + self.emb_size
@@ -141,7 +147,6 @@ class ETA(BaseModel):
         batch_size = int(first_offsets.size(0))
         device = next(self.parameters()).device
 
-        # 1. Plain field embeddings
         plain_embs: list[Tensor] = []
         for fn in self.field_names:
             entry = self.fields_cfg[fn]
@@ -153,7 +158,6 @@ class ETA(BaseModel):
             plain_embs.append(emb)
         plain_concat = torch.cat(plain_embs, dim=-1) if plain_embs else torch.zeros(batch_size, 0, device=device)
 
-        # 2. Target embeddings
         target_embs: list[Tensor] = []
         for tf in self.target_fields:
             entry = self.fields_cfg[tf]
@@ -164,43 +168,29 @@ class ETA(BaseModel):
             )
             target_embs.append(emb)
         target_concat = torch.cat(target_embs, dim=-1) if target_embs else torch.zeros(batch_size, 0, device=device)
-        target_for_eta = (torch.stack(target_embs, dim=0).mean(dim=0) if target_embs
-                          else torch.zeros(batch_size, self.emb_size, device=device))
+        target_for_sdim = (torch.stack(target_embs, dim=0).mean(dim=0) if target_embs
+                           else torch.zeros(batch_size, self.emb_size, device=device))
 
-        # 3. Behavior sequence
         bf = self.behavior_fields[0]
         indices = to_device(feature_bags[bf]["indices"].long(), device)
         offsets = to_device(feature_bags[bf]["offsets"].long(), device)
         padded_ids, lengths, _ = bag_to_padded(indices, offsets)
         seq_emb = self.behavior_embeddings[bf](padded_ids)
 
-        # 4. Hash-constrained attention
         B, T, d = seq_emb.shape
+
+        # Semantic mask: gate irrelevant items
+        mask = self.semantic_mask(target_for_sdim, seq_emb, gumbel_tau=self.gumbel_tau, gumbel_hard=self.gumbel_hard)
+
+        # Apply padding mask
         pad_mask = torch.arange(T, device=device).unsqueeze(0) >= lengths.unsqueeze(1)
+        mask = mask.masked_fill(pad_mask, 0.0)
 
-        # Hash behavior items and target
-        seq_hash = self.hash_encoder(seq_emb)
-        tgt_hash = self.hash_encoder(target_for_eta)
+        # Weighted aggregation
+        interest = (seq_emb * mask.unsqueeze(-1)).sum(dim=1)
+        mask_sum = mask.sum(dim=-1, keepdim=True).clamp(min=1)
+        interest = interest / mask_sum
 
-        # Hash match: items sharing at least one complete table match with target
-        match = (seq_hash == tgt_hash.unsqueeze(1)).all(dim=-1)
-        any_match = match.any(dim=-1)
-
-        # Activation unit: DIN-style attention
-        target_tile = target_for_eta.unsqueeze(1).expand(-1, T, -1)
-        cat_emb = torch.cat([seq_emb, target_tile, seq_emb * target_tile], dim=-1)
-        raw_scores = self.activation_unit(cat_emb).squeeze(-1)
-
-        # Mask: padding OR no hash match
-        attention_mask = pad_mask | ~any_match
-        scores = raw_scores.masked_fill(attention_mask, float("-inf"))
-        scores_safe = torch.where(attention_mask.all(dim=-1, keepdim=True),
-                                  torch.zeros_like(scores), scores)
-        attn = F.softmax(scores_safe, dim=-1)
-
-        interest = (attn.unsqueeze(-1) * seq_emb).sum(dim=1)
-
-        # 5. Concat -> MLP
         combined = torch.cat([plain_concat, target_concat, interest], dim=-1)
         hidden = self.mlp(combined)
         logit = self.head(hidden).squeeze(-1)
