@@ -286,8 +286,7 @@ mlp:
 ## 启动命令
 
 ```bash
-python -m gerbil_train.cli.dien_train \
-  --config configs/8-dien/experiment.yaml
+python -m gerbil_train.cli.7-dien_train --config configs/7-dien/experiment.yaml
 ```
 
 ## 前提条件

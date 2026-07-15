@@ -1,5 +1,7 @@
 # DeepFM
 
+
+
 ## 模型架构
 
 DeepFM 将预测拆为三项的加和：
@@ -225,5 +227,5 @@ output:
 ## 启动命令
 
 ```bash
-python3 -m gerbil_train.cli.deepfm_train --config configs/experiment/deepfm_ml1m.yaml
+python -m gerbil_train.cli.5-deepfm_train --config configs/5-deepfm/experiment.yaml
 ```

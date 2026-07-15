@@ -204,10 +204,10 @@ class MIMN(BaseModel):
 
         # 3. Behavior sequence → Bi-LSTM → interest states
         bf = self.behavior_fields[0]
-        indices = to_device(feature_bags[bf]["indices"].long(), device)
-        offsets = to_device(feature_bags[bf]["offsets"].long(), device)
-        padded_ids, lengths, _ = bag_to_padded(indices, offsets)
-        seq_emb = self.behavior_embeddings[bf](padded_ids)       # [B, T, d]
+        padded_ids, padded_weights, lengths, max_seq_len = bag_to_padded(feature_bags[bf], device)
+        seq_emb = self.behavior_embeddings[bf](padded_ids) * padded_weights.unsqueeze(-1)      # [B, T, d]
+        weight_sum = padded_weights.sum(dim=-1, keepdim=True).clamp(min=1e-8).unsqueeze(-1)
+        seq_emb = seq_emb / weight_sum
         lstm_out, _ = self.bi_lstm(seq_emb)                      # [B, T, 2h]
 
         # 4. Memory write: write LSTM states to memory

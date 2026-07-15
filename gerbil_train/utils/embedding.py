@@ -2,10 +2,36 @@
 
 from __future__ import annotations
 
+from typing import Mapping
+
 import torch
 from torch import Tensor, nn
 
 __all__ = ["bag_to_padded", "embed_one_field", "to_device"]
+
+
+class WeightedMeanEmbeddingBag(nn.Module):
+
+    def __init__(self, num_embeddings, embedding_dim):
+        super().__init__()
+        
+        self.emb_bag = nn.EmbeddingBag(num_embeddings, embedding_dim, mode="sum")
+        self.layer_norm = nn.LayerNorm(embedding_dim)
+        self.eps = 1e-6
+    
+    def forward(self, indices, offsets, per_sample_weights):
+        # [batch_size, emb_size]
+        sum_emb = self.emb_bag(
+            indices, 
+            offsets, 
+            per_sample_weights=per_sample_weights
+        )
+        # [batch_size, ]
+        sum_w = torch.embedding_bag(torch.ones_like(per_sample_weights), indices, offsets, per_sample_weights=per_sample_weights, mode="sum")
+        # [batch_size, emb_size]
+        mean_emb = sum_emb / (sum_w.unsqueeze(-1) + self.eps)
+        # [batch_size, emb_size]
+        return self.layer_norm(mean_emb)
 
 
 def to_device(tensor: Tensor, device: torch.device) -> Tensor:
@@ -19,7 +45,7 @@ def embed_one_field(emb: nn.EmbeddingBag,
                     device: torch.device) -> Tensor:
     """Embeds a single field using the provided embedding bag.
     
-    :param emb (nn.EmbeddingBag): The embedding bag to use. 不需要解包，直接查表加和，一步完成 Embedding
+    :param emb (nn.EmbeddingBag): The embedding bag to use. 不需要解包, 直接查表加和, 一步完成 Embedding
     :param indices (Tensor): The indices of the elements to embed. shape: [total_num_indices]
     :param offsets (Tensor): The offsets for the embedding bag. shape: [batch_size]
     :param weights (Tensor): The weights for the embedding bag. shape: [total_num_indices]
@@ -32,12 +58,12 @@ def embed_one_field(emb: nn.EmbeddingBag,
     return emb(indices, offsets, per_sample_weights=bag_weight)
 
 
-def bag_to_padded(indices: Tensor, offsets: Tensor) -> tuple[Tensor, Tensor, int]:
+def bag_to_padded(feature_bag: Mapping[str, Tensor], device: torch.device) -> tuple[Tensor, Tensor, int]:
     """Convert EmbeddingBag flat format to a padded sequence for attention/sequence models.
 
     EmbeddingBag stores variable-length sequences in a flat layout::
-        indices  = [a0, a1, a2, b0, b1, c0, c1, c2, c3]   -- all tokens concatenated
-        offsets  = [0, 3, 5]                                 -- start position of each sample
+        indices  = [a0, a1, a2, b0, b1, c0, c1, c2, c3]     -- all tokens concatenated
+        offsets  = [0, 3, 5]                                -- start position of each sample
 
         sample A: indices[0:3]  = [a0, a1, a2]              -- 3 tokens
         sample B: indices[3:5]  = [b0, b1]                  -- 2 tokens
@@ -82,7 +108,10 @@ def bag_to_padded(indices: Tensor, offsets: Tensor) -> tuple[Tensor, Tensor, int
         lengths:   ``[batch]`` actual sequence length per sample
         max_seq_len:  scalar, padded width
     """
-    device = indices.device
+    indices = to_device(feature_bag["indices"].long(), device)
+    offsets = to_device(feature_bag["offsets"].long(), device)
+    # fixme: weights目前没有加入
+    weights = to_device(feature_bag["weights"].float(), device)
     batch_size = offsets.size(0)
     total = indices.size(0)
 
@@ -103,8 +132,11 @@ def bag_to_padded(indices: Tensor, offsets: Tensor) -> tuple[Tensor, Tensor, int
 
     # [batch, max_seq_len] valid position mask
     mask = pos < lengths.unsqueeze(1)
-    # [batch, max_seq_len] gather values and zero-pad where mask is False
+    
     # indices[gather_idx]: 花式索引, 输出形状 = gather_idx形状
-    # weight_matrix[effective_index]: 布尔索引, 返回一维. 所有被 True 选中的元素被展平成一个一维列表，不保留原始形状
-    padded = torch.where(mask, indices[gather_idx], torch.tensor(0, device=device, dtype=indices.dtype))
-    return padded, lengths, max_seq_len
+    # weight_matrix[effective_index]: 布尔索引, 返回一维. 所有被 True 选中的元素被展平成一个一维列表, 不保留原始形状
+    # [batch, max_seq_len] gather values and zero-pad where mask is False
+    padded_id = torch.where(mask, indices[gather_idx], torch.tensor(0, device=device, dtype=indices.dtype))
+    # padded_weights, 用0.0作为padding值
+    padded_weights = torch.where(mask, weights[gather_idx], torch.tensor(0.0, device=device, dtype=weights.dtype))
+    return padded_id, padded_weights, lengths, max_seq_len

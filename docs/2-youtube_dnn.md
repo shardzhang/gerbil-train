@@ -56,7 +56,7 @@ user_emb = model.encode(feature_bags)   # → [batch_size, hidden_dim]
 ## 启动命令
 
 ```bash
-python -m gerbil_train.cli.youtube_dnn_train --config configs/2-youtube_dnn/experiment.yaml
+python -m gerbil_train.cli.2-youtube_dnn_train --config configs/2-youtube_dnn/experiment.yaml
 ```
 
 ## 参考

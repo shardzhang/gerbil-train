@@ -45,7 +45,7 @@ user_watch_same_genre:  {wide: false, deep: true}
 ## 启动命令
 
 ```bash
-python -m gerbil_train.cli.wide_and_deep_train --config configs/4-wide_and_deep/experiment.yaml
+python -m gerbil_train.cli.4-wide_and_deep_train --config configs/4-wide_and_deep/experiment.yaml
 ```
 
 ## 参考

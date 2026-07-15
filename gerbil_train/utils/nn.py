@@ -1,14 +1,9 @@
 """Neural network construction helpers."""
 
 from __future__ import annotations
-
-from typing import Sequence
-
-import torch
 from torch import nn
 
-
-__all__ = ["print_model_structure", "count_parameters"]
+__all__ = ["print_model_structure", "count_parameters", "count_buffers"]
 
 
 def _format_size(num_bytes: float) -> str:
@@ -62,6 +57,7 @@ def print_model_structure(model: nn.Module) -> None:
 
 
 def count_parameters(model: nn.Module) -> None:
+    """可训练参数"""
     rows: list[tuple[str, str, str, int, float]] = []
     total_all = sum(p.numel() for p in model.parameters()) or 1
     for module_name, module in model.named_modules():
@@ -105,4 +101,48 @@ def count_parameters(model: nn.Module) -> None:
             print(f"  {label:>{pad}s}  {val:>{cw['params']},}")
         else:
             print(f"  {label:>{pad}s}  {val:>{cw['params']}s}")
+    print()
+
+
+def count_buffers(model: nn.Module) -> None:
+    """buffers缓冲区变量
+
+    model.state_dict() 里面同时包含：
+    - parameters(可训练参数: weight/bias)
+    - buffers(缓冲区变量: running_mean, running_var, num_batches_tracked 等)
+    """
+    rows: list[tuple[str, str, str, int, float]] = []
+    total_all = sum(b.numel() for b in model.buffers()) or 1
+    for module_name, module in model.named_modules():
+        if module_name == "":
+            continue
+        count = sum(b.numel() for b in module.buffers(recurse=False))
+        if count == 0:
+            continue
+        name = getattr(module, "field_name", _strip_compile_prefix(module_name))
+        shapes = ", ".join(str(tuple(b.shape)) for b in module.buffers(recurse=False))
+        rows.append((name, type(module).__name__, shapes, count, count / total_all * 100))
+
+    rows.sort(key=lambda r: r[3], reverse=True)
+    fmt_name = max(len(r[0]) for r in rows) if rows else 5
+    col_w = {"name": max(7, fmt_name), "type": 18, "shape": 30, "params": 10, "pct": 6}
+    cw = col_w
+
+    head = f"  {'Buffer':<{cw['name']}s} {'Type':<{cw['type']}s} {'Shape':<{cw['shape']}s} {'Size':>{cw['params']}s}  {'%':>{cw['pct']}s}"
+    lines = [f"  {n:<{cw['name']}s} {t:<{cw['type']}s} {s:<{cw['shape']}s} {c:>{cw['params']},}  {p:>{cw['pct'] - 1}.1f}%" for n, t, s, c, p in rows]
+    width = max(len(l) for l in [head] + lines) + 2 if lines else len(head) + 2
+    sep = "  " + "─" * (width - 2)
+    print(f"\n{'=' * width}")
+    print(f"  Buffer Distribution")
+    print(f"{'=' * width}")
+    print(head)
+    print(sep)
+    for line in lines:
+        print(line)
+
+    buffer_bytes = sum(b.numel() * b.element_size() for b in model.buffers())
+    pad = width - 2 - cw["params"] - 2
+    print(sep)
+    print(f"  {'Total':>{pad}s}  {total_all:>{cw['params']},}")
+    print(f"  {'Total size':>{pad}s}  {_format_size(buffer_bytes):>{cw['params']}s}")
     print()

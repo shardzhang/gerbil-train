@@ -73,8 +73,11 @@ class BST(BaseModel):
         self.pos_embedding = nn.Embedding(num_embeddings=500, embedding_dim=self.emb_size)
 
         transformer_layer = nn.TransformerEncoderLayer(
-            d_model=self.emb_size, nhead=num_heads, dim_feedforward=ffn_hidden,
-            dropout=dropout, batch_first=True,
+            d_model=self.emb_size, 
+            nhead=num_heads, 
+            dim_feedforward=ffn_hidden,
+            dropout=dropout, 
+            batch_first=True,
         )
         self.transformer = nn.TransformerEncoder(transformer_layer, num_layers=num_layers)
 
@@ -142,10 +145,10 @@ class BST(BaseModel):
 
         # 3. Behavior sequence
         bf = self.behavior_fields[0]
-        indices = to_device(feature_bags[bf]["indices"].long(), device)
-        offsets = to_device(feature_bags[bf]["offsets"].long(), device)
-        padded_ids, lengths, _ = bag_to_padded(indices, offsets)
-        seq_emb = self.behavior_embeddings[bf](padded_ids)
+        padded_ids, padded_weights, lengths, max_seq_len = bag_to_padded(feature_bags[bf], device)
+        seq_emb = self.behavior_embeddings[bf](padded_ids) * padded_weights.unsqueeze(-1)
+        weight_sum = padded_weights.sum(dim=-1, keepdim=True).clamp(min=1e-8).unsqueeze(-1)
+        seq_emb = seq_emb / weight_sum
 
         # 4. Append target to sequence
         B, T, d = seq_emb.shape

@@ -70,8 +70,11 @@ class BERT4Rec(BaseModel):
         self.pos_embedding = nn.Embedding(500, self.emb_size)
 
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.emb_size, nhead=num_heads, dim_feedforward=ffn_hidden,
-            dropout=dropout, batch_first=True,
+            d_model=self.emb_size, 
+            nhead=num_heads, 
+            dim_feedforward=ffn_hidden,
+            dropout=dropout, 
+            batch_first=True,
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
@@ -112,34 +115,38 @@ class BERT4Rec(BaseModel):
 
         # 1. Plain field embeddings
         plain_embs: list[Tensor] = []
-        for fn in self.field_names:
-            entry = self.fields_cfg[fn]
+        for field_name in self.field_names:
+            entry = self.fields_cfg[field_name]
             emb = embed_one_field(
                 self.field_embedding_bags[str(entry.field_index)],
-                feature_bags[fn]["indices"], feature_bags[fn]["offsets"],
-                feature_bags[fn]["weights"], device=device,
+                feature_bags[field_name]["indices"], 
+                feature_bags[field_name]["offsets"],
+                feature_bags[field_name]["weights"], 
+                device=device,
             )
             plain_embs.append(emb)
         plain_concat = torch.cat(plain_embs, dim=-1) if plain_embs else torch.zeros(batch_size, 0, device=device)
 
         # 2. Target embeddings
         target_embs: list[Tensor] = []
-        for tf in self.target_fields:
-            entry = self.fields_cfg[tf]
+        for field_name in self.target_fields:
+            entry = self.fields_cfg[field_name]
             emb = embed_one_field(
                 self.target_embedding_bags[str(entry.field_index)],
-                feature_bags[tf]["indices"], feature_bags[tf]["offsets"],
-                feature_bags[tf]["weights"], device=device,
+                feature_bags[field_name]["indices"], 
+                feature_bags[field_name]["offsets"],
+                feature_bags[field_name]["weights"], 
+                device=device,
             )
             target_embs.append(emb)
         target_concat = torch.cat(target_embs, dim=-1) if target_embs else torch.zeros(batch_size, 0, device=device)
 
         # 3. Behavior sequence
         bf = self.behavior_fields[0]
-        indices = to_device(feature_bags[bf]["indices"].long(), device)
-        offsets = to_device(feature_bags[bf]["offsets"].long(), device)
-        padded_ids, lengths, _ = bag_to_padded(indices, offsets)
-        seq_emb = self.behavior_embeddings[bf](padded_ids)
+        padded_ids, padded_weights, lengths, max_seq_len = bag_to_padded(feature_bags[bf], device)
+        seq_emb = self.behavior_embeddings[bf](padded_ids) * padded_weights.unsqueeze(-1)
+        weight_sum = padded_weights.sum(dim=-1, keepdim=True).clamp(min=1e-8).unsqueeze(-1)
+        seq_emb = seq_emb / weight_sum
 
         B, T, d = seq_emb.shape
 

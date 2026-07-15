@@ -306,14 +306,13 @@ class DIEN(BaseModel):
             emb_dim = int(entry.emb_size)
             ie_hidden = self.interest_extractors[bf].gru.hidden_size
 
-            indices = to_device(feature_bags[bf]["indices"].long(), device)
-            offsets = to_device(feature_bags[bf]["offsets"].long(), device)
-
             # (a) Convert flat EmbeddingBag format to padded sequence
-            padded_ids, lengths, max_seq_len = bag_to_padded(indices, offsets)
+            padded_ids, padded_weights, lengths, max_seq_len = bag_to_padded(feature_bags[bf], device)
 
-            # (b) Embedding lookup
-            seq_emb = self.behavior_embedding_bags[bf](padded_ids)   # [batch, seq_len, emb_dim]
+            # (b) Embedding lookup (weighted average)
+            seq_emb = self.behavior_embedding_bags[bf](padded_ids) * padded_weights.unsqueeze(-1)   # [batch, seq_len, emb_dim]
+            weight_sum = padded_weights.sum(dim=-1, keepdim=True).clamp(min=1e-8).unsqueeze(-1)
+            seq_emb = seq_emb / weight_sum
 
             # (c) Interest Extractor: GRU over behavior sequence
             all_hidden = self.interest_extractors[bf](seq_emb, lengths)  # [batch, seq_len, ie_hidden]

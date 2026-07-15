@@ -86,7 +86,15 @@ class WideAndDeep(BaseModel):
 
         # Deep network
         mlp_cfg = model_cfg.mlp
-        self.input_bn = nn.BatchNorm1d(self.deep_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
+        # 由于使用bn, 不管对所有field concat后的整体input_emb做bn, 亦或独立对各个field自己emb做bn再进行concat, 效果相同
+        self.input_bn = nn.BatchNorm1d(
+            num_features=self.deep_sum_dim,
+            eps=1e-5,
+            momentum=0.1,
+            affine=True,
+            track_running_stats=True,
+            bias=True
+        ) if mlp_cfg.get("input_batch_norm", False) else None
 
         hidden_dims = list(mlp_cfg.get("hidden_dims", [128, 64]))
         self.deep_network = FullyConnectedLayer(
@@ -102,10 +110,12 @@ class WideAndDeep(BaseModel):
         self.bias = nn.Parameter(torch.zeros(1))
         self.reset_parameters()
 
+
     @staticmethod
     def _validate_fields(model_cfg: WideAndDeepModelConfig) -> None:
         if not model_cfg.embedding_fields:
             raise ValueError("embedding_fields must be a non-empty mapping")
+
 
     def reset_parameters(self) -> None:
         """initialize model parameters"""
@@ -117,6 +127,7 @@ class WideAndDeep(BaseModel):
             nn.init.xavier_uniform_(emb.weight)
         for emb in self.feature_embedding_bags.values():
             nn.init.xavier_uniform_(emb.weight)
+
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
         """Forward pass of the Wide and Deep model.
@@ -133,6 +144,7 @@ class WideAndDeep(BaseModel):
         for field_name, entry in self.wide_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
+            # [batch_size, 1]
             linear_emb = embed_one_field(
                 self.linear_embedding_bags[str(entry.field_index)],
                 feature_bags[field_name]["indices"],
@@ -141,6 +153,8 @@ class WideAndDeep(BaseModel):
                 device=device,
             )
             linear_sum = linear_sum + linear_emb.squeeze(-1)
+        # Note. logit饱和问题
+        linear_logit = linear_sum / max(len(self.wide_fields), 1)
 
         # 2. Deep term: high-order non-linear interactions via MLP
         #    Deep = MLP(concat(\mathbf{e}_1, ..., \mathbf{e}_n))
@@ -162,11 +176,14 @@ class WideAndDeep(BaseModel):
                 raise ValueError(f"Unsupported field_type={entry.field_type} concat_type={entry.concat_type}")
             deep_emb_list.append(feature_emb)
 
+        # [batch_size, deep_sum_dim]
         deep_input = torch.cat(deep_emb_list, dim=-1)
         if self.input_bn is not None:
             deep_input = self.input_bn(deep_input)
+        # [batch_size, hidden_dims[-1]]
         hidden = self.deep_network(deep_input)
+        # [batch_size, ]
         deep_logit = self.deep_head(hidden).squeeze(-1)
-
-        logits = linear_sum + self.bias + deep_logit
+        # [batch_size, ]
+        logits = linear_logit + self.bias + deep_logit
         return torch.sigmoid(logits)

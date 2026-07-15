@@ -95,7 +95,7 @@ class DeepFM(BaseModel):
         self.fm_embedding_bags = nn.ModuleDict()
         for field_name, entry in self.fm_fields.items():
             key = str(entry.field_index)
-            bag = self.deep_embedding_bags[key]
+            bag = self.deep_embedding_bags[key] # shared feature embeddings
             bag.field_name = f"{field_name}_fm"
             self.fm_embedding_bags[key] = bag
 
@@ -147,6 +147,7 @@ class DeepFM(BaseModel):
         linear_sum = torch.zeros(batch_size, device=device)
         for field_name, entry in self.wide_fields.items():
             if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
+                # [batch_size, 1]
                 linear_emb = embed_one_field(
                     self.linear_embedding_bags[str(entry.field_index)],
                     feature_bags[field_name]["indices"],
@@ -155,7 +156,8 @@ class DeepFM(BaseModel):
                     device=device,
                 )
                 linear_sum = linear_sum + linear_emb.squeeze(-1)
-        linear_logit = linear_sum / max(len(self.wide_field_names), 1)
+        # [batch_size, ]
+        linear_logit = linear_sum / max(len(self.wide_fields), 1)
 
         # 2. FM second-order term: pair-wise feature interactions
         # FM = 0.5 * ((Σ v)² - Σ(v²)) = Σ_{i<j} ⟨v_i, v_j⟩
@@ -175,10 +177,14 @@ class DeepFM(BaseModel):
             fm_input_emb = torch.cat(fm_emb_list, dim=-1)
             if self.fm_input_bn is not None:
                 fm_input_emb = self.fm_input_bn(fm_input_emb)
+            # [batch_size, len(self.fm_fields), emb_size]
             stacked = fm_input_emb.view(batch_size, len(self.fm_fields), -1)
-            summed = stacked.sum(dim=1)
-            sum_of_squares = (stacked * stacked).sum(dim=1)
-            fm_logits = 0.5 * (summed * summed - sum_of_squares).sum(dim=1) / len(self.fm_fields)
+            # [batch_size, emb_size]
+            square_of_summed = stacked.sum(dim=1) * stacked.sum(dim=1)
+            # [batch_size, emb_size]
+            sum_of_squared = (stacked * stacked).sum(dim=1)
+            # [batch_size, ]
+            fm_logits = 0.5 * (square_of_summed - sum_of_squared).sum(dim=1) / len(self.fm_fields)
         else:
             fm_logits = torch.zeros(batch_size, device=device)
 
@@ -188,6 +194,7 @@ class DeepFM(BaseModel):
         for field_name, entry in self.deep_fields.items():
             cat_emb = entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb")
             if cat_emb:
+                # [batch_size, emb_size]
                 feature_emb = embed_one_field(
                     self.deep_embedding_bags[str(entry.field_index)],
                     feature_bags[field_name]["indices"],
@@ -196,15 +203,19 @@ class DeepFM(BaseModel):
                     device=device,
                 )
             elif entry.field_type == 0 and entry.concat_type == "direct":
+                # [batch_size, dim]
                 feature_emb = feature_bags[field_name]["weights"].view(-1, int(entry.dim))
             else:
                 raise ValueError(f"Unsupported field_type={entry.field_type} concat_type={entry.concat_type}")
             deep_emb_list.append(feature_emb)
 
+        # [batch_size, deep_sum_dim]
         deep_input_emb = torch.cat(deep_emb_list, dim=-1)
         if self.deep_input_bn is not None:
             deep_input_emb = self.deep_input_bn(deep_input_emb)
+        # [batch_size, ]
         deep_logit = self.deep_head(self.deep_network(deep_input_emb)).squeeze(-1)
 
+        # [batch_size, ]
         logits = linear_logit + fm_logits + deep_logit
         return torch.sigmoid(logits)

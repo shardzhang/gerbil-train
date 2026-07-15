@@ -49,8 +49,7 @@ item_emb = model.item_encoder(item_features)
 ## 启动命令
 
 ```bash
-python -m gerbil_train.cli.shared_bottom_two_tower_train \
-  --config configs/99-sbtt/experiment.yaml
+python -m gerbil_train.cli.99-shared_bottom_two_tower_train --config configs/99-sbtt/sbtt_ml1m_v1.yaml
 ```
 
 ## 参考

@@ -189,21 +189,24 @@ class DSIN(BaseModel):
 
         # 3. Behavior sequence → sessions
         bf = self.behavior_fields[0]
-        indices = to_device(feature_bags[bf]["indices"].long(), device)
-        offsets = to_device(feature_bags[bf]["offsets"].long(), device)
-        padded_ids, lengths, _ = bag_to_padded(indices, offsets)
+        padded_ids, padded_weights, lengths, max_seq_len = bag_to_padded(feature_bags[bf], device)
         # padded_ids: [B, total_seq_len]
 
         # Split into sessions: [B, num_sessions, session_len]
         total_needed = self.num_sessions * self.session_len
         if padded_ids.size(1) < total_needed:
             padded_ids = F.pad(padded_ids, (0, total_needed - padded_ids.size(1)))
+            padded_weights = F.pad(padded_weights, (0, total_needed - padded_weights.size(1)))
         else:
             padded_ids = padded_ids[:, :total_needed]
+            padded_weights = padded_weights[:, :total_needed]
         session_ids = padded_ids.view(batch_size, self.num_sessions, self.session_len)
+        session_weights = padded_weights.view(batch_size, self.num_sessions, self.session_len)
 
         # Embed sessions: [B, num_sessions, session_len, emb_dim]
-        session_emb = self.behavior_embeddings[bf](session_ids)
+        session_emb = self.behavior_embeddings[bf](session_ids) * session_weights.unsqueeze(-1)
+        weight_sum = session_weights.sum(dim=-1, keepdim=True).clamp(min=1e-8).unsqueeze(-1)
+        session_emb = session_emb / weight_sum
 
         # Bias encoding
         session_emb = self.bias_encoding(session_emb)

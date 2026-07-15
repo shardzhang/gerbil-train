@@ -275,8 +275,8 @@ attention:
 
 ```bash
 # Binary
-python3 -m gerbil_train.cli.gwen_binary_train --config configs/experiment/gwen_ml1m_binary.yaml
+python -m gerbil_train.cli.2-gwen_binary_train --config configs/2-gwen_ml1m_binary/experiment.yaml
 
 # Multi-class
-python3 -m gerbil_train.cli.gwen_multiclass_train --config configs/experiment/gwen_ml1m_multiclass.yaml
+python -m gerbil_train.cli.2-gwen_multiclass_train --config configs/2-gwen_ml1m_multiclass/experiment.yaml
 ```

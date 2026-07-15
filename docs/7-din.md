@@ -249,7 +249,7 @@ mlp:
 ## 启动命令
 
 ```bash
-python3 -m gerbil_train.cli.din_train --config configs/4-din_train/experiment.yaml
+python -m gerbil_train.cli.7-din_train --config configs/7-din/experiment.yaml
 ```
 
 ## 前提条件

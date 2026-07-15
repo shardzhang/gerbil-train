@@ -131,8 +131,7 @@ field_attention:
 ## Launch
 
 ```bash
-python -m gerbil_train.cli.5-xdeepfm_train \
-  --config configs/5-xdeepfm/experiment.yaml
+python -m gerbil_train.cli.5-xdeepfm_train --config configs/5-xdeepfm/experiment.yaml
 ```
 
 ## Key Differences from DeepFM

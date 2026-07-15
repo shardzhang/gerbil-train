@@ -44,7 +44,7 @@ mlp:   # FM 不使用 MLP，此配置项仅占位
 ## 启动命令
 
 ```bash
-python -m gerbil_train.cli.fm_train --config configs/1-fm/experiment.yaml
+python -m gerbil_train.cli.1-fm_train --config configs/1-fm/experiment.yaml
 ```
 
 ## 前提条件

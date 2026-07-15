@@ -15,7 +15,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 from torch.utils.data import DataLoader
 
-from gerbil_train.utils.nn import count_parameters, print_model_structure
+from gerbil_train.utils.nn import count_parameters, count_buffers, print_model_structure
 from gerbil_train.utils.seed import set_seed
 from gerbil_train.metrics.classification import auc
 from gerbil_train.data.tfrecord_dataset import collect_tfrecord_part_files, count_tfrecord_records
@@ -200,6 +200,7 @@ class BaseTrainer:
             self.log_message(f"verbose: {self.verbose}")
             print_model_structure(self.model)
             count_parameters(self.model)
+            count_buffers(self.model)
 
         if self.best_checkpoint_path is not None:
             self.log_message(f"Setting best checkpoint path to {self.best_checkpoint_path}")
@@ -320,11 +321,8 @@ class BaseTrainer:
     def scheduler_step(self, step: int) -> None:
         """Step-level learning rate scheduling via ``_scheduler_cfg.type``.
 
-        - ``warmup_exp_decay``: linear warmup + exponential decay
-        - ``warmup_cos_decay``: linear warmup + cosine decay
-
-        - exp decay: 起始下降快，后期趋平，适合快速收敛到最优区域
-        - cos decay: 平滑下降，无突变，在 Transformer 和推荐模型中更常用
+        - ``warmup_exp_decay``: linear warmup + exponential decay(起始下降快，后期趋平，适合快速收敛到最优区域)
+        - ``warmup_cos_decay``: linear warmup + cosine decay(平滑下降，无突变，在 Transformer 和推荐模型中更常用)
         :param step: Current global step (0-indexed)
         """
         cfg = getattr(self, "_scheduler_cfg", None)
@@ -344,8 +342,8 @@ class BaseTrainer:
 
         # Phase 2: decay after warmup
         if cfg.type == "warmup_exp_decay":
-            if cfg.decay_rate < 0:
-                lr = self._initial_lr * math.exp(cfg.decay_rate * (step + 1 - warmup) / max(warmup, 1))
+            assert cfg.decay_rate <= 0, "decay_rate must be negative for exp decay"
+            lr = self._initial_lr * math.exp(cfg.decay_rate * (step + 1 - warmup) / max(warmup, 1))
         elif cfg.type == "warmup_cos_decay":
             total = max(cfg.total_steps, warmup + 1)
             progress = (step - warmup) / (total - warmup)
@@ -397,7 +395,7 @@ class BaseTrainer:
         checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         checkpoint = {
             "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),    # 优化器状态: Adam/SGD等动量, 一阶 / 二阶矩, 学习率调度器状态
             "best_metric": self.best_metric,
             "wait": self.wait,
             "current_epoch": self.current_epoch,

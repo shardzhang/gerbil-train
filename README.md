@@ -33,9 +33,10 @@
 | **SIM** | Sequential | GSU (top-K retrieval) + ESU (multi-head cross-attention). Long sequences. | [Pi 2020](https://doi.org/10.1145/3340531.3412744) |
 | **MIND** | Sequential | Dynamic routing (CapsNet) extracts K interest capsules. Label-aware attention selects relevant interest. | [Li 2019](https://doi.org/10.1145/3357384.3357814) |
 | **BST** | Sequential | Transformer encoder (self-attention) captures pairwise item-item interactions. | [Chen 2019](https://doi.org/10.1145/3326937.3341261) |
+| **ETA** | Sequential | LSH-constrained target attention. Hash matching reduces complexity for long sequences. | [Li 2021](https://doi.org/10.1145/3459637.3482270) |
 | **SDIM** | Sequential | Probabilistic semantic mask via Gumbel-Sigmoid. Filters irrelevant behavior items. | [Fan 2022](https://doi.org/10.1145/3511808.3557082) |
-| **BERT4Rec** | Sequential | Cloze-task (masked language model) for sequential recommendation. | [Sun 2019](https://doi.org/10.1145/3357384.3357895) |
 | **SASRec** | Sequential | Causal (left-to-right) Transformer. Interest from last behavior only. | [Kang 2018](https://arxiv.org/abs/1808.09781) |
+| **BERT4Rec** | Sequential | [CLS] token + bidirectional Transformer. No causal mask. | [Sun 2019](https://doi.org/10.1145/3357384.3357895) |
 | **Two-Tower** | Retrieval | Two-stage training (implicit pre-train + explicit fine-tune). | [Yi 2019](https://doi.org/10.1145/3298689.3346996) |
 | **Learning-to-Rank** | Ranking | Feed-forward network with configurable ranking losses. | [Burges 2005](https://doi.org/10.1145/1102351.1102363) |
 
