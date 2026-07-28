@@ -130,7 +130,7 @@ FTRL 适合：
 ## 启动命令
 
 ```bash
-python -m gerbil_train.cli.1-ftrl_train --config configs/1-ftrl/experiment.yaml
+python -m gerbil_train.cli.1-lr_train --config configs/1-lr/experiment.yaml
 ```
 
 

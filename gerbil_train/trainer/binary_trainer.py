@@ -89,10 +89,11 @@ class BinaryClassificationTrainer(BaseTrainer):
 
     def _create_optimizer(self, model: nn.Module, optimizer_cfg: Any) -> optim.Optimizer:
         """Create optimizer. Override in subclasses (e.g. FTRL) for different optimizers."""
-        return torch.optim.Adam(
+
+        return torch.optim.AdamW(
             model.parameters(),
-            lr=float(optimizer_cfg.lr or 1e-3),
-            weight_decay=float(optimizer_cfg.weight_decay or 0.0),
+            lr=optimizer_cfg.lr,
+            weight_decay=optimizer_cfg.weight_decay,
         )
 
 

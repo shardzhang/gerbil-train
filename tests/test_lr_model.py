@@ -5,11 +5,11 @@ import unittest
 import torch
 
 from gerbil_train.config.model_config import BaseModelConfig, FieldEntry
-from gerbil_train.models.ftrl import FTRLModel
+from gerbil_train.models.lr import LR
 
 
 class FTRLModelTests(unittest.TestCase):
-    """Unit tests for the FTRL model."""
+    """Unit tests for the LR model."""
 
     def _make_config(self) -> BaseModelConfig:
         fields = {
@@ -40,13 +40,13 @@ class FTRLModelTests(unittest.TestCase):
 
     def test_forward_shape(self) -> None:
         """Forward returns sigmoid of shape [batch_size]."""
-        model = FTRLModel(self._make_config())
+        model = LR(self._make_config())
         out = model(self._make_bags()["feature_bags"])
         self.assertEqual(tuple(out.shape), (2,))
 
     def test_sigmoid_range(self) -> None:
         """Sigmoid output is in [0, 1]."""
-        model = FTRLModel(self._make_config())
+        model = LR(self._make_config())
         out = model(self._make_bags()["feature_bags"])
         self.assertTrue(torch.all(out >= 0.0).item())
         self.assertTrue(torch.all(out <= 1.0).item())
@@ -54,7 +54,7 @@ class FTRLModelTests(unittest.TestCase):
     def test_ftrl_optimizer_step(self) -> None:
         """FTRL optimizer can take a step without error."""
         from gerbil_train.optimizers.ftrl import FTRL
-        model = FTRLModel(self._make_config())
+        model = LR(self._make_config())
         opt = FTRL(model.parameters(), alpha=0.1, beta=1.0, lambda1=0.5, lambda2=0.5)
         out = model(self._make_bags()["feature_bags"])
         loss = (out - torch.ones_like(out)).pow(2).mean()

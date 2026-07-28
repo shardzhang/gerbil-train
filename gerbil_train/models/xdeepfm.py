@@ -79,7 +79,6 @@ class xDeepFM(BaseModel):
             if e.field_type == 1 or (e.field_type == 0 and e.concat_type == "emb")
         }
 
-        self._validate_fields(model_cfg)
 
         self.deep_field_names = list(self.deep_fields.keys())
         self.cin_field_names = list(self.cin_fields.keys())
@@ -147,6 +146,7 @@ class xDeepFM(BaseModel):
         )
         deep_output_dim = hidden_dims[-1] if hidden_dims else self.deep_sum_dim
         self.deep_head = nn.Linear(deep_output_dim, 1)
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
     def _validate_fields(self, model_cfg: DeepFMModelConfig) -> None:

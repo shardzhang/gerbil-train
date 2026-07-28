@@ -31,7 +31,6 @@ class WideAndDeep(BaseModel):
     """
     def __init__(self, model_cfg: WideAndDeepModelConfig) -> None:
         super().__init__()
-        self._validate_fields(model_cfg)
 
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.field_names = list(self.embedding_fields.keys())
@@ -108,6 +107,7 @@ class WideAndDeep(BaseModel):
         deep_output_dim = hidden_dims[-1] if hidden_dims else self.deep_sum_dim
         self.deep_head = nn.Linear(deep_output_dim, 1)
         self.bias = nn.Parameter(torch.zeros(1))
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
 

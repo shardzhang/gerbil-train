@@ -16,10 +16,10 @@ compile:
 
 optimizer:
   type: ftrl
-  lr: 0.1
-  beta: 1.0
-  lambda1: 1.0
-  lambda2: 1.0
+  lr: 0.1         # 或 "adam"
+  beta: 1.0       # FTRL
+  lambda1: 1.0    # FTRL 
+  lambda2: 1.0    # FTRL
 
 scheduler:
   warmup_steps: 0

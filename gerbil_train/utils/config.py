@@ -53,7 +53,7 @@ def load_experiment_config(experiment_path: str | Path) -> dict[str, Any]:
         "model": model,
         "train": train,
     }
-    for key in ("eval", "export"):
+    for key in ("eval", "export", "slim"):
         if key in experiment:
-            config[key] = load_yaml(_resolve(experiment[key]))
+            config[key] = load_yaml(_resolve(experiment[key])) if isinstance(experiment[key], str) else experiment[key]
     return config

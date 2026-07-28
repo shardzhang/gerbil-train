@@ -23,7 +23,6 @@ class GwENBaseModel(BaseModel):
         super().__init__()
         
         self.fields_entry: Mapping[str, FieldEntry] = config.embedding_fields
-        self._validate_fields(config)
         
         # task can be "binary" or "multiclass"
         self.task = task
@@ -89,6 +88,7 @@ class GwENBaseModel(BaseModel):
             self.head = nn.Linear(final_hidden_dim, self.target_size)
         else:
             raise ValueError(f"Unsupported task: {task}")
+        self._validate_fields(config)
         self.reset_parameters()
 
 

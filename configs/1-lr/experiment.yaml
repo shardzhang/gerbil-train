@@ -1,0 +1,6 @@
+name: lr_ml1m
+description: Logistic Regression (LR) model on MovieLens 1M TFRecord samples.
+
+data: 0-data/ml1m_binary_tfrecord.yaml
+model: 1-lr/model.yaml
+train: 1-lr/trainer.yaml

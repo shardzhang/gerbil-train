@@ -112,9 +112,9 @@ class MultiClassClassificationTrainer(BaseTrainer):
             if self.loss_cfg.type in ("nce", "sampled_softmax"):
                 hidden = self.model.encode(batch["feature_bags"])
                 if self.loss_cfg.type == "nce":
-                    loss = nce_loss(hidden, self.model.head.weight, batch["targets"].long(), num_sampled=self.loss_cfg.num_sampled)
+                    loss = nce_loss(hidden, self.model.head.weight, batch["targets"].long(), num_sampled=self.loss_cfg.num_neg)
                 elif self.loss_cfg.type == "sampled_softmax":
-                    loss = sampled_softmax_loss(hidden, self.model.head.weight, batch["targets"].long(), num_sampled=self.loss_cfg.num_sampled, class_bias=self.model.head.bias)
+                    loss = sampled_softmax_loss(hidden, self.model.head.weight, batch["targets"].long(), num_sampled=self.loss_cfg.num_neg, class_bias=self.model.head.bias)
                 else:
                     raise NotImplementedError(f"Loss type {self.loss_cfg.type} not implemented")
             elif self.loss_cfg.type == "ce":

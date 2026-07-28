@@ -104,7 +104,6 @@ class DIEN(BaseModel):
 
     def __init__(self, model_cfg: DIENModelConfig) -> None:
         super().__init__()
-        self._validate_fields(model_cfg)
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.item_num = model_cfg.target_size
 
@@ -219,6 +218,7 @@ class DIEN(BaseModel):
         )
         final_hidden_dim = hidden_dims[-1] if hidden_dims else self.embedding_sum_dim
         self.head = nn.Linear(final_hidden_dim, 1)
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
     def _validate_fields(self, model_cfg: DIENModelConfig) -> None:

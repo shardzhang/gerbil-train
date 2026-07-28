@@ -21,11 +21,11 @@ from gerbil_train.models.wide_and_deep import WideAndDeep
 from gerbil_train.models.din import DIN
 from gerbil_train.models.dien import DIEN
 from gerbil_train.models.youtube_dnn import YouTubeDNN
-from gerbil_train.models.ftrl import FTRLModel
+from gerbil_train.models.lr import LR
 from gerbil_train.trainer.binary_trainer import BinaryClassificationTrainer
 from gerbil_train.trainer.multi_trainer import MultiClassClassificationTrainer
 from gerbil_train.trainer.dien_trainer import DIENTrainer
-from gerbil_train.trainer.ftrl_trainer import FTRLTrainer
+from gerbil_train.trainer.lr_trainer import FTRLTrainer
 
 
 class CliModelInstantiationTests(unittest.TestCase):
@@ -123,7 +123,7 @@ class CliModelInstantiationTests(unittest.TestCase):
     def test_ftrl_smoke(self) -> None:
         fields = {"uid": self._make_field("uid", 1), "iid": self._make_field("iid", 2)}
         cfg = BaseModelConfig(target_size=0, embedding_fields=fields)
-        model = FTRLModel(cfg)
+        model = LR(cfg)
         out = model(self._make_feature_bags(["uid", "iid"]))
         self.assertEqual(out.shape, (2,))
 
@@ -184,7 +184,7 @@ class TrainerInitSmokeTests(unittest.TestCase):
         self.assertEqual(t.model_name, "DIEN")
 
     def test_ftrl_trainer_init(self) -> None:
-        model = FTRLModel(self._minimal_model_cfg())
+        model = LR(self._minimal_model_cfg())
         t = FTRLTrainer(model, self._minimal_train_cfg())
         self.assertEqual(t.model_name, "FTRL")
 

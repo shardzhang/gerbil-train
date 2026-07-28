@@ -32,7 +32,6 @@ class YouTubeDNN(BaseModel):
 
     def __init__(self, model_cfg: YouTubeDNNModelConfig) -> None:
         super().__init__()
-        self._validate_fields(model_cfg)
 
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.field_names = list(self.embedding_fields.keys())
@@ -88,6 +87,7 @@ class YouTubeDNN(BaseModel):
         final_hidden_dim = hidden_dims[-1] if hidden_dims else self.embedding_sum_dim
         # head.weight = item_embedding_matrix (no bias for ANN serving)
         self.head = nn.Linear(final_hidden_dim, int(model_cfg.target_size), bias=self.head_bias)
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
     def _validate_fields(self, model_cfg: YouTubeDNNModelConfig) -> None:

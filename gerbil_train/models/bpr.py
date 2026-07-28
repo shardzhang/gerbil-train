@@ -31,7 +31,6 @@ class BPR(BaseModel):
     def __init__(self, model_cfg: BaseModelConfig) -> None:
         super().__init__()
 
-        self._validate_fields(model_cfg)
 
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
@@ -57,6 +56,7 @@ class BPR(BaseModel):
             mode="sum",
         )
 
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
 

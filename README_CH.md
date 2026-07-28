@@ -126,7 +126,7 @@ python -m gerbil_train.cli.6-dcn_train           --config configs/6-dcn/experime
 python -m gerbil_train.cli.6-dcnv2_train         --config configs/6-dcnv2/experiment.yaml
 python -m gerbil_train.cli.5-xdeepfm_train       --config configs/5-xdeepfm/experiment.yaml
 python -m gerbil_train.cli.4-wide_and_deep_train --config configs/4-wide_and_deep/experiment.yaml
-python -m gerbil_train.cli.1-ftrl_train          --config configs/1-ftrl/experiment.yaml
+python -m gerbil_train.cli.1-lr_train          --config configs/1-lr/experiment.yaml
 
 # 序列模型
 python -m gerbil_train.cli.7-din_train           --config configs/7-din/experiment.yaml

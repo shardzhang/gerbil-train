@@ -99,8 +99,8 @@ Multi-class models support three losses interchangeable via a single config line
 
 ```yaml
 loss:
-  type: ce                      # ce | nce | sampled_softmax
-  num_sampled: 100
+  type: ce                      # ce | nce | sampled_softmax | bpr
+  num_neg: 5                    # negative samples per positive
 ```
 
 ### 6. FTRL Optimizer
@@ -172,7 +172,7 @@ python -m gerbil_train.cli.6-autoint_train       --config configs/6-autoint/expe
 python -m gerbil_train.cli.6-fibinet_train       --config configs/6-fibinet/experiment.yaml
 python -m gerbil_train.cli.6-dcn_train           --config configs/6-dcn/experiment.yaml
 python -m gerbil_train.cli.6-dcnv2_train         --config configs/6-dcnv2/experiment.yaml
-python -m gerbil_train.cli.1-ftrl_train         --config configs/1-ftrl/experiment.yaml
+python -m gerbil_train.cli.1-lr_train         --config configs/1-lr/experiment.yaml
 
 # Sequential Models
 python -m gerbil_train.cli.7-din_train          --config configs/7-din/experiment.yaml
@@ -244,7 +244,7 @@ gerbil_train/
 │   ├── gwen_binary_trainer.py / gwen_multiclass_trainer.py
 │   ├── din_trainer.py / dien_trainer.py
 │   ├── deepfm_trainer.py / fm_trainer.py / xdeepfm_trainer.py
-│   ├── wide_and_deep_trainer.py / ftrl_trainer.py
+│   ├── wide_and_deep_trainer.py / lr_trainer.py
 │   ├── youtube_dnn_trainer.py
 │   ├── shared_bottom_two_tower_trainer.py
 │   └── learning_to_rank_trainer.py

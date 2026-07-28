@@ -157,7 +157,6 @@ class Node2Vec(BaseModel):
 
     def __init__(self, model_cfg: BaseModelConfig) -> None:
         super().__init__()
-        self._validate_fields(model_cfg)
 
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
@@ -169,6 +168,7 @@ class Node2Vec(BaseModel):
         # Same Skip-gram architecture as Word2Vec
         self.target_embedding = nn.Embedding(self.vocab_size, self.emb_size)
         self.context_embedding = nn.Embedding(self.vocab_size, self.emb_size)
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:

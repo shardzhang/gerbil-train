@@ -1,4 +1,4 @@
-"""Train an FTRL linear model on TFRecord samples."""
+"""Train LR (FTRL-linear) model on TFRecord samples."""
 
 
 from __future__ import annotations
@@ -14,11 +14,12 @@ from gerbil_train.utils.run import close_exp_log, create_run_dir, save_run_confi
 from gerbil_train.utils.training import build_dataloaders, build_model_config
 from gerbil_train.config.model_config import BaseModelConfig
 from gerbil_train.config.train_config import TrainConfig
-from gerbil_train.models.ftrl import FTRLModel
-from gerbil_train.trainer.ftrl_trainer import FTRLTrainer
+from gerbil_train.models.lr import LR
+from gerbil_train.trainer.binary_trainer import BinaryClassificationTrainer
+from gerbil_train.trainer.lr_trainer import FTRLTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-CONFIG_PATH = PROJECT_ROOT / "configs/1-ftrl/experiment.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs/1-lr/experiment.yaml"
 
 
 def main() -> None:
@@ -37,9 +38,12 @@ def main() -> None:
     print(f"Loading TFRecords from {data_cfg['paths']['tfrecord_root']}")
 
     train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg)
-    model = FTRLModel(model_cfg)
-    # FTRL is designed for online learning; torch.compile not applicable
-    trainer = FTRLTrainer(model, train_cfg, data_cfg)
+    model = LR(model_cfg)
+    if train_cfg.optimizer.type == "ftrl":
+        # FTRL is designed for online learning; torch.compile not applicable
+        trainer = FTRLTrainer(model, train_cfg, data_cfg)
+    else:
+        trainer = BinaryClassificationTrainer(model, train_cfg, data_cfg)
     trainer.fit(train_loader, validation_loader, test_loader)
 
     if test_loader is not None:
@@ -52,4 +56,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
-# python3 -m gerbil_train.cli.1-ftrl_train --config configs/1-ftrl/experiment.yaml
+# python3 -m gerbil_train.cli.1-lr_train --config configs/1-lr/experiment.yaml

@@ -35,7 +35,6 @@ class NCF(BaseModel):
     def __init__(self, model_cfg: BaseModelConfig) -> None:
         super().__init__()
 
-        self._validate_fields(model_cfg)
 
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.field_names = list(self.embedding_fields.keys())
@@ -118,6 +117,7 @@ class NCF(BaseModel):
         fusion_dim = self.emb_size + mlp_hidden[-1] + plain_dim
         self.fusion_head = nn.Linear(fusion_dim, 1, bias=False)
 
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:

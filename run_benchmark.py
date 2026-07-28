@@ -42,7 +42,7 @@ MODELS: list[dict] = [
     # ---- Classic CTR (Feature Interaction) ----
     {"name": "fm",           "family": "ctr",       "task": "binary", "cli": "gerbil_train.cli.1-fm_train",           "config": "configs/1-fm/experiment.yaml",            "monitor": "val_auc"},
     {"name": "ffm",          "family": "ctr",       "task": "binary", "cli": "gerbil_train.cli.1-ffm_train",          "config": "configs/1-ffm/experiment.yaml",           "monitor": "val_auc"},
-    {"name": "ftrl",         "family": "ctr",       "task": "binary", "cli": "gerbil_train.cli.1-ftrl_train",         "config": "configs/1-ftrl/experiment.yaml",          "monitor": "val_auc"},
+    {"name": "ftrl",         "family": "ctr",       "task": "binary", "cli": "gerbil_train.cli.1-lr_train",         "config": "configs/1-lr/experiment.yaml",          "monitor": "val_auc"},
     {"name": "afm",          "family": "ctr",       "task": "binary", "cli": "gerbil_train.cli.3-afm_train",          "config": "configs/3-afm/experiment.yaml",           "monitor": "val_auc"},
     {"name": "ncf",          "family": "ctr",       "task": "binary", "cli": "gerbil_train.cli.3-ncf_train",          "config": "configs/3-ncf/experiment.yaml",           "monitor": "val_auc"},
     {"name": "nfm",          "family": "ctr",       "task": "binary", "cli": "gerbil_train.cli.3-nfm_train",          "config": "configs/3-nfm/experiment.yaml",           "monitor": "val_auc"},

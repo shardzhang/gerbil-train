@@ -18,7 +18,7 @@ class MVDNNTrainer(BinaryClassificationTrainer):
     def __init__(self, model: nn.Module, train_cfg: TrainConfig, data_cfg: dict[str, Any] | None = None) -> None:
         super().__init__(model, train_cfg, data_cfg)
         self.model_name = "MV-DNN"
-        self.num_neg = int(train_cfg.optimizer.bpr_num_neg)
+        self.num_neg = int(train_cfg.loss.num_neg)
         self.item_vocab = int(model.fields_cfg[model.item_field].dim)
 
     def forward_step(self, batch: dict[str, Any]) -> dict[str, torch.Tensor]:

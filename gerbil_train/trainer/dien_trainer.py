@@ -21,7 +21,7 @@ class DIENTrainer(BinaryClassificationTrainer):
     def __init__(self, model: DIEN, train_cfg: TrainConfig, data_cfg: dict[str, Any] | None = None) -> None:
         super().__init__(model, train_cfg, data_cfg)
         self.model_name = "DIEN"
-        self.aux_weight = float(getattr(getattr(train_cfg, "loss", None), "num_sampled", 1.0))
+        self.aux_weight = float(getattr(getattr(train_cfg, "loss", None), "num_neg", 1.0))
 
     def compute_total_loss(self, outputs: torch.Tensor, batch: dict[str, Any]) -> torch.Tensor:
         """Compute BCE + auxiliary GRU prediction loss."""

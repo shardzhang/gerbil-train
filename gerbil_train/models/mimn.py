@@ -75,7 +75,6 @@ class MIMN(BaseModel):
 
     def __init__(self, model_cfg: DIENModelConfig) -> None:
         super().__init__()
-        self._validate_fields(model_cfg)
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
         self.behavior_fields = model_cfg.behavior_fields
@@ -155,6 +154,7 @@ class MIMN(BaseModel):
 
         self.interest_dim = lstm_hidden * 2
         self.target_proj = nn.Linear(self.emb_size, self.interest_dim, bias=False) if self.emb_size != self.interest_dim else nn.Identity()
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
     def _validate_fields(self, model_cfg: DIENModelConfig) -> None:

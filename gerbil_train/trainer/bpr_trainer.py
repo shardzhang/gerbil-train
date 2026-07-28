@@ -25,7 +25,7 @@ class BPRTrainer(BinaryClassificationTrainer):
 
         self.model_name = "BPR"
         self.model = model
-        self.num_neg = int(train_cfg.optimizer.bpr_num_neg)
+        self.num_neg = int(train_cfg.loss.num_neg)
         self.item_vocab = int(model.fields_cfg[model.item_field].dim)
 
 

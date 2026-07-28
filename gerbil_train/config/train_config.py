@@ -19,7 +19,11 @@ class TrainOptimizerConfig:
     type: str = "adam"
     lr: float = 0.001
     weight_decay: float = 0.0
-    bpr_num_neg: int = 5
+@dataclass
+class FTRLOptimizerConfig(TrainOptimizerConfig):
+    beta: float = 1.0
+    lambda1: float = 1.0
+    lambda2: float = 1.0
 
 
 @dataclass
@@ -59,8 +63,8 @@ class TrainLoggingConfig:
 
 @dataclass
 class TrainLossConfig:
-    type: str = "ce"           # "ce" (cross-entropy) or "nce" (sampled softmax)
-    num_sampled: int = 100     # negative samples per batch (only for nce)
+    type: str = "ce"           # "ce" (cross-entropy) or "nce" (Noise Contrastive Estimation) or "sampled_softmax"
+    num_neg: int = 5           # negative samples per positive (nce / sampled_softmax / bpr)
 
 
 @dataclass
@@ -94,12 +98,18 @@ class TrainConfig:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "TrainConfig":
+        optimizer_dict = d.get("optimizer", {})
+        if optimizer_dict.get("type") == "ftrl":
+            optimizer = FTRLOptimizerConfig(**optimizer_dict)
+        else:
+            optimizer = TrainOptimizerConfig(**optimizer_dict)
+
         return cls(
             seed=int(d.get("seed", 42)),
             device=str(d.get("device", "cpu")),
             epochs=int(d.get("epochs", 1)),
             data=TrainDataConfig(**d.get("data", {})),
-            optimizer=TrainOptimizerConfig(**d.get("optimizer", {})),
+            optimizer=optimizer,
             scheduler=TrainSchedulerConfig(**d.get("scheduler", {})),
             checkpoint=TrainCheckpointConfig(**d.get("checkpoint", {})),
             early_stop=TrainEarlyStopConfig(**d.get("early_stop", {})),

@@ -43,7 +43,6 @@ class DeepFM(BaseModel):
             if e.field_type == 1 or (e.field_type == 0 and e.concat_type == "emb")
         }
 
-        self._validate_fields(model_cfg)
 
         self.deep_field_names = list(self.deep_fields.keys())
         self.fm_field_names = list(self.fm_fields.keys())
@@ -120,6 +119,7 @@ class DeepFM(BaseModel):
         self.deep_head = nn.Linear(deep_output_dim, 1)
 
         self.bias = nn.Parameter(torch.zeros(1))
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
 

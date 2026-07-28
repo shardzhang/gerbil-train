@@ -1,8 +1,6 @@
 task: binary
 embedding:
   default_emb_size: 4
-  fm_fields: []
-  deep_fields: []
   fields:
     user_id:
       field_index: 1

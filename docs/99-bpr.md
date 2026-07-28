@@ -41,8 +41,9 @@ mlp:
   user_field: user_id
   item_field: movie_id
 
-optimizer:
-  bpr_num_neg: 5  # negatives per positive
+loss:
+  type: bpr
+  num_neg: 5  # negatives per positive
 ```
 
 ## Launch

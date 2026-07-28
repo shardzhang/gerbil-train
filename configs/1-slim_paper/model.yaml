@@ -1,0 +1,16 @@
+task: binary
+embedding:
+  default_emb_size: 8
+  fields:
+    user_id:
+      field_index: 1
+      field_type: 1
+      dim: 5393
+      emb_size: 8
+      enabled: true
+    movie_id:
+      field_index: 101
+      field_type: 1
+      dim: 3705
+      emb_size: 8
+      enabled: true

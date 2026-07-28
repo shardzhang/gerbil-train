@@ -50,8 +50,8 @@ class SLIM(BaseModel):
             mode="sum",
         )
         self.bias = nn.Parameter(torch.zeros(1))
-        self.reset_parameters()
         self._validate_fields(model_cfg)
+        self.reset_parameters()
         
 
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:

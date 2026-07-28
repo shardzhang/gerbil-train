@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from torch import nn
 
-from gerbil_train.config.train_config import TrainConfig
+from gerbil_train.config.train_config import FTRLOptimizerConfig, TrainConfig
 from gerbil_train.trainer.binary_trainer import BinaryClassificationTrainer
 from gerbil_train.optimizers.ftrl import FTRL
 
@@ -20,11 +18,11 @@ class FTRLTrainer(BinaryClassificationTrainer):
         super().__init__(model, train_cfg, data_cfg)
         self.model_name = "FTRL"
 
-    def _create_optimizer(self, model: nn.Module, cfg: Any) -> FTRL:
+    def _create_optimizer(self, model: nn.Module, cfg: FTRLOptimizerConfig) -> FTRL:
         return FTRL(
             model.parameters(),
-            alpha=float(getattr(cfg, "lr", 0.1)),
-            beta=float(getattr(cfg, "beta", 1.0)),
-            lambda1=float(getattr(cfg, "lambda1", 1.0)),
-            lambda2=float(getattr(cfg, "lambda2", 1.0)),
+            alpha=float(cfg.lr),
+            beta=float(cfg.beta),
+            lambda1=float(cfg.lambda1),
+            lambda2=float(cfg.lambda2),
         )

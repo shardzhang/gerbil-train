@@ -39,7 +39,6 @@ class GateNet(BaseModel):
 
     def __init__(self, model_cfg: BaseModelConfig) -> None:
         super().__init__()
-        self._validate_fields(model_cfg)
 
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.field_names = list(self.embedding_fields.keys())
@@ -119,6 +118,7 @@ class GateNet(BaseModel):
         for _ in range(num_tasks):
             self.heads.append(nn.Linear(tower_hidden[-1], 1))
 
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:

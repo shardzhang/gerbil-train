@@ -80,7 +80,6 @@ class AutoInt(BaseModel):
 
     def __init__(self, model_cfg: AutoIntModelConfig) -> None:
         super().__init__()
-        self._validate_fields(model_cfg)
 
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.field_names = list(self.embedding_fields.keys())
@@ -137,6 +136,7 @@ class AutoInt(BaseModel):
         final_dim = hidden_dims[-1] if hidden_dims else n_emb * self.emb_size
         self.head = nn.Linear(final_dim, 1)
         self.bias = nn.Parameter(torch.zeros(1))
+        self._validate_fields(model_cfg)
         self.reset_parameters()
 
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:

@@ -14,11 +14,14 @@ compile:
   enabled: false
   mode: default
 
+loss:
+  type: bpr
+  num_neg: 5
+
 optimizer:
   type: adam
   lr: 0.001
   weight_decay: 0.00001
-  bpr_num_neg: 5
 
 scheduler:
   warmup_steps: 0

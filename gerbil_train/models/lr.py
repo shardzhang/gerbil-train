@@ -16,11 +16,11 @@ from gerbil_train.config.model_config import BaseModelConfig, FieldEntry
 from gerbil_train.utils.embedding import embed_one_field
 from gerbil_train.models.base_model import BaseModel
 
-__all__ = ["FTRLModel"]
+__all__ = ["LR"]
 
 
-class FTRLModel(BaseModel):
-    """FTRL linear model with per-field EmbeddingBag(vocab → 1).
+class LR(BaseModel):
+    """Logistic Regression (FTRL-linear) model with per-field EmbeddingBag(vocab → 1).
 
     Forward: sum of all field embeddings + bias → sigmoid.
 
@@ -29,11 +29,9 @@ class FTRLModel(BaseModel):
 
     def __init__(self, model_cfg: BaseModelConfig) -> None:
         super().__init__()
-        self._validate_fields(model_cfg)
 
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.field_names = list(self.embedding_fields.keys())
-
         self.linear_embeddings = nn.ModuleDict()
         for field_name, entry in self.embedding_fields.items():
             key = str(entry.field_index)
@@ -47,19 +45,17 @@ class FTRLModel(BaseModel):
                 self.linear_embeddings[key] = bag
 
         self.bias = nn.Parameter(torch.zeros(1))
+        self._validate_fields(model_cfg)
         self.reset_parameters()
-
 
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:
         if not model_cfg.embedding_fields:
             raise ValueError("embedding_fields must be a non-empty mapping")
 
-
     def reset_parameters(self) -> None:
         nn.init.zeros_(self.bias)
         for emb in self.linear_embeddings.values():
             nn.init.zeros_(emb.weight)
-
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
         first_offsets = feature_bags[self.field_names[0]]["offsets"]

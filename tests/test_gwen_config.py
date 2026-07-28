@@ -90,9 +90,9 @@ class GwENLossConfigTests(unittest.TestCase):
         self.assertEqual(cfg.type, "ce")
 
     def test_nce(self) -> None:
-        cfg = TrainLossConfig(**{"type": "nce", "num_sampled": 50})
+        cfg = TrainLossConfig(**{"type": "nce", "num_neg": 50})
         self.assertEqual(cfg.type, "nce")
-        self.assertEqual(cfg.num_sampled, 50)
+        self.assertEqual(cfg.num_neg, 50)
 
 
 class GwENCompileConfigTests(unittest.TestCase):
@@ -137,7 +137,7 @@ class TrainConfigFromDictTests(unittest.TestCase):
             "data": {"batch_size": 256, "num_workers": 2},
             "optimizer": {"lr": 0.01},
             "checkpoint": {"monitor": "hit@10", "mode": "max"},
-            "loss": {"type": "nce", "num_sampled": 50},
+            "loss": {"type": "nce", "num_neg": 50},
             "compile": {"enabled": True},
         })
         self.assertEqual(cfg.seed, 7)

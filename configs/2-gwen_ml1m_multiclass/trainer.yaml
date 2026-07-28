@@ -14,8 +14,8 @@ compile:
   mode: default
 
 loss:
-  type: nce                      # ce | nce | sampled_softmax
-  num_sampled: 50              # 仅 nce / sampled_softmax 时生效
+  type: nce                      # ce | nce | sampled_softmax | bpr
+  num_neg: 50                  # negative samples per positive
 
 optimizer:
   type: adam
