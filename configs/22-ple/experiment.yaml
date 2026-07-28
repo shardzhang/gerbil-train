@@ -1,6 +1,6 @@
 name: ple_ml1m
 description: PLE (Progressive Layered Extraction) on MovieLens 1M TFRecord samples.
 
-data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/22-ple/model.yaml
-train: configs/22-ple/trainer.yaml
+data: 0-data/ml1m_binary_tfrecord.yaml
+model: 22-ple/model.yaml
+train: 22-ple/trainer.yaml

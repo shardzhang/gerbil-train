@@ -1,6 +1,6 @@
 seed: 42
 device: cpu
-epochs: 5
+epochs: 1
 
 data:
   batch_size: 512
@@ -11,7 +11,7 @@ data:
   shuffle_buffer: 8192
 
 compile:
-  enabled: false
+  enabled: true
   mode: default
 
 optimizer:
@@ -20,7 +20,7 @@ optimizer:
   weight_decay: 0.00001
 
 scheduler:
-  enabled: false
+  type: none
 
 checkpoint:
   monitor: val_gauc

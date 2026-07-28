@@ -57,7 +57,7 @@ def embed_one_field(emb: nn.EmbeddingBag,
     return emb(indices, offsets, per_sample_weights=bag_weight)
 
 
-def bag_to_padded(feature_bag: Mapping[str, Tensor], device: torch.device) -> tuple[Tensor, Tensor, int]:
+def bag_to_padded(feature_bag: Mapping[str, Tensor], device: torch.device) -> tuple[Tensor, Tensor, Tensor, int]:
     """Convert EmbeddingBag flat format to a padded sequence for attention/sequence models.
 
     EmbeddingBag stores variable-length sequences in a flat layout::

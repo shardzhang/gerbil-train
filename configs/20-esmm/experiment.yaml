@@ -1,6 +1,6 @@
 name: esmm_ml1m
 description: ESMM (Entire Space Multi-Task Model) on MovieLens 1M TFRecord samples.
 
-data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/20-esmm/model.yaml
-train: configs/20-esmm/trainer.yaml
+data: 0-data/ml1m_binary_tfrecord.yaml
+model: 20-esmm/model.yaml
+train: 20-esmm/trainer.yaml

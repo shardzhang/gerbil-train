@@ -62,6 +62,11 @@ class BaseModelConfig:
     # dict[field_name, dict[field_index, tuple[mean, std]]]
     field_stats: dict[str, dict[int, tuple[float, float]]] = field(default_factory=dict)
 
+    # Shared config: fields used by SLIM, SIM, DIEN, etc.
+    slim: dict[str, Any] = field(default_factory=dict)
+    behavior_fields: list[str] = field(default_factory=list)
+    target_fields: list[str] = field(default_factory=list)
+
     @classmethod
     def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "BaseModelConfig":
         return cls(
@@ -70,6 +75,9 @@ class BaseModelConfig:
             mlp=dict(model_cfg.get("mlp", {})),
             field_attention=dict(model_cfg.get("field_attention", {})),
             field_stats=dict(model_cfg.get("field_stats", {})),
+            slim=dict(model_cfg.get("slim", {})),
+            behavior_fields=list(model_cfg.get("behavior_fields", [])),
+            target_fields=list(model_cfg.get("target_fields", [])),
         )
 
 

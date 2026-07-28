@@ -1,6 +1,6 @@
 name: sdim_ml1m
 description: SDIM (Semantic Deep Interest Model) on MovieLens 1M TFRecord samples.
 
-data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/15-sdim/model.yaml
-train: configs/15-sdim/trainer.yaml
+data: 0-data/ml1m_binary_tfrecord.yaml
+model: 15-sdim/model.yaml
+train: 15-sdim/trainer.yaml

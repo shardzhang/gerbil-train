@@ -1,6 +1,6 @@
 name: youtube_dnn_ml1m
 description: YouTubeDNN (YouTube Deep Neural Network) on MovieLens 1M multi-class TFRecord samples.
 
-data: configs/0-data/ml1m_multiclass_tfrecord.yaml
-model: configs/2-youtube_dnn/model.yaml
-train: configs/2-youtube_dnn/trainer.yaml
+data: 0-data/ml1m_multiclass_tfrecord.yaml
+model: 2-youtube_dnn/model.yaml
+train: 2-youtube_dnn/trainer.yaml

@@ -1,6 +1,6 @@
 name: din_ml1m
 description: DIN (Deep Interest Network) on MovieLens 1M TFRecord samples.
 
-data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/7-din/model.yaml
-train: configs/7-din/trainer.yaml
+data: 0-data/ml1m_binary_tfrecord.yaml
+model: 7-din/model.yaml
+train: 7-din/trainer.yaml

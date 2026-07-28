@@ -1,6 +1,6 @@
 name: star_ml1m
 description: STAR (Star Topology Adaptive Recommender) on MovieLens 1M TFRecord samples.
 
-data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/6-star/model.yaml
-train: configs/6-star/trainer.yaml
+data: 0-data/ml1m_binary_tfrecord.yaml
+model: 6-star/model.yaml
+train: 6-star/trainer.yaml

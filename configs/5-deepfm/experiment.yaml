@@ -1,6 +1,6 @@
 name: deepfm_ml1m
 description: DeepFM (Deep Factorization Machine with Field Attention) on MovieLens 1M TFRecord samples.
 
-data: configs/0-data/ml1m_binary_tfrecord.yaml
-model: configs/5-deepfm/model.yaml
-train: configs/5-deepfm/trainer.yaml
+data: 0-data/ml1m_binary_tfrecord.yaml
+model: 5-deepfm/model.yaml
+train: 5-deepfm/trainer.yaml
