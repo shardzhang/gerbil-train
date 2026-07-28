@@ -37,16 +37,16 @@ class NCF(BaseModel):
 
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Designate user/item fields from mlp config
         ncf_cfg = dict(model_cfg.mlp)
         self.user_field: str = str(ncf_cfg.pop("user_field", self.field_names[0]))
         self.item_field: str = str(ncf_cfg.pop("item_field", self.field_names[1]))
         self.plain_field_names = [n for n in self.field_names if n not in (self.user_field, self.item_field)]
-        user_entry = self.fields_cfg[self.user_field]
-        item_entry = self.fields_cfg[self.item_field]
+        user_entry = self.embedding_fields[self.user_field]
+        item_entry = self.embedding_fields[self.item_field]
         self.emb_size = int(user_entry.emb_size)
 
         # --- Separate embedding bags ---
@@ -54,7 +54,7 @@ class NCF(BaseModel):
         # Plain (non-user, non-item) field embeddings
         self.plain_embedding_bags = nn.ModuleDict()
         for fn in self.plain_field_names:
-            entry = self.fields_cfg[fn]
+            entry = self.embedding_fields[fn]
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -107,7 +107,7 @@ class NCF(BaseModel):
         # --- Plain features ---
         plain_dim = 0
         for fn in self.plain_field_names:
-            entry = self.fields_cfg[fn]
+            entry = self.embedding_fields[fn]
             if entry.field_type == 0 and entry.concat_type == "direct":
                 plain_dim += int(entry.dim)
             else:
@@ -141,7 +141,7 @@ class NCF(BaseModel):
         # --- Embed all plain fields ---
         plain_embs: list[Tensor] = []
         for fn in self.plain_field_names:
-            entry = self.fields_cfg[fn]
+            entry = self.embedding_fields[fn]
             if entry.field_type == 0 and entry.concat_type == "direct":
                 plain_embs.append(feature_bags[fn]["weights"].view(-1, int(entry.dim)))
             else:

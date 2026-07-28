@@ -32,8 +32,8 @@ class MVDNN(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # User/item fields from config
         mv_cfg: dict[str, Any] = model_cfg.mlp
@@ -49,7 +49,7 @@ class MVDNN(BaseModel):
 
         # Embedding bags (shared by field_index)
         self.embedding_bags = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -64,7 +64,7 @@ class MVDNN(BaseModel):
         def _view_dim(field_names: list[str]) -> int:
             d = 0
             for fn in field_names:
-                entry = self.fields_cfg[fn]
+                entry = self.embedding_fields[fn]
                 if entry.field_type == 0 and entry.concat_type == "direct":
                     d += int(entry.dim)
                 else:
@@ -111,7 +111,7 @@ class MVDNN(BaseModel):
         embs: list[Tensor] = []
         device = next(self.parameters()).device
         for fn in field_names:
-            entry = self.fields_cfg[fn]
+            entry = self.embedding_fields[fn]
             if entry.field_type == 0 and entry.concat_type == "direct":
                 embs.append(feature_bags[fn]["weights"].view(-1, int(entry.dim)).to(device))
             else:

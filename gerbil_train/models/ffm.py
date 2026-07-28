@@ -29,14 +29,14 @@ class FFM(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Only categorical fields (not concat_type="direct") participate in FFM
         self.ffm_field_names = [n for n in self.field_names
-                                if not (self.fields_cfg[n].field_type == 0 and self.fields_cfg[n].concat_type == "direct")]
+                                if not (self.embedding_fields[n].field_type == 0 and self.embedding_fields[n].concat_type == "direct")]
         self.num_fields = len(self.ffm_field_names)
-        self.emb_size = int(self.fields_cfg[self.ffm_field_names[0]].emb_size)
+        self.emb_size = int(self.embedding_fields[self.ffm_field_names[0]].emb_size)
 
         # Field pairs for FFM term (upper triangle)
         self.field_pairs: list[tuple[str, str]] = []
@@ -46,7 +46,7 @@ class FFM(BaseModel):
 
         # Linear embeddings: vocab → 1
         self.linear_embeddings = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -61,8 +61,8 @@ class FFM(BaseModel):
         # Key: f"{field_name_i}→{field_name_j}" for i's embedding when interacting with j
         self.ffm_embeddings = nn.ModuleDict()
         for fi, fj in self.field_pairs:
-            entry_i = self.fields_cfg[fi]
-            entry_j = self.fields_cfg[fj]
+            entry_i = self.embedding_fields[fi]
+            entry_j = self.embedding_fields[fj]
             key_ij = f"{fi}→{fj}"
             key_ji = f"{fj}→{fi}"
             if key_ij not in self.ffm_embeddings:
@@ -80,13 +80,13 @@ class FFM(BaseModel):
 
         # Direct/continuous fields → plain concat
         self.direct_field_names = [n for n in self.field_names
-                                   if self.fields_cfg[n].field_type == 0 and self.fields_cfg[n].concat_type == "direct"]
+                                   if self.embedding_fields[n].field_type == 0 and self.embedding_fields[n].concat_type == "direct"]
 
         self.bias = nn.Parameter(torch.zeros(1))
 
         # Final head: linear(1 + 1 + sum_direct → 1)
         # FFM logit + linear sum + direct features
-        direct_dim = sum(int(self.fields_cfg[n].dim) for n in self.direct_field_names)
+        direct_dim = sum(int(self.embedding_fields[n].dim) for n in self.direct_field_names)
         self.head = nn.Linear(2 + direct_dim, 1)
 
         self.reset_parameters()
@@ -115,7 +115,7 @@ class FFM(BaseModel):
 
         # 1. Linear term: w_0 + Σ w_i · x_i
         linear_sum = self.bias.expand(batch_size).to(device)
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             linear_emb = embed_one_field(
@@ -132,7 +132,7 @@ class FFM(BaseModel):
         #   v_{j,f_i}: field_j's embedding when interacting with field_i
         ffm_logits = torch.zeros(batch_size, device=device)
         for fi, fj in self.field_pairs:
-            entry_i = self.fields_cfg[fi]
+            entry_i = self.embedding_fields[fi]
             v_i_to_j = embed_one_field(
                 self.ffm_embeddings[f"{fi}→{fj}"],
                 feature_bags[fi]["indices"],

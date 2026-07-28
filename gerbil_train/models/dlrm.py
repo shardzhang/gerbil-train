@@ -30,16 +30,16 @@ class DLRM(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Separate sparse (categorical) and dense (continuous) fields
         self.sparse_fields = {
-            n: e for n, e in self.fields_cfg.items()
+            n: e for n, e in self.embedding_fields.items()
             if not (e.field_type == 0 and e.concat_type == "direct")
         }
         self.dense_fields = {
-            n: e for n, e in self.fields_cfg.items()
+            n: e for n, e in self.embedding_fields.items()
             if e.field_type == 0 and e.concat_type == "direct"
         }
         self.num_sparse = len(self.sparse_fields)

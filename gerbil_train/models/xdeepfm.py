@@ -68,11 +68,11 @@ class xDeepFM(BaseModel):
 
     def __init__(self, model_cfg: DeepFMModelConfig) -> None:
         super().__init__()
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
         # Split fields by tower assignment
-        self.wide_fields = {n: e for n, e in self.fields_cfg.items() if e.wide}
-        self.deep_fields = {n: e for n, e in self.fields_cfg.items() if e.deep}
+        self.wide_fields = {n: e for n, e in self.embedding_fields.items() if e.wide}
+        self.deep_fields = {n: e for n, e in self.embedding_fields.items() if e.deep}
         # CIN requires embedding → only categorical/non-direct deep fields
         self.cin_fields = {
             n: e for n, e in self.deep_fields.items()
@@ -170,7 +170,7 @@ class xDeepFM(BaseModel):
             nn.init.xavier_uniform_(emb.weight)
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
-        first_offsets = feature_bags[next(iter(self.fields_cfg.keys()))]["offsets"]
+        first_offsets = feature_bags[next(iter(self.embedding_fields.keys()))]["offsets"]
         batch_size = int(first_offsets.size(0))
         device = next(self.parameters()).device
 

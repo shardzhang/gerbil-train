@@ -31,14 +31,14 @@ class EGES(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # EGES config: item field + side info fields
         eges_cfg: dict[str, Any] = model_cfg.mlp
         self.item_field = str(eges_cfg["item_field"])
         self.side_fields = list(eges_cfg.get("side_fields", []))
-        self.emb_size = int(self.fields_cfg[self.item_field].emb_size)
+        self.emb_size = int(self.embedding_fields[self.item_field].emb_size)
 
         # All other fields are treated as user/plain features
         self.plain_field_names = [n for n in self.field_names
@@ -46,7 +46,7 @@ class EGES(BaseModel):
 
         # Embedding bag for each field (shared by field_index)
         self.embedding_bags = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -63,7 +63,7 @@ class EGES(BaseModel):
         # Side info projection (if emb_size differs)
         self.side_proj = nn.ModuleDict()
         for sf in self.side_fields:
-            side_entry = self.fields_cfg[sf]
+            side_entry = self.embedding_fields[sf]
             if int(side_entry.emb_size) != self.emb_size:
                 self.side_proj[sf] = nn.Linear(int(side_entry.emb_size), self.emb_size, bias=False)
 
@@ -72,12 +72,12 @@ class EGES(BaseModel):
 
         # MLP
         user_dim = sum(
-            int(self.fields_cfg[fn].emb_size) for fn in self.plain_field_names
-            if not (self.fields_cfg[fn].field_type == 0 and self.fields_cfg[fn].concat_type == "direct")
+            int(self.embedding_fields[fn].emb_size) for fn in self.plain_field_names
+            if not (self.embedding_fields[fn].field_type == 0 and self.embedding_fields[fn].concat_type == "direct")
         )
         direct_dim = sum(
-            int(self.fields_cfg[fn].dim) for fn in self.plain_field_names
-            if self.fields_cfg[fn].field_type == 0 and self.fields_cfg[fn].concat_type == "direct"
+            int(self.embedding_fields[fn].dim) for fn in self.plain_field_names
+            if self.embedding_fields[fn].field_type == 0 and self.embedding_fields[fn].concat_type == "direct"
         )
         mlp_input_dim = user_dim + direct_dim + self.emb_size
 
@@ -115,7 +115,7 @@ class EGES(BaseModel):
         source_embs: list[Tensor] = []
 
         # 1. Base item embedding
-        item_entry = self.fields_cfg[self.item_field]
+        item_entry = self.embedding_fields[self.item_field]
         base_emb = embed_one_field(
             self.embedding_bags[str(item_entry.field_index)],
             feature_bags[self.item_field]["indices"],
@@ -127,7 +127,7 @@ class EGES(BaseModel):
 
         # 2. Side info embeddings (with optional dimension projection)
         for sf in self.side_fields:
-            entry = self.fields_cfg[sf]
+            entry = self.embedding_fields[sf]
             side_emb = embed_one_field(
                 self.embedding_bags[str(entry.field_index)],
                 feature_bags[sf]["indices"],
@@ -147,7 +147,7 @@ class EGES(BaseModel):
         # --- User / plain features ---
         plain_embs: list[Tensor] = []
         for fn in self.plain_field_names:
-            entry = self.fields_cfg[fn]
+            entry = self.embedding_fields[fn]
             if entry.field_type == 0 and entry.concat_type == "direct":
                 plain_embs.append(feature_bags[fn]["weights"].view(-1, int(entry.dim)))
             else:

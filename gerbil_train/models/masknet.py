@@ -92,12 +92,12 @@ class MaskNet(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Embedding bags for all non-direct fields
         self.embedding_bags = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -110,19 +110,19 @@ class MaskNet(BaseModel):
 
         # Determine common embedding size (project if needed)
         self.field_names_no_direct = [n for n in self.field_names
-                                      if not (self.fields_cfg[n].field_type == 0 and self.fields_cfg[n].concat_type == "direct")]
+                                      if not (self.embedding_fields[n].field_type == 0 and self.embedding_fields[n].concat_type == "direct")]
         self.num_fields = len(self.field_names_no_direct)
 
         # Use the first categorical field's emb_size as the common size
         if self.field_names_no_direct:
-            self.field_emb_size = int(self.fields_cfg[self.field_names_no_direct[0]].emb_size)
+            self.field_emb_size = int(self.embedding_fields[self.field_names_no_direct[0]].emb_size)
         else:
             self.field_emb_size = 8
 
         # Project all field embeddings to a uniform size
         self.field_proj = nn.ModuleDict()
         for fn in self.field_names_no_direct:
-            entry = self.fields_cfg[fn]
+            entry = self.embedding_fields[fn]
             if int(entry.emb_size) != self.field_emb_size:
                 self.field_proj[fn] = nn.Linear(int(entry.emb_size), self.field_emb_size, bias=False)
 
@@ -134,8 +134,8 @@ class MaskNet(BaseModel):
 
         # Direct-type continuous fields (not processed through mask blocks)
         self.direct_field_names = [n for n in self.field_names
-                                   if self.fields_cfg[n].field_type == 0 and self.fields_cfg[n].concat_type == "direct"]
-        direct_dim = sum(int(self.fields_cfg[n].dim) for n in self.direct_field_names)
+                                   if self.embedding_fields[n].field_type == 0 and self.embedding_fields[n].concat_type == "direct"]
+        direct_dim = sum(int(self.embedding_fields[n].dim) for n in self.direct_field_names)
 
         # Mask blocks (serial)
         concat_dim = self.num_fields * self.field_emb_size
@@ -168,7 +168,7 @@ class MaskNet(BaseModel):
         # Embed each field (skip direct-type fields in mask blocks)
         field_embs: list[Tensor] = []
         for fn in self.field_names_no_direct:
-            entry = self.fields_cfg[fn]
+            entry = self.embedding_fields[fn]
             emb = embed_one_field(
                 self.embedding_bags[str(entry.field_index)],
                 feature_bags[fn]["indices"],
@@ -191,7 +191,7 @@ class MaskNet(BaseModel):
         # Append direct-type features
         direct_feats: list[Tensor] = []
         for fn in self.direct_field_names:
-            direct_feats.append(feature_bags[fn]["weights"].view(-1, int(self.fields_cfg[fn].dim)))
+            direct_feats.append(feature_bags[fn]["weights"].view(-1, int(self.embedding_fields[fn].dim)))
         if direct_feats:
             x = torch.cat([x] + direct_feats, dim=-1)
 

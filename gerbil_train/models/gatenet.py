@@ -41,12 +41,12 @@ class GateNet(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Embedding bags
         self.embedding_bags = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -59,7 +59,7 @@ class GateNet(BaseModel):
 
         # Per-field gates
         self.field_gates = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 raw_dim = int(entry.dim)
                 self.field_gates[field_name] = _FieldGate(raw_dim)
@@ -69,7 +69,7 @@ class GateNet(BaseModel):
         # Input dimension after gating
         self.input_dim = sum(
             int(e.dim if (e.field_type == 0 and e.concat_type == "direct") else e.emb_size)
-            for fn, e in self.fields_cfg.items()
+            for fn, e in self.embedding_fields.items()
         )
 
         # GateNet config
@@ -139,7 +139,7 @@ class GateNet(BaseModel):
 
         # Gate each field, then concat
         gated_list: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 feat = feature_bags[field_name]["weights"].view(-1, int(entry.dim))
             else:

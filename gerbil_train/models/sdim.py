@@ -73,17 +73,17 @@ class SDIM(BaseModel):
     def __init__(self, model_cfg: DIENModelConfig) -> None:
         super().__init__()
         self._validate_fields(model_cfg)
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
         self.behavior_fields = model_cfg.behavior_fields
         self.target_fields = model_cfg.target_fields
         reserved = set(self.behavior_fields) | set(self.target_fields)
-        self.field_names = [n for n in self.fields_cfg if n not in reserved]
-        self.emb_size = int(self.fields_cfg[self.behavior_fields[0]].emb_size)
+        self.field_names = [n for n in self.embedding_fields if n not in reserved]
+        self.emb_size = int(self.embedding_fields[self.behavior_fields[0]].emb_size)
 
         self.target_embedding_bags = nn.ModuleDict()
         for f_name in self.target_fields:
-            entry = self.fields_cfg[f_name]
+            entry = self.embedding_fields[f_name]
             key = str(entry.field_index)
             if key not in self.target_embedding_bags:
                 self.target_embedding_bags[key] = nn.EmbeddingBag(
@@ -92,14 +92,14 @@ class SDIM(BaseModel):
 
         self.behavior_embeddings = nn.ModuleDict()
         for bf in self.behavior_fields:
-            entry = self.fields_cfg[bf]
+            entry = self.embedding_fields[bf]
             self.behavior_embeddings[bf] = nn.Embedding(
                 num_embeddings=int(entry.dim) + 1, embedding_dim=int(entry.emb_size), padding_idx=int(entry.dim),
             )
 
         self.field_embedding_bags = nn.ModuleDict()
         for field_name in self.field_names:
-            entry = self.fields_cfg[field_name]
+            entry = self.embedding_fields[field_name]
             key = str(entry.field_index)
             if key not in self.field_embedding_bags:
                 self.field_embedding_bags[key] = nn.EmbeddingBag(
@@ -113,8 +113,8 @@ class SDIM(BaseModel):
 
         self.semantic_mask = SemanticMask(self.emb_size, hidden_dims=mask_hidden)
 
-        plain_dim = sum(int(self.fields_cfg[fn].emb_size) for fn in self.field_names)
-        target_dim = sum(int(self.fields_cfg[tf].emb_size) for tf in self.target_fields)
+        plain_dim = sum(int(self.embedding_fields[fn].emb_size) for fn in self.field_names)
+        target_dim = sum(int(self.embedding_fields[tf].emb_size) for tf in self.target_fields)
         mlp_input_dim = plain_dim + target_dim + self.emb_size
 
         mlp_cfg: dict[str, Any] = model_cfg.mlp
@@ -149,7 +149,7 @@ class SDIM(BaseModel):
 
         plain_embs: list[Tensor] = []
         for fn in self.field_names:
-            entry = self.fields_cfg[fn]
+            entry = self.embedding_fields[fn]
             emb = embed_one_field(
                 self.field_embedding_bags[str(entry.field_index)],
                 feature_bags[fn]["indices"], feature_bags[fn]["offsets"],
@@ -160,7 +160,7 @@ class SDIM(BaseModel):
 
         target_embs: list[Tensor] = []
         for tf in self.target_fields:
-            entry = self.fields_cfg[tf]
+            entry = self.embedding_fields[tf]
             emb = embed_one_field(
                 self.target_embedding_bags[str(entry.field_index)],
                 feature_bags[tf]["indices"], feature_bags[tf]["offsets"],

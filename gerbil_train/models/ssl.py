@@ -31,12 +31,12 @@ class SSLModel(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
         ssl_cfg: dict[str, Any] = model_cfg.mlp
         self.item_field = str(ssl_cfg["item_field"])
-        self.emb_size = int(self.fields_cfg[self.item_field].emb_size)
-        self.vocab_size = int(self.fields_cfg[self.item_field].dim)
+        self.emb_size = int(self.embedding_fields[self.item_field].emb_size)
+        self.vocab_size = int(self.embedding_fields[self.item_field].dim)
         self.temperature = float(ssl_cfg.get("temperature", 0.5))
         self.mask_ratio = float(ssl_cfg.get("mask_ratio", 0.15))
 

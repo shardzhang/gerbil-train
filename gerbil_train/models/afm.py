@@ -31,17 +31,17 @@ class AFM(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
         self.num_fields = len(self.field_names)
-        self.emb_size = int(next(iter(self.fields_cfg.values())).emb_size)
+        self.emb_size = int(next(iter(self.embedding_fields.values())).emb_size)
 
         # Linear embeddings: vocab → 1
         self.linear_embeddings = nn.ModuleDict()
         # Feature embeddings: vocab → k
         self.afm_embeddings = nn.ModuleDict()
 
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -99,7 +99,7 @@ class AFM(BaseModel):
 
         # 1. Linear term: w_0 + Σ w_i · x_i
         linear_sum = self.bias.expand(batch_size).to(device)
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             linear_emb = embed_one_field(
@@ -113,7 +113,7 @@ class AFM(BaseModel):
 
         # 2. Collect field embeddings (exclude direct fields)
         fm_emb_list: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             feature_emb = embed_one_field(

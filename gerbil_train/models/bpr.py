@@ -33,16 +33,16 @@ class BPR(BaseModel):
 
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
         # Designate user/item fields from mlp config
         bpr_cfg = dict(model_cfg.mlp)
-        self.user_field = str(bpr_cfg.pop("user_field", next(iter(self.fields_cfg))))
-        self.item_field = str(bpr_cfg.pop("item_field", next(iter(self.fields_cfg))))
-        self.emb_size = int(self.fields_cfg[self.user_field].emb_size)
+        self.user_field = str(bpr_cfg.pop("user_field", next(iter(self.embedding_fields))))
+        self.item_field = str(bpr_cfg.pop("item_field", next(iter(self.embedding_fields))))
+        self.emb_size = int(self.embedding_fields[self.user_field].emb_size)
 
         # User embedding bag (single-valued, mode="sum" = direct lookup)
-        user_entry = self.fields_cfg[self.user_field]
+        user_entry = self.embedding_fields[self.user_field]
         self.user_embedding_bag = nn.EmbeddingBag(
             num_embeddings=int(user_entry.dim),
             embedding_dim=int(user_entry.emb_size),
@@ -50,7 +50,7 @@ class BPR(BaseModel):
         )
 
         # Item embedding bag
-        item_entry = self.fields_cfg[self.item_field]
+        item_entry = self.embedding_fields[self.item_field]
         self.item_embedding_bag = nn.EmbeddingBag(
             num_embeddings=int(item_entry.dim),
             embedding_dim=int(item_entry.emb_size),

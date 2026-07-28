@@ -23,7 +23,7 @@ class DIN(BaseModel):
 
         self._validate_fields(model_cfg)
         
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields              
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields              
         self.item_num = model_cfg.target_size
         
         # Whether to use softmax attention
@@ -36,13 +36,13 @@ class DIN(BaseModel):
         self.target_fields: list[str]  = model_cfg.target_fields
         reserved = set(self.behavior_fields) | set(self.target_fields)
         # Plain feature. 其他特征(除去行为序列特征和target特征)
-        self.field_names = [n for n in self.fields_cfg if n not in reserved]
+        self.field_names = [n for n in self.embedding_fields if n not in reserved]
 
         # 1. Target (candidate item) field embeddings. 包括item_id, cate_id, brand_id
         self.target_embedding_dims: dict[str, int] = {}
         self.target_embedding_bags = nn.ModuleDict()
         for f_name in self.target_fields:
-            entry = self.fields_cfg[f_name]
+            entry = self.embedding_fields[f_name]
             self.target_embedding_dims[f_name] = int(entry.emb_size)
             bag = nn.EmbeddingBag(
                 num_embeddings=int(entry.dim),
@@ -58,7 +58,7 @@ class DIN(BaseModel):
         self.behavior_embedding_bags = nn.ModuleDict()
         self.local_activation_units = nn.ModuleDict()
         for f_name in self.behavior_fields:
-            entry = self.fields_cfg[f_name]
+            entry = self.embedding_fields[f_name]
             self.behavior_emb_dims[f_name] = int(entry.emb_size)
             self.behavior_embedding_bags[f_name] = EmbeddingLayer(
                 item_num=int(entry.dim), 
@@ -75,13 +75,13 @@ class DIN(BaseModel):
         # When target_merge="proj": concat targets → Linear project to behavior emb_dim
         if self.target_merge == "proj" and self.target_fields and self.behavior_fields:
             total_target_dim = sum(self.target_embedding_dims.values())
-            proj_dim = int(self.fields_cfg[self.behavior_fields[0]].emb_size)
+            proj_dim = int(self.embedding_fields[self.behavior_fields[0]].emb_size)
             self.target_proj = nn.Linear(total_target_dim, proj_dim)
 
         # 3. Plain feature (non-behavior, non-target) field embeddings
         self.field_embedding_dims: dict[str, int] = {}
         for f_name in self.field_names:
-            entry = self.fields_cfg[f_name]
+            entry = self.embedding_fields[f_name]
             if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
                 self.field_embedding_dims[f_name] = int(entry.emb_size)
             elif entry.field_type == 0 and entry.concat_type == "direct":
@@ -91,7 +91,7 @@ class DIN(BaseModel):
 
         self.field_embedding_bags = nn.ModuleDict()
         for f_name in self.field_names:
-            entry = self.fields_cfg[f_name]
+            entry = self.embedding_fields[f_name]
             if entry.field_type == 0 and entry.concat_type == "direct":
                 print(f"[debug] Field {f_name}(field_type={entry.field_type}), concat_type={entry.concat_type}, skip embedding")
                 continue
@@ -152,7 +152,7 @@ class DIN(BaseModel):
         # Embed plain feature fields
         field_embs: list[Tensor] = []
         for field_name in self.field_names:
-            entry = self.fields_cfg[field_name]
+            entry = self.embedding_fields[field_name]
             if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
                 field_emb = embed_one_field(
                     self.field_embedding_bags[str(entry.field_index)], 
@@ -172,7 +172,7 @@ class DIN(BaseModel):
         target_embs: list[Tensor] = []
         for field_name in self.target_fields:
             target_emb = embed_one_field(
-                self.target_embedding_bags[str(self.fields_cfg[field_name].field_index)],
+                self.target_embedding_bags[str(self.embedding_fields[field_name].field_index)],
                 feature_bags[field_name]["indices"],
                 feature_bags[field_name]["offsets"],
                 feature_bags[field_name]["weights"],

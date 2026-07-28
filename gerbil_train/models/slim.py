@@ -27,12 +27,12 @@ class SLIM(BaseModel):
 
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Linear embeddings: vocab → 1 (one weight per feature value)
         self.linear_embedding_bags = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             key = str(entry.field_index)
             if key not in self.linear_embedding_bags:
                 self.linear_embedding_bags[key] = nn.EmbeddingBag(
@@ -60,7 +60,7 @@ class SLIM(BaseModel):
 
         # Linear term: w_0 + Σ w_i · x_i
         linear_sum = self.bias.expand(batch_size).to(device)
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             linear_emb = embed_one_field(
                 self.linear_embedding_bags[str(entry.field_index)],
                 feature_bags[field_name]["indices"],

@@ -82,8 +82,8 @@ class AutoInt(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
         self.emb_size = int(next(iter(model_cfg.embedding_fields.values())).emb_size)
 
         # Field embeddings (shared for linear + attention)
@@ -91,7 +91,7 @@ class AutoInt(BaseModel):
         # Linear embeddings: vocab → 1
         self.linear_embeddings = nn.ModuleDict()
 
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -123,7 +123,7 @@ class AutoInt(BaseModel):
         ])
 
         # MLP on top of concatenated field outputs
-        n_emb = sum(1 for e in self.fields_cfg.values() if not (e.field_type == 0 and e.concat_type == "direct"))
+        n_emb = sum(1 for e in self.embedding_fields.values() if not (e.field_type == 0 and e.concat_type == "direct"))
         mlp_cfg: dict[str, Any] = model_cfg.mlp
         hidden_dims = list(mlp_cfg["hidden_dims"])
         self.mlp = FullyConnectedLayer(
@@ -164,7 +164,7 @@ class AutoInt(BaseModel):
         # 1. Linear term
         linear_sum = self.bias.expand(batch_size).to(device)
         emb_list: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)

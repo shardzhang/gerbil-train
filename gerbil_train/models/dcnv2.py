@@ -87,11 +87,11 @@ class DCNv2(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         emb_dims = {}
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 emb_dims[field_name] = int(entry.dim)
                 continue
@@ -103,7 +103,7 @@ class DCNv2(BaseModel):
         # Feature embeddings: vocab → k
         self.feature_embeddings = nn.ModuleDict()
 
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -162,7 +162,7 @@ class DCNv2(BaseModel):
 
         linear_sum = self.bias.expand(batch_size).to(device)
         emb_list: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 emb_list.append(feature_bags[field_name]["weights"].view(-1, int(entry.dim)))
                 continue

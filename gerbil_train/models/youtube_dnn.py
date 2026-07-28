@@ -34,15 +34,15 @@ class YouTubeDNN(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
         self.behavior_fields = set(model_cfg.behavior_fields)
         self.example_age_field = model_cfg.example_age_field
         self.head_bias = model_cfg.head_bias
 
         # Compute per-field embedding dimensions
         self.field_embedding_dims: dict[str, int] = {}
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if field_name == self.example_age_field:
                 self.field_embedding_dims[field_name] = 1
             elif entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
@@ -55,7 +55,7 @@ class YouTubeDNN(BaseModel):
 
         # EmbeddingBags for each field
         self.embedding_bags = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if field_name == self.example_age_field:
                 continue
             is_behavior = field_name in self.behavior_fields
@@ -115,7 +115,7 @@ class YouTubeDNN(BaseModel):
         device = next(self.parameters()).device
 
         field_embs: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if field_name == self.example_age_field:
                 ages = feature_bags[field_name]["weights"].view(-1, 1)
                 field_embs.append((ages + 1).log())

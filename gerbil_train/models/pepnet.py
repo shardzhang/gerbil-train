@@ -57,12 +57,12 @@ class PEPNet(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Embedding bags for all fields
         self.embedding_bags = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -75,11 +75,11 @@ class PEPNet(BaseModel):
 
         # Input dimension
         self.input_dim = sum(
-            int(e.emb_size) for fn, e in self.fields_cfg.items()
+            int(e.emb_size) for fn, e in self.embedding_fields.items()
             if not (e.field_type == 0 and e.concat_type == "direct")
         )
         direct_dim = sum(
-            int(e.dim) for fn, e in self.fields_cfg.items()
+            int(e.dim) for fn, e in self.embedding_fields.items()
             if e.field_type == 0 and e.concat_type == "direct"
         )
         self.input_dim += direct_dim
@@ -93,7 +93,7 @@ class PEPNet(BaseModel):
         tower_hidden = list(pep_cfg["tower_hidden"])
         num_tasks = int(pep_cfg["num_tasks"])
         self.task_names = list(pep_cfg.get("task_names", [f"task_{i}" for i in range(num_tasks)]))
-        cond_dim = int(self.fields_cfg[self.domain_field].emb_size)
+        cond_dim = int(self.embedding_fields[self.domain_field].emb_size)
         self.dropout = float(pep_cfg.get("dropout", 0.1))
 
         # EPNet: generates scale & bias for the input
@@ -152,7 +152,7 @@ class PEPNet(BaseModel):
         # Embed all fields
         emb_list: list[Tensor] = []
         domain_emb = None
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 feats = feature_bags[field_name]["weights"].view(-1, int(entry.dim))
             else:

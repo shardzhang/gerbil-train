@@ -29,8 +29,8 @@ class FM(BaseModel):
         
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
         self.num_fields = len(self.field_names)
 
         # Linear embeddings: vocab → 1
@@ -38,7 +38,7 @@ class FM(BaseModel):
         # Feature embeddings: vocab → k (shared by FM)
         self.fm_embedding_bags = nn.ModuleDict()
 
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -84,7 +84,7 @@ class FM(BaseModel):
 
         # 1. Linear term: w_0 + Σ w_i · x_i
         linear_sum = self.bias.expand(batch_size).to(device)
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             linear_emb = embed_one_field(
@@ -99,7 +99,7 @@ class FM(BaseModel):
 
         # 2. FM term: 0.5 * ((Σ v)² - Σ(v²))
         fm_emb_list: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             feature_emb = embed_one_field(

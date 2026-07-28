@@ -33,12 +33,12 @@ class WideAndDeep(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Separate fields by tower assignment
-        self.wide_fields = {n: e for n, e in self.fields_cfg.items() if e.wide}
-        self.deep_fields = {n: e for n, e in self.fields_cfg.items() if e.deep}
+        self.wide_fields = {n: e for n, e in self.embedding_fields.items() if e.wide}
+        self.deep_fields = {n: e for n, e in self.embedding_fields.items() if e.deep}
         self.wide_field_names = list(self.wide_fields.keys())
         self.deep_field_names = list(self.deep_fields.keys())
 
@@ -134,7 +134,7 @@ class WideAndDeep(BaseModel):
         
         :return: Predicted scores for each sample in the batch.
         """ 
-        first_offsets = feature_bags[next(iter(self.fields_cfg.keys()))]["offsets"]
+        first_offsets = feature_bags[next(iter(self.embedding_fields.keys()))]["offsets"]
         batch_size = int(first_offsets.size(0))
         device = next(self.parameters()).device
 

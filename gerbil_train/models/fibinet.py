@@ -77,16 +77,16 @@ class FiBiNet(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
-        self.emb_size = int(next(iter(self.fields_cfg.values())).emb_size)
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
+        self.emb_size = int(next(iter(self.embedding_fields.values())).emb_size)
 
         # Linear embeddings: vocab → 1
         self.linear_embeddings = nn.ModuleDict()
         # Feature embeddings: vocab → k
         self.feature_embeddings = nn.ModuleDict()
 
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -104,7 +104,7 @@ class FiBiNet(BaseModel):
                 )
 
         # Number of fields that participate in interactions
-        n_emb = sum(1 for e in self.fields_cfg.values() if not (e.field_type == 0 and e.concat_type == "direct"))
+        n_emb = sum(1 for e in self.embedding_fields.values() if not (e.field_type == 0 and e.concat_type == "direct"))
 
         # SENET Layer (feature importance)
         fibi_cfg: dict[str, Any] = model_cfg.field_attention
@@ -157,7 +157,7 @@ class FiBiNet(BaseModel):
         # 1. Linear term
         linear_sum = self.bias.expand(batch_size).to(device)
         emb_list: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)

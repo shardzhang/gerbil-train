@@ -105,20 +105,20 @@ class DIEN(BaseModel):
     def __init__(self, model_cfg: DIENModelConfig) -> None:
         super().__init__()
         self._validate_fields(model_cfg)
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         self.item_num = model_cfg.target_size
 
         self.target_merge = model_cfg.target_merge
         self.behavior_fields = model_cfg.behavior_fields
         self.target_fields = model_cfg.target_fields
         reserved = set(self.behavior_fields) | set(self.target_fields)
-        self.plain_field_names = [n for n in self.fields_cfg if n not in reserved]
+        self.plain_field_names = [n for n in self.embedding_fields if n not in reserved]
 
         # 1. Target (candidate item) field embeddings
         self.target_embedding_dims: dict[str, int] = {}
         self.target_embedding_bags = nn.ModuleDict()
         for f_name in self.target_fields:
-            entry = self.fields_cfg[f_name]
+            entry = self.embedding_fields[f_name]
             self.target_embedding_dims[f_name] = int(entry.emb_size)
             key = str(entry.field_index)
             if key not in self.target_embedding_bags:
@@ -142,7 +142,7 @@ class DIEN(BaseModel):
         self.behavior_emb_size: int | None = None
 
         for bf in self.behavior_fields:
-            entry = self.fields_cfg[bf]
+            entry = self.embedding_fields[bf]
             emb_dim = int(entry.emb_size)
             self.behavior_emb_size = emb_dim
             self.behavior_emb_dims[bf] = emb_dim
@@ -182,7 +182,7 @@ class DIEN(BaseModel):
         self.plain_field_embedding_dims: dict[str, int] = {}
         self.plain_field_bags = nn.ModuleDict()
         for field_name in self.plain_field_names:
-            entry = self.fields_cfg[field_name]
+            entry = self.embedding_fields[field_name]
             if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
                 self.plain_field_embedding_dims[field_name] = int(entry.emb_size)
             elif entry.field_type == 0 and entry.concat_type == "direct":
@@ -258,7 +258,7 @@ class DIEN(BaseModel):
         # 1. Plain field embeddings
         plain_embs: list[Tensor] = []
         for field_name in self.plain_field_names:
-            entry = self.fields_cfg[field_name]
+            entry = self.embedding_fields[field_name]
             if entry.field_type == 1 or (entry.field_type == 0 and entry.concat_type == "emb"):
                 emb = embed_one_field(
                     self.plain_field_bags[str(entry.field_index)],
@@ -278,7 +278,7 @@ class DIEN(BaseModel):
         target_embs: list[Tensor] = []
         for field_name in self.target_fields:
             emb = embed_one_field(
-                self.target_embedding_bags[str(self.fields_cfg[field_name].field_index)],
+                self.target_embedding_bags[str(self.embedding_fields[field_name].field_index)],
                 feature_bags[field_name]["indices"],
                 feature_bags[field_name]["offsets"],
                 feature_bags[field_name]["weights"],
@@ -302,7 +302,7 @@ class DIEN(BaseModel):
         aux_logits: dict[str, Tensor] = {}
 
         for bf in self.behavior_fields:
-            entry = self.fields_cfg[bf]
+            entry = self.embedding_fields[bf]
             emb_dim = int(entry.emb_size)
             ie_hidden = self.interest_extractors[bf].gru.hidden_size
 

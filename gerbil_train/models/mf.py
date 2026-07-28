@@ -26,21 +26,21 @@ class MF(BaseModel):
 
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
         mf_cfg = model_cfg.mf
         user_field = mf_cfg.get("user_field", "user_id")
         item_field = mf_cfg.get("item_field", "item_id")
         embedding_dim = int(mf_cfg.get("embedding_dim", 8))
 
-        if user_field not in self.fields_cfg:
+        if user_field not in self.embedding_fields:
             raise ValueError(f"user_field '{user_field}' not found in embedding_fields")
-        if item_field not in self.fields_cfg:
+        if item_field not in self.embedding_fields:
             raise ValueError(f"item_field '{item_field}' not found in embedding_fields")
 
         self.user_field = user_field
         self.item_field = item_field
-        user_entry = self.fields_cfg[user_field]
-        item_entry = self.fields_cfg[item_field]
+        user_entry = self.embedding_fields[user_field]
+        item_entry = self.embedding_fields[item_field]
 
         # User and item embeddings (regular Embedding, not bag)
         self.user_embedding = nn.Embedding(

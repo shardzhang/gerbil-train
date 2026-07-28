@@ -32,12 +32,12 @@ class MMoE(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
-        self.field_names = list(self.fields_cfg.keys())
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.field_names = list(self.embedding_fields.keys())
 
         # Embedding bags for all fields
         self.embedding_bags = nn.ModuleDict()
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 continue
             key = str(entry.field_index)
@@ -50,12 +50,12 @@ class MMoE(BaseModel):
 
         # Compute embedding input dimension
         self.emb_concat_dim = sum(
-            int(e.emb_size) for fn, e in self.fields_cfg.items()
+            int(e.emb_size) for fn, e in self.embedding_fields.items()
             if not (e.field_type == 0 and e.concat_type == "direct")
         )
         # Plus direct field dimensions
         direct_dim = sum(
-            int(e.dim) for fn, e in self.fields_cfg.items()
+            int(e.dim) for fn, e in self.embedding_fields.items()
             if e.field_type == 0 and e.concat_type == "direct"
         )
         self.input_dim = self.emb_concat_dim + direct_dim
@@ -140,7 +140,7 @@ class MMoE(BaseModel):
 
         # Embed all fields and concat
         emb_list: list[Tensor] = []
-        for field_name, entry in self.fields_cfg.items():
+        for field_name, entry in self.embedding_fields.items():
             if entry.field_type == 0 and entry.concat_type == "direct":
                 emb_list.append(feature_bags[field_name]["weights"].view(-1, int(entry.dim)))
             else:

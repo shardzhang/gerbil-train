@@ -159,12 +159,12 @@ class Node2Vec(BaseModel):
         super().__init__()
         self._validate_fields(model_cfg)
 
-        self.fields_cfg: Mapping[str, FieldEntry] = model_cfg.embedding_fields
+        self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
         n2v_cfg: dict[str, Any] = model_cfg.mlp
         self.item_field = str(n2v_cfg["item_field"])
-        self.emb_size = int(self.fields_cfg[self.item_field].emb_size)
-        self.vocab_size = int(self.fields_cfg[self.item_field].dim)
+        self.emb_size = int(self.embedding_fields[self.item_field].emb_size)
+        self.vocab_size = int(self.embedding_fields[self.item_field].dim)
 
         # Same Skip-gram architecture as Word2Vec
         self.target_embedding = nn.Embedding(self.vocab_size, self.emb_size)
