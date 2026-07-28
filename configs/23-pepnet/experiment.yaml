@@ -1,0 +1,6 @@
+name: pepnet_ml1m
+description: PEPNet (Parameter Efficient Personalized Network) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/23-pepnet/model.yaml
+train: configs/23-pepnet/trainer.yaml

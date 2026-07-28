@@ -6,26 +6,26 @@ BST applies **Transformer encoder** to user behavior sequences, where **self-att
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Transformer
-        POS[+ Positional Encoding]
-        TE1[Transformer Layer 1<br/>Multi-Head Self-Attn + FFN]
-        TE2[Transformer Layer 2<br/>Multi-Head Self-Attn + FFN]
-        GATHER[Take target position output]
+    subgraph "Transformer"
+        POS["+ Positional Encoding"]
+        TE1["Transformer Layer 1<br/>Multi-Head Self-Attn + FFN"]
+        TE2["Transformer Layer 2<br/>Multi-Head Self-Attn + FFN"]
+        GATHER["Take target position output"]
     end
-    subgraph Input
-        SEQ[Behavior Seq<br/>B, T, d]
-        TGT[Target<br/>B, 1, d]
-        CONCAT_SEQ[Concat behavior + target]
+    subgraph "Input"
+        SEQ["Behavior Seq<br/>B, T, d"]
+        TGT["Target<br/>B, 1, d"]
+        CONCAT_SEQ["Concat behavior + target"]
     end
-    FB[feature_bags] --> SEQ --> CONCAT_SEQ
+    FB["feature_bags"] --> SEQ --> CONCAT_SEQ
     FB --> TGT --> CONCAT_SEQ
     CONCAT_SEQ --> POS --> TE1 --> TE2 --> GATHER --> CONCAT
     FB --> CONCAT --> MLP_NET --> HEAD --> OUT

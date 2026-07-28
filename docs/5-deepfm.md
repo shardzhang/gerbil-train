@@ -1,74 +1,100 @@
 # DeepFM
 
+## 数学公式
+
+DeepFM = **bias + 一阶线性项 + FM二阶交叉项 + Deep深度MLP项** 四部分相加
+
+DeepFM 将预测：
+
+$$ \hat{y} = \text{bias} + \underbrace{\sum_{i} w_i \cdot e_i^{\text{linear}}}_{\text{一阶线性}} + \underbrace{\frac{1}{2}\sum_{i} \sum_{j \neq i} \langle e_i, e_j \rangle}_{\text{二阶 FM 交互}} + \underbrace{\text{MLP}([e_1, e_2, ..., e_n])}_{\text{Deep 项}} $$
+
+embedding符号区分
+
+- $e_i^\text{linear}$：一阶线性用的是**单独线性/一阶embedding参数**
+- $e_1,e_2...e_n$：二阶FM & Deep分支用**共享的field embedding向量**。DeepFM核心就是**FM分支和Deep分支共享底层embedding**
+
+
+
+或者
+
+
+
+$\hat{y} = b + \sum_i w_i x_i + \frac12\left[\left(\sum_i \boldsymbol{v}_i x_i\right)^2 - \sum_i (\boldsymbol{v}_i x_i)^2\right] + \text{MLP}(\boldsymbol{v}_1 x_1, \boldsymbol{v}_2 x_2, ..., \boldsymbol{v}_n x_n)$
+
+- $b$：全局偏置 bias
+- $\sum w_i x_i$：一阶线性项
+- $x_i$ ：one-hot向量
+- $w_i$：一阶线性用的是单独线性/一阶embedding参数
+- $\boldsymbol{v}_i$：二阶FM & Deep分支共享field embedding向量
+- MLP：深度网络分支
+
+(1) 二阶原始写法是双重循环 $\boldsymbol{\sum_i\sum_{j\neq i}}$，存在冗余计算。原始双重求和写法**数学结果正确**，但不是工程实现写法，会造成 $O(n^2)$ 复杂度，实际DeepFM代码都是用上面化简公式实现
+
+标准FM公式等价化简：$\displaystyle \frac12\sum_i\sum_{j\neq i}\langle e_i,e_j\rangle = \frac12\left[\left(\sum_i e_i\right)^2-\sum_i e_i^2\right]$
+
+
+
+
+
+**一阶线性项：** 每个字段独立做维度为 1 的 EmbeddingBag 求和
+
+$$ y_{linear} = \text{bias} + \sum_{i=1}^{n} \text{EmbeddingBag}_i^{\text{linear}}(indices_i, offsets_i, weights_i) $$
+
+$$ \quad\quad = b + \sum_{i=1}^{n} w_i \cdot e_i^{(1)} \quad e_i^{(1)} \in \mathbb{R} $$
+
+**二阶 FM 交互项：** 所有字段的特征 embedding 做 pairwise dot product
+
+$$ y_{FM} = \frac{1}{2} \sum_{i=1}^{n} \sum_{j=1}^{n} \langle e_i, e_j \rangle $$
+
+$$ \quad\quad = \frac{1}{2} \left[ \big( \sum_{i=1}^{n} e_i \big)^2 - \sum_{i=1}^{n} e_i^2 \right] \quad e_i \in \mathbb{R}^{d} $$
+
+**Deep 项：** 所有字段 embedding 拼接后经过 MLP
+
+$$ y_{deep} = \text{head}(\text{MLP}( [e_1, e_2, ..., e_n] )) $$
+
+
+
+
+
+## 注意事项
+
+可见FM部分是对所有特征域进行两两交叉组合。一共包括N(N-1)/2个内积的累计和，是否发生logit很大问题？
+
 
 
 ## 模型架构
 
-DeepFM 将预测拆为三项的加和：
-
-$$ \hat{y} = \text{bias} + \underbrace{\sum_{i} w_i \cdot e_i^{\text{linear}}}_{\text{一阶线性}} + \underbrace{\frac{1}{2}\sum_{i} \sum_{j \neq i} \langle e_i, e_j \rangle}_{\text{二阶 FM 交互}} + \underbrace{\text{MLP}([e_1, e_2, ..., e_n])}_{\text{Deep 项}} $$
-
-```
-                                   ┌──────────────────────────┐
-                                   │     Output (sigmoid)     │
-                                   └────────────┬─────────────┘
-                                                │
-                          ┌─────────────────────┼─────────────────────┐
-                          │                     │                     │
-                     ┌────┴─────┐          ┌────┴──────┐         ┌───┴─────┐
-                     │1st-order │          │2nd-order  │         │  Deep   │
-                     │ (linear) │          │ FM (pair) │         │ (MLP)   │
-                     └────┬─────┘          └────┬──────┘         └───┬─────┘
-                          │                     │                     │
-                          │       ┌─────────────┼─────────────┐       │
-                          │       │             │             │       │
-                     ┌────┴─────┐ │     ┌───────┴───────┐   │  ┌────┴─────┐
-                     │  Linear  │ │     │   Feature     │   │  │  Concat  │
-                     │Embedding │ │     │  Embedding    │   │  │ all embs │
-                     │Bag(dim=1)│ │     │  Bag(emb_d)   │   │  └──────────┘
-                     └────┬─────┘ │     └───────┬───────┘   │
-                          │       │             │           │
-                          └───────┼─────────────┼───────────┘
-                                  │             │
-                              ┌───┴──────┐  ┌───┴──────┐
-                              │ user_id  │  │ user_id  │
-                              │ item_id  │  │ item_id  │
-                              │ gender   │  │ gender   │
-                              │   ...    │  │   ...    │
-                              └──────────┘  └──────────┘
-```
-
 ```mermaid
 graph TB
-    subgraph Output
+    subgraph "Output"
         OUT["Output<br/>sigmoid"]
     end
 
-    subgraph Fusion
-        ADD[+]
+    subgraph "Fusion"
+        ADD["+"]
     end
 
-    subgraph First_Order
+    subgraph "First_Order"
         L1["LinearEmbeddingBag<br/>dim=1"]
         L2["LinearEmbeddingBag<br/>dim=1"]
         L3["LinearEmbeddingBag<br/>dim=1"]
-        L_SUM[sum]
+        L_SUM["sum"]
     end
 
-    subgraph FM_Second_Order
+    subgraph "FM_Second_Order"
         F1["FeatureEmbeddingBag<br/>dim=emb_dim"]
         F2["FeatureEmbeddingBag<br/>dim=emb_dim"]
         F3["FeatureEmbeddingBag<br/>dim=emb_dim"]
-        FM["FM Interaction<br/>½(Σe² - Σe²)"]
+        FM["FM Interaction<br/>½("(Σe")² - Σ("e²)")"]
     end
 
-    subgraph Deep
-        D_CONCAT[Concat]
+    subgraph "Deep"
+        D_CONCAT["Concat"]
         D_MLP["MLP: 128 → 64"]
-        D_HEAD[Linear Head]
+        D_HEAD["Linear Head"]
     end
 
-    subgraph Input
+    subgraph "Input"
         I1["user_id<br/>indices/offsets/weights"]
         I2["item_id<br/>indices/offsets/weights"]
         I3["gender<br/>indices/offsets/weights"]
@@ -88,7 +114,7 @@ graph TB
     D_CONCAT --> D_MLP --> D_HEAD --> ADD
 
     ADD --> OUT
-    ADD --> BIAS[global bias]
+    BIAS["global bias"] --> ADD
 
     style OUT fill:#4a9,stroke:#333
     style ADD fill:#fc9,stroke:#333
@@ -97,72 +123,25 @@ graph TB
     style D_MLP fill:#9bd,stroke:#333
 ```
 
-### 三项贡献的分解
 
-**一阶线性项：** 每个字段独立做维度为 1 的 EmbeddingBag 求和
 
-$$ y_{linear} = \text{bias} + \sum_{i=1}^{n} \text{EmbeddingBag}_i^{\text{linear}}(indices_i, offsets_i, weights_i) $$
 
-$$ \quad\quad = b + \sum_{i=1}^{n} w_i \cdot e_i^{(1)} \quad e_i^{(1)} \in \mathbb{R} $$
 
-**二阶 FM 交互项：** 所有字段的特征 embedding 做 pairwise dot product
-
-$$ y_{FM} = \frac{1}{2} \sum_{i=1}^{n} \sum_{j=1}^{n} \langle e_i, e_j \rangle $$
-
-$$ \quad\quad = \frac{1}{2} \left[ \big( \sum_{i=1}^{n} e_i \big)^2 - \sum_{i=1}^{n} e_i^2 \right] \quad e_i \in \mathbb{R}^{d} $$
-
-**Deep 项：** 所有字段 embedding 拼接后经过 MLP
-
-$$ y_{deep} = \text{head}(\text{MLP}( [e_1, e_2, ..., e_n] )) $$
-
-### 三项贡献的可视化
+## 数据流程
 
 ```mermaid
 flowchart LR
-    subgraph bias
-        B[scalar bias]
-    end
-    subgraph first_order
-        LO["Linear EmbeddingBag<br/>dim=1 per field"]
-        LS[sum all fields]
-    end
-    subgraph fm
-        FO["Feature EmbeddingBag<br/>dim=emb_dim per field"]
-        F["½ΣΣ⟨eᵢ,eⱼ⟩"]
-    end
-    subgraph deep
-        DC[concat all field embs]
-        DM[MLP]
-        DH[Linear]
-    end
+    T["TFRecord"] --> DS["BinaryTFRecordDataset"]
+    DS --> COL["BatchCollator"]
+    COL --> FB["feature_bags dict"]
+    COL --> TG["targets Tensor"]
 
-    B --> ADD[+]
-    LO --> LS --> ADD
-    FO --> F --> ADD
-    DC --> DM --> DH --> ADD
-    ADD --> ACT[sigmoid]
+    FB --> M["DeepFM"]
+    TG --> LOSS["BCE Loss"]
 
-    style B fill:#eee,stroke:#666
-    style LS fill:#f9d,stroke:#333
-    style F fill:#9df,stroke:#333
-    style DH fill:#9bd,stroke:#333
-```
-
-## 数据处理流程
-
-```mermaid
-flowchart LR
-    T[TFRecord] --> DS[BinaryTFRecordDataset]
-    DS --> COL[BatchCollator]
-    COL --> FB[feature_bags dict]
-    COL --> TG[targets Tensor]
-
-    FB --> M[DeepFM]
-    TG --> LOSS[BCE Loss]
-
-    M --> OUT[sigmoid scores]
+    M --> OUT["sigmoid scores"]
     OUT --> LOSS
-    OUT --> AUC[AUC Evaluation]
+    OUT --> AUC["AUC Evaluation"]
 
     style T fill:#fcd,stroke:#333
     style DS fill:#cfc,stroke:#333
@@ -170,59 +149,7 @@ flowchart LR
     style M fill:#9cf,stroke:#333
 ```
 
-## 前向传播
 
-```python
-logits = bias.expand(batch_size)
-
-for fn in field_names:
-    # 一阶项: LinearEmbeddingBag(dim=1)
-    linear_emb = self.linear_embeddings[fn](indices, offsets, weights)
-    logits += linear_emb.squeeze(-1)
-
-    # Deep 和 FM 共享的 feature embedding
-    feature_emb = self.feature_embeddings[fn](indices, offsets, weights)
-    feature_emb_list.append(feature_emb)
-
-# FM 二阶项
-stacked = stack(feature_emb_list)                          # [B, N, D]
-logits += 0.5 * (stacked.sum(1)² - (stacked²).sum(1)).sum(1)
-
-# Deep 项
-deep_input = concat(feature_emb_list)                      # [B, N×D]
-logits += deep_head(MLP(deep_input))
-
-return sigmoid(logits)
-```
-
-## 与重构前的区别
-
-| 维度 | 重构前 | 重构后 |
-|------|--------|--------|
-| Embedding | `nn.Embedding`（单值） | `nn.EmbeddingBag`（多值，支持多值特征） |
-| 输入格式 | `sparse_features: Tensor[B, N]` | `feature_bags: dict[str, {indices, offsets, weights}]` |
-| 数据源 | MovieLens `.dat` 文件 | TFRecord |
-| 验证指标 | NDCG@K（ranking 负采样） | AUC（pointwise） |
-| 配置格式 | `sparse_fields` | `embedding.fields`（与 GwEN 一致） |
-
-## 配置文件
-
-```yaml
-# configs/model/deepfm.yaml
-task: binary
-embedding:
-  default_emb_size: 16
-  fields: {}
-
-deep:
-  hidden_dims: [128, 64]
-  activation: relu
-  dropout: 0.1
-  batch_norm: false
-
-output:
-  activation: sigmoid
-```
 
 ## 启动命令
 

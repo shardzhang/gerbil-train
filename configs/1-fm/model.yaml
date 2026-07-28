@@ -5,7 +5,7 @@ embedding:
     user_id:
       field_index: 1
       field_type: 1
-      dim: 5393
+      dim: 6041
       emb_size: 8
       enabled: true
     user_age:
@@ -50,105 +50,133 @@ embedding:
       dim: 4
       emb_size: 8
       enabled: true
-    user_movie_rate_cnt:
-      field_index: 10
-      field_type: 1
-      dim: 7
-      emb_size: 8
-      enabled: true
-    user_movie_rate_cnt_7day:
-      field_index: 11
-      field_type: 1
-      dim: 7
-      emb_size: 8
-      enabled: true
-    user_movie_rate_cnt_15day:
-      field_index: 12
-      field_type: 1
-      dim: 7
-      emb_size: 8
-      enabled: true
-    user_movie_rate_cnt_30day:
-      field_index: 13
-      field_type: 1
-      dim: 7
-      emb_size: 8
-      enabled: true
-    user_avg_rate:
-      field_index: 14
-      field_type: 1
-      dim: 4
-      emb_size: 8
-      enabled: true
-    user_avg_rate_7day:
-      field_index: 15
-      field_type: 1
-      dim: 4
-      emb_size: 8
-      enabled: true
-    user_avg_rate_15day:
-      field_index: 16
-      field_type: 1
-      dim: 4
-      emb_size: 8
-      enabled: true
-    user_avg_rate_30day:
-      field_index: 17
-      field_type: 1
-      dim: 4
-      emb_size: 8
-      enabled: true
     user_rate_std_continue:
-      field_index: 18
+      field_index: 10
       field_type: 0
       dim: 2
       concat_type: direct
       emb_size: 8
       enabled: true
     user_rate_std_7day_continue:
-      field_index: 19
+      field_index: 11
       field_type: 0
       dim: 2
       concat_type: direct
       emb_size: 8
       enabled: true
     user_rate_std_15day_continue:
-      field_index: 21
+      field_index: 12
       field_type: 0
       dim: 2
       concat_type: direct
       emb_size: 8
       enabled: true
     user_rate_std_30day_continue:
+      field_index: 13
+      field_type: 0
+      dim: 2
+      concat_type: direct
+      emb_size: 8
+      enabled: true
+    user_rate_avg:
+      field_index: 14
+      field_type: 1
+      dim: 4
+      emb_size: 8
+      enabled: true
+    user_rate_avg_7day:
+      field_index: 15
+      field_type: 1
+      dim: 4
+      emb_size: 8
+      enabled: true
+    user_rate_avg_15day:
+      field_index: 16
+      field_type: 1
+      dim: 4
+      emb_size: 8
+      enabled: true
+    user_rate_avg_30day:
+      field_index: 17
+      field_type: 1
+      dim: 4
+      emb_size: 8
+      enabled: true
+    user_rate_avg_continue:
+      field_index: 18
+      field_type: 0
+      dim: 2
+      concat_type: direct
+      emb_size: 8
+      enabled: true
+    user_rate_avg_7day_continue:
+      field_index: 19
+      field_type: 0
+      dim: 2
+      concat_type: direct
+      emb_size: 8
+      enabled: true
+    user_rate_avg_15day_continue:
+      field_index: 20
+      field_type: 0
+      dim: 2
+      concat_type: direct
+      emb_size: 8
+      enabled: true
+    user_rate_avg_30day_continue:
+      field_index: 21
+      field_type: 0
+      dim: 2
+      concat_type: direct
+      emb_size: 8
+      enabled: true
+    user_movie_rate_cnt:
       field_index: 22
-      field_type: 0
-      dim: 2
-      concat_type: direct
+      field_type: 1
+      dim: 7
       emb_size: 8
       enabled: true
-    user_avg_rate_continue:
+    user_movie_rate_7day_cnt:
       field_index: 23
-      field_type: 0
-      dim: 2
-      concat_type: direct
+      field_type: 1
+      dim: 7
       emb_size: 8
       enabled: true
-    user_avg_rate_7day_continue:
+    user_movie_rate_15day_cnt:
       field_index: 24
-      field_type: 0
-      dim: 2
-      concat_type: direct
+      field_type: 1
+      dim: 7
       emb_size: 8
       enabled: true
-    user_avg_rate_15day_continue:
+    user_movie_rate_30day_cnt:
       field_index: 25
+      field_type: 1
+      dim: 7
+      emb_size: 8
+      enabled: true
+    user_movie_rate_cnt_continue:
+      field_index: 26
       field_type: 0
       dim: 2
       concat_type: direct
       emb_size: 8
       enabled: true
-    user_avg_rate_30day_continue:
-      field_index: 26
+    user_movie_rate_7day_cnt_continue:
+      field_index: 27
+      field_type: 0
+      dim: 2
+      concat_type: direct
+      emb_size: 8
+      enabled: true
+    user_movie_rate_15day_cnt_continue:
+      field_index: 28
+      field_type: 0
+      dim: 2
+      concat_type: direct
+      emb_size: 8
+      enabled: true
+    user_movie_rate_30day_cnt_continue:
+      field_index: 29
       field_type: 0
       dim: 2
       concat_type: direct
@@ -157,16 +185,142 @@ embedding:
     movie_id:
       field_index: 101
       field_type: 1
-      dim: 3579
+      dim: 3705
+      emb_size: 8
+      enabled: true
+    user_movie_rate_id_15days:
+      field_index: 101
+      field_type: 1
+      dim: 3705
+      emb_size: 8
+      enabled: true
+    user_movie_rate_id_1days:
+      field_index: 101
+      field_type: 1
+      dim: 3705
+      emb_size: 8
+      enabled: true
+    user_movie_rate_id_3days:
+      field_index: 101
+      field_type: 1
+      dim: 3705
+      emb_size: 8
+      enabled: true
+    user_movie_rate_id_7days:
+      field_index: 101
+      field_type: 1
+      dim: 3705
+      emb_size: 8
+      enabled: true
+    user_movie_rate_ids:
+      field_index: 101
+      field_type: 1
+      dim: 3705
       emb_size: 8
       enabled: true
     movie_title:
       field_index: 102
       field_type: 1
-      dim: 4524
+      dim: 4979
       emb_size: 8
       enabled: true
     movie_genres:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_15day:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_1day:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_3day:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_7day:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_cnt_15days:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_cnt_1days:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_cnt_3days:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_cnt_7days:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_genres_rate_cnts:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_movie_rate_genre_15days:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_movie_rate_genre_1days:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_movie_rate_genre_3days:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_movie_rate_genre_7days:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_movie_rate_genres:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+    user_top3_genres:
       field_index: 103
       field_type: 1
       dim: 19
@@ -178,7 +332,7 @@ embedding:
       dim: 11
       emb_size: 8
       enabled: true
-    movie_avg_rate:
+    movie_rate_avg:
       field_index: 105
       field_type: 1
       dim: 9
@@ -202,7 +356,7 @@ embedding:
       dim: 6
       emb_size: 8
       enabled: true
-    movie_avg_rate_continue:
+    movie_rate_avg_continue:
       field_index: 109
       field_type: 0
       dim: 2
@@ -231,42 +385,6 @@ embedding:
       field_index: 204
       field_type: 1
       dim: 3
-      emb_size: 8
-      enabled: true
-    user_genres_rate_cnts:
-      field_index: 312
-      field_type: 1
-      dim: 19
-      emb_size: 8
-      enabled: true
-    user_genres_rate_cnt_1days:
-      field_index: 313
-      field_type: 1
-      dim: 19
-      emb_size: 8
-      enabled: true
-    user_genres_rate_cnt_3days:
-      field_index: 314
-      field_type: 1
-      dim: 19
-      emb_size: 8
-      enabled: true
-    user_genres_rate_cnt_7days:
-      field_index: 315
-      field_type: 1
-      dim: 19
-      emb_size: 8
-      enabled: true
-    user_genres_rate_cnt_15days:
-      field_index: 316
-      field_type: 1
-      dim: 19
-      emb_size: 8
-      enabled: true
-    user_top3_genres:
-      field_index: 317
-      field_type: 1
-      dim: 19
       emb_size: 8
       enabled: true
     user_watch_same_genre:
@@ -315,8 +433,8 @@ embedding:
 mlp:
   hidden_dims: []
   activation: relu
-  dropout: 0.0
-  batch_norm: false
-  input_batch_norm: false
+  dropout: 0.1
+  batch_norm: true
+  input_batch_norm: true
 field_attention:
-  enabled: false
+  enabled: true

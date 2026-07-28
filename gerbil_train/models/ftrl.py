@@ -49,14 +49,17 @@ class FTRLModel(BaseModel):
         self.bias = nn.Parameter(torch.zeros(1))
         self.reset_parameters()
 
+
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:
         if not model_cfg.embedding_fields:
             raise ValueError("embedding_fields must be a non-empty mapping")
+
 
     def reset_parameters(self) -> None:
         nn.init.zeros_(self.bias)
         for emb in self.linear_embeddings.values():
             nn.init.zeros_(emb.weight)
+
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
         first_offsets = feature_bags[self.field_names[0]]["offsets"]

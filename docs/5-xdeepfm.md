@@ -6,29 +6,29 @@ xDeepFM replaces DeepFM's FM term with a **Compressed Interaction Network (CIN)*
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[Output<br/>sigmoid]
+    subgraph "Output"
+        OUT["Output<br/>sigmoid"]
     end
 
-    subgraph Linear
-        L_SUM[sum of linear embeddings<br/>1st-order]
+    subgraph "Linear"
+        L_SUM["sum of linear embeddings<br/>1st-order"]
     end
 
-    subgraph CIN
-        CIN_IN[Field embeddings<br/>batch, m, d]
-        CIN_OP[Outer product ⊗<br/>X^k ⊗ X^⁰]
-        CIN_FC[Linear compress<br/>H_k×m → H_{k+1}]
-        CIN_POOL[Sum pooling<br/>over embedding dim]
+    subgraph "CIN"
+        CIN_IN["Field embeddings<br/>batch, m, d"]
+        CIN_OP["Outer product ⊗<br/>X^k ⊗ X^⁰"]
+        CIN_FC["Linear compress<br/>H_k×m → H_{"k+1"}"]
+        CIN_POOL["Sum pooling<br/>over embedding dim"]
     end
 
-    subgraph Deep
-        D_CONCAT[Concat all field embs]
-        D_MLP[MLP]
-        D_HEAD[Linear Head]
+    subgraph "Deep"
+        D_CONCAT["Concat all field embs"]
+        D_MLP["MLP"]
+        D_HEAD["Linear Head"]
     end
 
-    subgraph Input
-        FB[feature_bags dict]
+    subgraph "Input"
+        FB["feature_bags dict"]
     end
 
     FB --> L_SUM --> OUT
@@ -52,7 +52,7 @@ flowchart TD
     Xk["Xᵏ: [batch, Hₖ, d]"] --> OP
     OP --> Z["Z: [batch, Hₖ, m, d]"]
     Z --> R["Reshape<br/>[batch, d, Hₖ·m]"]
-    R --> FC["Linear(Hₖ·m → Hₖ₊₁)<br/>applied along feature dim"]
+    R --> FC["Linear("Hₖ·m → Hₖ₊₁")<br/>applied along feature dim"]
     FC --> Xk1["Xᵏ⁺¹: [batch, Hₖ₊₁, d]"]
     Xk1 --> POOL["Sum pool over d<br/>→ [batch, Hₖ₊₁]"]
     Xk1 --> Xk

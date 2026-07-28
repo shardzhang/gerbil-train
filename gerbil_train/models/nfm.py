@@ -58,14 +58,14 @@ class NFM(BaseModel):
 
         # MLP on top of Bi-Interaction Pooling output
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [128, 64]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.mlp = FullyConnectedLayer(
             input_dim=self.emb_size,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_dim = hidden_dims[-1] if hidden_dims else self.emb_size
         self.head = nn.Linear(final_dim, 1)

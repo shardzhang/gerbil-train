@@ -6,40 +6,40 @@ DSIN models user behavior as **sessions** rather than a flat sequence. Sessions 
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
 
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
 
-    subgraph Interest_Extraction
-        SESS[Split into sessions<br/>B, S, L]
-        EMB[Behavior Embedding<br/>B, S, L, d]
-        BIAS[Bias Encoding<br/>session + position]
-        LSTM[Bi-LSTM per session<br/>d to 2h]
-        POOL[Mean pooling<br/>B, S, 2h]
+    subgraph "Interest_Extraction"
+        SESS["Split into sessions<br/>B, S, L"]
+        EMB["Behavior Embedding<br/>B, S, L, d"]
+        BIAS["Bias Encoding<br/>session + position"]
+        LSTM["Bi-LSTM per session<br/>d to 2h"]
+        POOL["Mean pooling<br/>B, S, 2h"]
     end
 
-    subgraph Session_Interaction
-        SA[Multi-Head Self-Attention<br/>across sessions]
-        RES[(+) Residual]
+    subgraph "Session_Interaction"
+        SA["Multi-Head Self-Attention<br/>across sessions"]
+        RES["(+) Residual"]
     end
 
-    subgraph Attention_Pooling
-        AU[Concat + Linear + ReLU + Linear]
-        SM[Softmax]
-        WS[Weighted Sum to B, 2h]
+    subgraph "Attention_Pooling"
+        AU["Concat + Linear + ReLU + Linear"]
+        SM["Softmax"]
+        WS["Weighted Sum to B, 2h"]
     end
 
-    subgraph Target
-        TGT[Target Item Embedding]
+    subgraph "Target"
+        TGT["Target Item Embedding"]
     end
 
-    FB[feature_bags] --> SESS
+    FB["feature_bags"] --> SESS
     SESS --> EMB --> BIAS --> LSTM --> POOL --> SA --> RES
     RES --> AU
     TGT --> AU

@@ -58,7 +58,7 @@ class GwENBaseModel(BaseModel):
             self.field_embedding_bags[str(entry.field_index)] = bag
 
         # Field-level attention
-        self.enable_attention = bool(config.field_attention.get("enabled", False))
+        self.enable_attention = bool(config.field_attention["enabled"])
         if self.enable_attention:
             self.field_attention = nn.ModuleDict({
                 field_name: nn.Linear(self.field_embedding_dims[field_name], 1, bias=False)
@@ -68,15 +68,15 @@ class GwENBaseModel(BaseModel):
         # MLP for final prediction
         self.embedding_sum_dim = sum(self.field_embedding_dims.values())
         mlp_cfg = config.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
-        self.input_bn = nn.BatchNorm1d(self.embedding_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
+        hidden_dims = list(mlp_cfg["hidden_dims"])
+        self.input_bn = nn.BatchNorm1d(self.embedding_sum_dim) if mlp_cfg["input_batch_norm"] else None
         self.mlp = FullyConnectedLayer(
             input_dim=self.embedding_sum_dim, 
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", True)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
 
         final_hidden_dim = hidden_dims[-1] if hidden_dims else self.embedding_sum_dim

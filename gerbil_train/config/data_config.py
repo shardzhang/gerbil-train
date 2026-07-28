@@ -7,8 +7,8 @@ from typing import Any
 @dataclass
 class DataPathsConfig:
     tfrecord_root: str
-    nn_pos_map_txt: str
-    nn_pos_map_json: str
+    pos_map_txt: str
+    pos_map_json: str
 
 
 @dataclass

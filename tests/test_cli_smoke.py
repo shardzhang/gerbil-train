@@ -146,8 +146,10 @@ class CliModelInstantiationTests(unittest.TestCase):
             import json
             json_path.write_text(json.dumps({"target_size": 5}))
             from gerbil_train.utils.training import build_model_config
-            exp_cfg = {"model": yaml.safe_load(yaml_path.read_text()),
-                       "data": {"paths": {"nn_pos_map_json": str(json_path)}}}
+            exp_cfg = {
+                "model": yaml.safe_load(yaml_path.read_text()),
+               "data": {"paths": {"pos_map_json": str(json_path)}}
+            }
             cfg = build_model_config(exp_cfg, BaseModelConfig)
             self.assertIn("uid", cfg.embedding_fields)
 

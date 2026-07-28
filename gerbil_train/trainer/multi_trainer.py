@@ -140,7 +140,9 @@ class MultiClassClassificationTrainer(BaseTrainer):
         return self.model(batch["feature_bags"])
 
     def compute_loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute cross-entropy loss."""
+        """Compute cross-entropy loss.
+        多分类和二分类的compute_loss()方法的入参不同. 多分类输入logits, 二分类输入sigmoid概率值
+        """
         return F.cross_entropy(logits, targets)
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:

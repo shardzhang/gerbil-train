@@ -1,0 +1,6 @@
+name: mvdnn_ml1m
+description: MV-DNN (Multi-View Deep Neural Network) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/99-mvdnn/model.yaml
+train: configs/99-mvdnn/trainer.yaml

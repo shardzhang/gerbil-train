@@ -13,9 +13,14 @@
 |------|------|------|------|
 | **FM** | CTR | Linear(一阶) + FM(二阶交叉)，无 Deep MLP | [Rendle 2010](https://doi.org/10.1109/ICDM.2010.127) |
 | **FTRL** | CTR | FTRL-Proximal 在线学习优化器 | [McMahan 2013](https://doi.org/10.1145/2487575.2488200) |
+| **FFM** | CTR | 域感知FM: 每对field独立embedding, Σ_{i<j} ⟨v_{i,f_j}, v_{j,f_i}⟩ | [Juan 2016](https://doi.org/10.1145/2959100.2959137) |
 | **GwEN** | 多分类 | EmbeddingBag + 可选 field 级注意力 + MLP | — |
 | **GwEN 二分类** | CTR | 二分类变体，sigmoid 输出 | — |
 | **YouTubeDNN** | 多分类 | Behavior `mode="mean"`，example age，`encode()` 推理 | [Covington 2016](https://doi.org/10.1145/2959100.2959190) |
+| **EGES** | 召回 | 增强图嵌入+边信息, 注意力加权物品+边信息嵌入 | [Wang 2018](https://doi.org/10.1145/3178876.3186070) |
+| **Word2Vec** | 召回 | 行为序列Skip-gram负采样, target+context物品嵌入 | [Mikolov 2013](https://arxiv.org/abs/1310.4546) |
+| **SSL** | 召回 | 自监督对比学习, 数据增强(mask/crop) + InfoNCE损失 | [Xie 2021](https://arxiv.org/abs/2104.06879) |
+| **NCF** | CTR | GMF(逐元素乘积) + MLP + NeuMF融合, 学习非线性用户-物品交互 | [He 2017](https://doi.org/10.1145/3038912.3052569) |
 | **AFM** | CTR | FM + 每对特征交叉可学习的注意力权重 | [Xiao 2017](https://doi.org/10.24963/ijcai.2017/435) |
 | **NFM** | CTR | Bi-Interaction 池化 → MLP | [He 2017](https://doi.org/10.1145/3038912.3052569) |
 | **PNN** | CTR | Linear + Product Layer（内积交叉）+ MLP | [Qu 2016](https://doi.org/10.1109/icdm.2016.0151) |
@@ -25,7 +30,10 @@
 | **DCN** | CTR | Cross Network（有界交叉）+ Deep MLP | [Wang 2017](https://doi.org/10.1145/3124749.3124754) |
 | **DCNv2** | CTR | 全 d×d 矩阵交叉层，支持低秩近似 | [Wang 2021](https://doi.org/10.1145/3459637.3481951) |
 | **FiBiNet** | CTR | SENET 特征加权 + 双线性交互 + MLP | [Huang 2019](https://arxiv.org/abs/1905.09433) |
+| **STAR** | CTR | 星形拓扑自适应网络, 每场景参数 = 共享 ⊙ 专用 | [Sheng 2022](https://dl.acm.org/doi/10.1145/3459637.3482412) |
+| **MaskNet** | CTR | 实例引导掩码块, 样本级特征掩码 + FC | [Wang 2021](https://arxiv.org/abs/2102.07619) |
 | **AutoInt** | CTR | Multi-head self-attention 建模特征交互 | [Song 2019](https://doi.org/10.1145/3357384.3357925) |
+| **DLRM** | CTR | Bottom MLP(连续) + 稀疏嵌入 + 全配对点积 + Top MLP | [Naumov 2019](https://arxiv.org/abs/1906.00091) |
 | **DIN** | 序列推荐 | LocalActivationUnit 行为序列注意力 | [Zhou 2018](https://doi.org/10.1145/3219819.3219823) |
 | **DIEN** | 序列推荐 | GRU + AUGRU 行为演化建模 | [Zhou 2019](https://doi.org/10.1609/aaai.v33i01.33015941) |
 | **DSIN** | 序列推荐 | 会话分割 + Bi-LSTM + 自注意力 | [Feng 2019](https://doi.org/10.24963/ijcai.2019/319) |
@@ -37,8 +45,17 @@
 | **SDIM** | 序列推荐 | Gumbel-Sigmoid概率语义掩码, 过滤无关行为 | [Fan 2022](https://doi.org/10.1145/3511808.3557082) |
 | **SASRec** | 序列推荐 | 因果Transformer(从左到右), 仅从最后行为提取兴趣 | [Kang 2018](https://arxiv.org/abs/1808.09781) |
 | **BERT4Rec** | 序列推荐 | [CLS]标记 + 双向Transformer, 无因果掩码 | [Sun 2019](https://doi.org/10.1145/3357384.3357895) |
+| **TWIN** | 序列推荐 | 两阶段兴趣发现, 原型分配 + 目标感知注意力 | [TWIN 2023](https://arxiv.org/abs/2302.09894) |
+| **ESMM** | 多任务 | 全空间CVR多任务模型, pCTCVR = pCTR × pCVR, 全空间损失 | [Ma 2018](https://doi.org/10.1145/3209978.3210104) |
 | **双塔模型** | 检索 | 两阶段训练（隐式 + 显式） | [Yi 2019](https://doi.org/10.1145/3298689.3346996) |
+| **MV-DNN** | 检索 | 多视角DNN, 独立用户/物品DNN + 余弦相似度 + BPR损失 | [Elkahky 2015](https://www.microsoft.com/en-us/research/publication/multi-view-deep-neural-network-for-cross-view-learning/) |
+| **MMoE** | 多任务 | 多门控专家混合, K个共享专家 + T个任务门控, 软路由 | [Ma 2018](https://dl.acm.org/doi/10.1145/3219819.3220007) |
+| **PLE** | 多任务 | 渐进分层提取, 多层共享+任务专用专家, 渐进分离 | [Tang 2020](https://dl.acm.org/doi/10.1145/3383313.3412236) |
+| **PEPNet** | 多任务 | 参数高效个性化网络, EPNet按域/用户生成scale&bias | [Chang 2023](https://dl.acm.org/doi/10.1145/3543507.3583206) |
+| **GateNet** | 多任务 | 逐field sigmoid门控特征选择 + MMoE 骨干 | [Dai 2021](https://dl.acm.org/doi/10.1145/3459637.3481952) |
+| **AdaTT** | 多任务 | 自适应任务间融合, 每任务独立专家 + 跨任务门控融合层 | [Li 2022](https://dl.acm.org/doi/10.1145/3485447.3512040) |
 | **LTR** | 排序 | 多种排序损失（LambdaRank, RankNet 等） | [Burges 2005](https://doi.org/10.1145/1102351.1102363) |
+| **BPR** | 排序 | 负采样配对排序损失, 用户-物品点积 | [Rendle 2009](https://arxiv.org/abs/1205.2618) |
 
 ## 项目亮点
 

@@ -57,9 +57,9 @@ class DSIN(BaseModel):
 
         # Session config
         dsig_cfg: dict[str, Any] = model_cfg.interest_extractor
-        self.num_sessions = int(dsig_cfg.get("num_sessions", 4))
-        self.session_len = int(dsig_cfg.get("session_len", 10))
-        self.lstm_hidden = int(dsig_cfg.get("lstm_hidden", 64))
+        self.num_sessions = int(dsig_cfg["num_sessions"])
+        self.session_len = int(dsig_cfg["session_len"])
+        self.lstm_hidden = int(dsig_cfg["lstm_hidden"])
 
         # Target embeddings
         self.target_embedding_bags = nn.ModuleDict()
@@ -108,7 +108,7 @@ class DSIN(BaseModel):
         )
 
         # 3. Multi-head self-attention across sessions
-        attn_heads = int(dsig_cfg.get("attn_heads", 4))
+        attn_heads = int(dsig_cfg["attn_heads"])
         self.session_attention = nn.MultiheadAttention(
             embed_dim=self.lstm_hidden * 2,
             num_heads=attn_heads,
@@ -116,7 +116,7 @@ class DSIN(BaseModel):
         )
 
         # 4. DIN-style attention: target → each session interest
-        attn_hidden = int(dsig_cfg.get("attn_hidden", 64))
+        attn_hidden = int(dsig_cfg["attn_hidden"])
         self.target_attention = nn.Sequential(
             nn.Linear(self.lstm_hidden * 2 + self.emb_size, attn_hidden),
             nn.ReLU(),
@@ -130,14 +130,14 @@ class DSIN(BaseModel):
         mlp_input_dim = plain_dim + target_dim + interest_dim
 
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.mlp = FullyConnectedLayer(
             input_dim=mlp_input_dim,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_dim = hidden_dims[-1] if hidden_dims else mlp_input_dim
         self.head = nn.Linear(final_dim, 1)

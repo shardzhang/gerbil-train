@@ -6,23 +6,23 @@ SDIM learns a **probabilistic semantic mask** over behavior sequences via Gumbel
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Semantic Mask
-        GATE[Gate Network<br/>[target; item; target*item; target-item]]
-        P[mask = sigmoid / Gumbel-Sigmoid<br/>∈ [0, 1]]
-        FILL[mask out irrelevant items]
-        AGG[Masked aggregation + normalize]
+    subgraph "Semantic Mask"
+        GATE["Gate Network<br/>[target; item; target*item; target-item]"]
+        P["mask = sigmoid / Gumbel-Sigmoid<br/>∈ [0, 1]"]
+        FILL["mask out irrelevant items"]
+        AGG["Masked aggregation + normalize"]
     end
-    subgraph Input
-        SEQ[Behavior items<br/>B, T, d]
-        TGT[Target<br/>B, d]
+    subgraph "Input"
+        SEQ["Behavior items<br/>B, T, d"]
+        TGT["Target<br/>B, d"]
     end
     FB --> SEQ --> GATE
     FB --> TGT --> GATE

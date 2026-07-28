@@ -14,24 +14,24 @@ Same mathematical form as FM, but outputs a **k-dimensional vector** (not a scal
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph Fusion
-        ADD[+]
+    subgraph "Fusion"
+        ADD["+"]
     end
-    subgraph Linear
-        L1[Linear Embedding<br/>dim=1 per field]
-        LS[sum]
+    subgraph "Linear"
+        L1["Linear Embedding<br/>dim=1 per field"]
+        LS["sum"]
     end
-    subgraph Bi_Interaction
-        BI[Bi-Interaction Pooling<br/>Σ_i Σ_{j>i} v_i ⊙ v_j → k-dim vector]
+    subgraph "Bi_Interaction"
+        BI["Bi-Interaction Pooling<br/>Σ_i Σ_{"j>i"} v_i ⊙ v_j → k-dim vector"]
     end
-    subgraph Deep
-        MLP[MLP<br/>k → 128 → 64 → 1]
+    subgraph "Deep"
+        MLP["MLP<br/>k → 128 → 64 → 1"]
     end
-    subgraph Input
-        I[feature_bags]
+    subgraph "Input"
+        I["feature_bags"]
     end
 
     I --> L1 --> LS --> ADD

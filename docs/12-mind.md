@@ -6,29 +6,29 @@ MIND introduces **multi-interest representation** via capsule-based dynamic rout
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Label-Aware Attention
-        ATTN[softmax target ✕ V_i]
-        SUM[weighted sum over K interests]
+    subgraph "Label-Aware Attention"
+        ATTN["softmax target ✕ V_i"]
+        SUM["weighted sum over K interests"]
     end
-    subgraph Dynamic Routing
-        INIT[Behavior Capsules<br/>B, T, d]
-        ITER[Iterative routing x3]
-        V1[Interest Capsule 1]
-        V2[Interest Capsule 2]
-        VK[Interest Capsule K]
+    subgraph "Dynamic Routing"
+        INIT["Behavior Capsules<br/>B, T, d"]
+        ITER["Iterative routing x3"]
+        V1["Interest Capsule 1"]
+        V2["Interest Capsule 2"]
+        VK["Interest Capsule K"]
     end
-    subgraph Target
-        TGT[Target Embedding<br/>B, d]
+    subgraph "Target"
+        TGT["Target Embedding<br/>B, d"]
     end
-    FB[feature_bags] --> INIT
+    FB["feature_bags"] --> INIT
     FB --> TGT
     INIT --> ITER --> V1 & V2 & VK
     V1 & V2 & VK --> ATTN

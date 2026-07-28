@@ -6,29 +6,29 @@ SIM extends the modeling of user interests from **long-term behavior sequences**
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Stage-2 ESU
-        MHA[Multi-Head Attention<br/>K items x target]
-        FUSE[FFN + Residual]
+    subgraph "Stage-2 ESU"
+        MHA["Multi-Head Attention<br/>K items x target"]
+        FUSE["FFN + Residual"]
     end
-    subgraph Stage-1 GSU
-        SIM_DOT[Similarity: target x behavior]
-        TOPK[Top-K Selection]
+    subgraph "Stage-1 GSU"
+        SIM_DOT["Similarity: target x behavior"]
+        TOPK["Top-K Selection"]
     end
-    subgraph Encoder
-        EMB[Behavior Embedding<br/>B, T, d]
+    subgraph "Encoder"
+        EMB["Behavior Embedding<br/>B, T, d"]
     end
-    subgraph Target
-        TGT[Target Embedding<br/>B, d]
+    subgraph "Target"
+        TGT["Target Embedding<br/>B, d"]
     end
-    FB[feature_bags] --> EMB --> SIM_DOT
+    FB["feature_bags"] --> EMB --> SIM_DOT
     FB --> TGT --> SIM_DOT
     SIM_DOT --> TOPK
     TOPK --> MHA

@@ -64,10 +64,10 @@ class SASRec(BaseModel):
 
         # SASRec config
         sasrec_cfg: dict[str, Any] = model_cfg.interest_extractor
-        num_heads = int(sasrec_cfg.get("num_heads", 4))
-        num_layers = int(sasrec_cfg.get("num_layers", 2))
-        ffn_hidden = int(sasrec_cfg.get("ffn_hidden", self.emb_size * 2))
-        dropout = float(sasrec_cfg.get("dropout", 0.1))
+        num_heads = int(sasrec_cfg["num_heads"])
+        num_layers = int(sasrec_cfg["num_layers"])
+        ffn_hidden = int(sasrec_cfg["ffn_hidden"])
+        dropout = float(sasrec_cfg["dropout"])
 
         self.pos_embedding = nn.Embedding(500, self.emb_size)
 
@@ -83,11 +83,11 @@ class SASRec(BaseModel):
         mlp_input_dim = plain_dim + target_dim + self.emb_size
 
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.mlp = FullyConnectedLayer(
             input_dim=mlp_input_dim, hidden_dims=hidden_dims, bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)), activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]), activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_dim = hidden_dims[-1] if hidden_dims else mlp_input_dim
         self.head = nn.Linear(final_dim, 1)

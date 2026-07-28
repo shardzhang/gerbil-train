@@ -10,7 +10,7 @@ from gerbil_train.exceptions import ConfigError
 class FieldEntry:
     """One embedding field in the model config.
 
-    :param field_index:  Feature index matching ``nn_pos_map.txt``
+    :param field_index:  Feature index matching ``pos_map.txt``
     :param field_type:   0 = continuous (bucketed), 1 = categorical
     :param dim:  Dimension for this field
     :param emb_size:  Embedding dimension for this field
@@ -28,47 +28,39 @@ class FieldEntry:
 
 
 def load_enabled_field_entries(model_cfg: dict[str, Any]) -> tuple[list[FieldEntry], list[str]]:
-    """Load all enabled field entries from the model config.
-
-    Supports both old format (``embedding_fields``) and new format (``embedding.fields``).
-    """
-    fields = model_cfg.get("embedding_fields") or model_cfg.get("embedding", {}).get("fields", {})
+    """Load all enabled field entries from the model config."""
+    fields = model_cfg.get("embedding", {}).get("fields", {})
     # print(f"[debug] fields: {fields}")
+
     enabled_field_entries: list[FieldEntry] = []
     disabled_field_names: list[str] = []
-    for field_name, field_entry in fields.items():
-        if field_entry["enabled"]:
+    for name, entry in fields.items():
+        if entry["enabled"]:
             enabled_field_entries.append(FieldEntry(
-                field_index=field_entry["field_index"],
-                field_type=field_entry["field_type"],
-                field_name=field_name,
-                dim=field_entry["dim"],
-                concat_type=field_entry.get("concat_type", "emb"),
-                emb_size=field_entry["emb_size"],
-                enabled=field_entry["enabled"],
-                wide=bool(field_entry.get("wide", True)),
-                deep=bool(field_entry.get("deep", True)),
+                field_index=entry["field_index"],
+                field_type=entry["field_type"],
+                field_name=name,
+                dim=entry["dim"],
+                concat_type=entry.get("concat_type", "emb"),
+                emb_size=entry["emb_size"],
+                enabled=entry["enabled"],
+                wide=bool(entry.get("wide", True)),
+                deep=bool(entry.get("deep", True)),
             ))
         else:
-            print(f"Disabled field {field_name}")
-            disabled_field_names.append(field_name)
+            print(f"Disabled field {name}")
+            disabled_field_names.append(name)
     return enabled_field_entries, disabled_field_names  
 
 
 @dataclass
 class BaseModelConfig:
     target_size: int
-    # dict[field_name, FieldEntry]
     embedding_fields: dict[str, FieldEntry]
     mlp: dict[str, Any] = field(default_factory=dict)
-    # dict[field_index, Any]
     field_attention: dict[int, Any] = field(default_factory=dict)
     # dict[field_name, dict[field_index, tuple[mean, std]]]
     field_stats: dict[str, dict[int, tuple[float, float]]] = field(default_factory=dict)
-    # AFM attention network config
-    afm_attention: dict[str, Any] = field(default_factory=dict)
-    # AutoInt multi-head self-attention config
-    auto_attention: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "BaseModelConfig":
@@ -78,7 +70,37 @@ class BaseModelConfig:
             mlp=dict(model_cfg.get("mlp", {})),
             field_attention=dict(model_cfg.get("field_attention", {})),
             field_stats=dict(model_cfg.get("field_stats", {})),
+        )
+
+
+@dataclass
+class AFMModelConfig(BaseModelConfig):
+    afm_attention: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "AFMModelConfig":
+        return cls(
+            target_size=int(model_cfg.get("target_size", 0)),
+            embedding_fields={field.field_name: field for field in field_entries},
+            mlp=dict(model_cfg.get("mlp", {})),
+            field_attention=dict(model_cfg.get("field_attention", {})),
+            field_stats=dict(model_cfg.get("field_stats", {})),
             afm_attention=dict(model_cfg.get("afm_attention", {})),
+        )
+
+
+@dataclass
+class AutoIntModelConfig(BaseModelConfig):
+    auto_attention: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "AutoIntModelConfig":
+        return cls(
+            target_size=int(model_cfg.get("target_size", 0)),
+            embedding_fields={field.field_name: field for field in field_entries},
+            mlp=dict(model_cfg.get("mlp", {})),
+            field_attention=dict(model_cfg.get("field_attention", {})),
+            field_stats=dict(model_cfg.get("field_stats", {})),
             auto_attention=dict(model_cfg.get("auto_attention", {})),
         )
 
@@ -155,6 +177,22 @@ class WideAndDeepModelConfig(BaseModelConfig):
             target_size=int(model_cfg.get("target_size", 0)),
             embedding_fields={field.field_name: field for field in field_entries},
             output=dict(model_cfg.get("output", {})),
+            mlp=dict(model_cfg.get("mlp", {})),
+            field_attention=dict(model_cfg.get("field_attention", {})),
+            field_stats=dict(model_cfg.get("field_stats", {})),
+        )
+
+
+@dataclass
+class MFModelConfig(BaseModelConfig):
+    mf: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, model_cfg: dict[str, Any], field_entries: list[FieldEntry]) -> "MFModelConfig":
+        return cls(
+            target_size=int(model_cfg.get("target_size", 0)),
+            embedding_fields={field.field_name: field for field in field_entries},
+            mf=dict(model_cfg.get("mf", {})),
             mlp=dict(model_cfg.get("mlp", {})),
             field_attention=dict(model_cfg.get("field_attention", {})),
             field_stats=dict(model_cfg.get("field_stats", {})),

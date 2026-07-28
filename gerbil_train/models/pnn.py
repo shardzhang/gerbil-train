@@ -64,14 +64,14 @@ class PNN(BaseModel):
         product_dim = n_emb * self.emb_size + num_pairs
 
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [128, 64]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.mlp = FullyConnectedLayer(
             input_dim=product_dim,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_dim = hidden_dims[-1] if hidden_dims else product_dim
         self.head = nn.Linear(final_dim, 1)

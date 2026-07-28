@@ -8,22 +8,22 @@ $$ \hat{y} = \sigma\big( \text{Linear} + \text{Combine}(\text{Cross}(x_0), \text
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph Combination
-        COMB[Concat → Linear]
+    subgraph "Combination"
+        COMB["Concat → Linear"]
     end
-    subgraph Cross
-        CN[Cross Network<br/>x₀⊙(Wₗ·xₗ+bₗ)+xₗ]
+    subgraph "Cross"
+        CN["Cross Network<br/>x₀⊙(Wₗ·xₗ+bₗ)+xₗ"]
     end
-    subgraph Deep
-        MLP[MLP]
+    subgraph "Deep"
+        MLP["MLP"]
     end
-    subgraph Input
-        EMB[Concat Field Embeddings]
+    subgraph "Input"
+        EMB["Concat Field Embeddings"]
     end
-    I[feature_bags] --> EMB
+    I["feature_bags"] --> EMB
     EMB --> CN --> COMB
     EMB --> MLP --> COMB
     COMB --> OUT

@@ -123,7 +123,7 @@ class xDeepFM(BaseModel):
                 )
 
         # CIN
-        cin_layer_units = list(model_cfg.output.get("cin_layer_units", [128, 128]))
+        cin_layer_units = list(model_cfg.output["cin_layer_units"])
         cin_emb_dim = int(next(iter(self.cin_fields.values())).emb_size) if self.cin_fields else 0
         self.cin = CIN(
             num_fields=len(self.cin_fields),
@@ -134,16 +134,16 @@ class xDeepFM(BaseModel):
 
         # Deep network
         mlp_cfg = model_cfg.mlp
-        self.deep_input_bn = nn.BatchNorm1d(self.deep_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
+        self.deep_input_bn = nn.BatchNorm1d(self.deep_sum_dim) if mlp_cfg["input_batch_norm"] else None
 
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [128, 64]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.deep_network = FullyConnectedLayer(
             input_dim=self.deep_sum_dim,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         deep_output_dim = hidden_dims[-1] if hidden_dims else self.deep_sum_dim
         self.deep_head = nn.Linear(deep_output_dim, 1)

@@ -6,37 +6,37 @@ AutoInt treats each feature field as a **token** and uses **multi-head self-atte
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph Fusion
-        ADD[+]
+    subgraph "Fusion"
+        ADD["+"]
     end
-    subgraph Linear_Term
-        L1[Linear Embedding<br/>dim=1 per field]
-        LS[sum]
+    subgraph "Linear_Term"
+        L1["Linear Embedding<br/>dim=1 per field"]
+        LS["sum"]
     end
-    subgraph Transformer
-        SUB1[Interacting Layer × N]
+    subgraph "Transformer"
+        SUB1["Interacting Layer × N"]
     end
-    subgraph Interacting_Layer
-        MHA[Multi-Head<br/>Self-Attention]
-        RES1[(+)]
-        FFN[Feed-Forward]
-        RES2[(+)]
-        LN1[LayerNorm]
-        LN2[LayerNorm]
+    subgraph "Interacting_Layer"
+        MHA["Multi-Head<br/>Self-Attention"]
+        RES1["(+)"]
+        FFN["Feed-Forward"]
+        RES2["(+)"]
+        LN1["LayerNorm"]
+        LN2["LayerNorm"]
     end
-    subgraph Deep
-        CONCAT[Concat all field outputs]
-        MLP[MLP]
-        HEAD[Linear Head]
+    subgraph "Deep"
+        CONCAT["Concat all field outputs"]
+        MLP["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Embeddings
-        EMB[Field Embeddings<br/>dim=k per field]
+    subgraph "Embeddings"
+        EMB["Field Embeddings<br/>dim=k per field"]
     end
 
-    I[feature_bags] --> L1 --> LS --> ADD
+    I["feature_bags"] --> L1 --> LS --> ADD
     I --> EMB --> SUB1 --> CONCAT --> MLP --> HEAD --> ADD
     SUB1 -.->|stacked| SUB1
 

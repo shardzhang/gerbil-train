@@ -1,0 +1,6 @@
+name: node2vec_ml1m
+description: Node2Vec (biased random walks + Skip-gram) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/33-node2vec/model.yaml
+train: configs/33-node2vec/trainer.yaml

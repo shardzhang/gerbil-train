@@ -11,7 +11,6 @@ __all__ = ["bag_to_padded", "embed_one_field", "to_device"]
 
 
 class WeightedMeanEmbeddingBag(nn.Module):
-
     def __init__(self, num_embeddings, embedding_dim):
         super().__init__()
         

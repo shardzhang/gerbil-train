@@ -71,7 +71,7 @@ def build_model_config(exp_cfg: dict[str, Any], config_class: type) -> Any:
     model_cfg_raw = exp_cfg["model"]
     enabled_entries, _ = load_enabled_field_entries(model_cfg_raw)
     model_cfg = config_class.from_dict(model_cfg_raw, enabled_entries)
-    pos_map_json = Path(data_cfg["paths"]["nn_pos_map_json"])
+    pos_map_json = Path(data_cfg["paths"]["pos_map_json"])
     model_cfg.field_stats = load_field_stats(pos_map_json)
     model_cfg.target_size = load_target_size(pos_map_json)
     exp_cfg["_model_cfg"] = model_cfg

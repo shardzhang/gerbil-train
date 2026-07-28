@@ -122,20 +122,20 @@ class DCNv2(BaseModel):
 
         # Cross Network V2
         cross_cfg: dict[str, Any] = model_cfg.field_attention
-        num_cross_layers = int(cross_cfg.get("num_cross_layers", 3))
-        cross_rank = int(cross_cfg.get("cross_rank", 0))
+        num_cross_layers = int(cross_cfg["num_cross_layers"])
+        cross_rank = int(cross_cfg["cross_rank"])
         self.cross_network = CrossNetworkV2(self.embedding_sum_dim, num_cross_layers, cross_rank)
 
         # Deep Network
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [128, 64]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.deep_network = FullyConnectedLayer(
             input_dim=self.embedding_sum_dim,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         deep_output_dim = hidden_dims[-1] if hidden_dims else self.embedding_sum_dim
 

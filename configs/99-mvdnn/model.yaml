@@ -1,0 +1,66 @@
+task: binary
+embedding:
+  default_emb_size: 4
+  fields:
+    user_id:
+      field_index: 1
+      field_type: 1
+      dim: 5393
+      emb_size: 16
+      enabled: true
+    user_age:
+      field_index: 2
+      field_type: 1
+      dim: 8
+      emb_size: 4
+      enabled: true
+    user_gender:
+      field_index: 3
+      field_type: 1
+      dim: 3
+      emb_size: 4
+      enabled: true
+    user_occupation:
+      field_index: 4
+      field_type: 1
+      dim: 21
+      emb_size: 4
+      enabled: true
+    movie_id:
+      field_index: 101
+      field_type: 1
+      dim: 3579
+      emb_size: 16
+      enabled: true
+    movie_title:
+      field_index: 102
+      field_type: 1
+      dim: 4524
+      emb_size: 8
+      enabled: true
+    movie_genres:
+      field_index: 103
+      field_type: 1
+      dim: 19
+      emb_size: 8
+      enabled: true
+
+mlp:
+  user_field: user_id
+  item_field: movie_id
+  user_side_fields:
+  - user_age
+  - user_gender
+  - user_occupation
+  item_side_fields:
+  - movie_title
+  - movie_genres
+  user_hidden:
+  - 128
+  - 64
+  item_hidden:
+  - 128
+  - 64
+  embedding_dim: 16
+field_attention:
+  enabled: false

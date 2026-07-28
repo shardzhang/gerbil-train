@@ -1,0 +1,6 @@
+name: word2vec_ml1m
+description: Word2Vec (Skip-gram with Negative Sampling) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/32-word2vec/model.yaml
+train: configs/32-word2vec/trainer.yaml

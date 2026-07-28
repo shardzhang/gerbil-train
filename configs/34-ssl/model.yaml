@@ -1,0 +1,17 @@
+task: binary
+embedding:
+  default_emb_size: 4
+  fields:
+    user_movie_rate:
+      field_index: 101
+      field_type: 1
+      dim: 3579
+      emb_size: 16
+      enabled: true
+
+mlp:
+  item_field: user_movie_rate
+  temperature: 0.5
+  mask_ratio: 0.15
+field_attention:
+  enabled: false

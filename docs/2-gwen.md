@@ -4,31 +4,31 @@
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[Output]
+    subgraph "Output"
+        OUT["Output"]
     end
 
-    subgraph Head
-        HEAD[Linear Head]
+    subgraph "Head"
+        HEAD["Linear Head"]
     end
 
-    subgraph MLP
-        MLP_BN[BatchNorm] --> MLP_NET["MLP: 256 → 128 → ReLU"]
+    subgraph "MLP"
+        MLP_BN["BatchNorm"] --> MLP_NET["MLP: 256 → 128 → ReLU"]
     end
 
-    subgraph Field_Attention
-        ATT_W[softmax weights]
-        ATT_CONCAT[Weighted Concat]
+    subgraph "Field_Attention"
+        ATT_W["softmax weights"]
+        ATT_CONCAT["Weighted Concat"]
     end
 
-    subgraph Embedding_Bags
+    subgraph "Embedding_Bags"
         EB1["EmbeddingBag<br/>user_id<br/>vocab=5344, dim=16"]
         EB2["EmbeddingBag<br/>movie_id<br/>vocab=3156, dim=16"]
         EB3["EmbeddingBag<br/>gender<br/>vocab=3, dim=8"]
-        EB4[...]
+        EB4["..."]
     end
 
-    subgraph Input
+    subgraph "Input"
         FB["feature_bags dict<br/>{indices, offsets, weights}"]
     end
 
@@ -108,21 +108,21 @@ $$ x = \text{concat}(w_1 \cdot e_1, w_2 \cdot e_2, ..., w_n \cdot e_n) $$
 
 ```mermaid
 graph LR
-    subgraph Fields
+    subgraph "Fields"
         F1["emb_1<br/>dim=d1"]
         F2["emb_2<br/>dim=d2"]
         F3["emb_n<br/>dim=dn"]
     end
-    subgraph Scores
+    subgraph "Scores"
         S1["Linear → score_1"]
         S2["Linear → score_2"]
         S3["Linear → score_n"]
     end
-    subgraph Softmax
+    subgraph "Softmax"
         SM["softmax → w_1, w_2, w_n"]
     end
-    subgraph Output
-        C[w₁·emb₁ ⊕ w₂·emb₂ ⊕ ...]
+    subgraph "Output"
+        C["w₁·emb₁ ⊕ w₂·emb₂ ⊕ ..."]
     end
 
     F1 --> S1 --> SM
@@ -136,19 +136,19 @@ graph LR
 
 ```mermaid
 flowchart LR
-    subgraph TFRecord
+    subgraph "TFRecord"
         T["TFRecord<br/>protobuf"]
     end
-    subgraph Dataset
-        D[TFRecordDataset]
+    subgraph "Dataset"
+        D["TFRecordDataset"]
         EXT["extract_target<br/>extract_field_values"]
     end
-    subgraph Collator
-        C[BatchCollator]
+    subgraph "Collator"
+        C["BatchCollator"]
         PACK["indices: flat concat<br/>offsets: per-sample start<br/>weights: per-index values<br/>targets: labels"]
     end
-    subgraph Model
-        M[GwEN model]
+    subgraph "Model"
+        M["GwEN model"]
     end
 
     T --> D
@@ -191,17 +191,17 @@ targets = Tensor[bs]  # binary: 0.0 / 1.0  |  multiclass: class index
 
 ```mermaid
 flowchart TD
-    A[feature_bags] --> B{遍历每个字段}
+    A["feature_bags"] --> B{"遍历每个字段"}
     B --> C["EmbeddingBag<br/>mode='sum'"]
     C --> D["每个字段得到一个<br/>dense vector"]
-    D --> E{enable_attention?}
+    D --> E{"enable_attention?"}
     E -->|是| F["Field Attention<br/>加权拼接"]
-    E -->|否| G[直接 concat]
-    F --> H[optional BatchNorm1d]
+    E -->|否| G["直接 concat"]
+    F --> H["optional BatchNorm1d"]
     G --> H
-    H --> I[MLP]
-    I --> J[Linear Head]
-    J --> K{BINARY or MULTI?}
+    H --> I["MLP"]
+    I --> J["Linear Head"]
+    J --> K{"BINARY or MULTI?"}
     K -->|Binary| L["sigmoid → squeeze"]
     K -->|Multi| M["logits → CrossEntropyLoss"]
 ```

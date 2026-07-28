@@ -43,49 +43,49 @@
 
 ```mermaid
 graph TB
-    subgraph Output
+    subgraph "Output"
         OUT["sigmoid output<br/>batch_size"]
     end
 
-    subgraph Head
-        PRED[Linear Head]
+    subgraph "Head"
+        PRED["Linear Head"]
     end
 
-    subgraph MLP
+    subgraph "MLP"
         MLP_NET["MLP<br/>256 → 128 → ReLU"]
     end
 
-    subgraph Fusion
-        CONCAT[Concat]
+    subgraph "Fusion"
+        CONCAT["Concat"]
     end
 
-    subgraph Non_Behavior_Fields
+    subgraph "Non_Behavior_Fields"
         EB1["EmbeddingBag<br/>user_id<br/>vocab=5393, dim=16"]
         EB2["EmbeddingBag<br/>item_id<br/>vocab=3579, dim=16"]
         EB3["EmbeddingBag<br/>movie_genres<br/>vocab=19, dim=16"]
     end
 
-    subgraph Behavior_Sequence
+    subgraph "Behavior_Sequence"
         BEH_IDS["behavior indices<br/>total_items"]
         BEH_EMB["nn.Embedding<br/>per-item lookup"]
         BAG2PAD["bag_to_padded()<br/>[batch, seq_len, emb_dim]"]
     end
 
-    subgraph Interest_Extractor
+    subgraph "Interest_Extractor"
         GRU["GRU<br/>hidden_size<br/>(bidirectional=False)"]
     end
 
-    subgraph Attention_Score
+    subgraph "Attention_Score"
         AU_CONCAT["Concat: hidden + target + hidden*target"]
         AU_MLP["MLP: 4d → 32 → 16 → 1"]
         AU_SCORE["attention scores<br/>per hidden state"]
     end
 
-    subgraph Interest_Evolving
+    subgraph "Interest_Evolving"
         AUGRU["AUGRU<br/>Attention-GRU<br/>ũ_t = a_t · u_t"]
     end
 
-    subgraph Input
+    subgraph "Input"
         FB["feature_bags dict<br/>{indices, offsets, weights}"]
     end
 

@@ -6,24 +6,24 @@ BERT4Rec applies **bidirectional Transformer** (no causal masking) on behavior s
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Bidirectional Transformer
-        CLS[prepend [CLS]]
-        POS[+ Positional Encoding]
-        BI[No causal mask<br/>bidirectional attention]
-        TE1[Transformer Layer 1]
-        TE2[Transformer Layer 2]
-        CLS_OUT[[CLS] output → interest]
+    subgraph "Bidirectional Transformer"
+        CLS["prepend [CLS]"]
+        POS["+ Positional Encoding"]
+        BI["No causal mask<br/>bidirectional attention"]
+        TE1["Transformer Layer 1"]
+        TE2["Transformer Layer 2"]
+        CLS_OUT["[CLS"] output → interest]
     end
-    subgraph Input
-        SEQ[Behavior items<br/>B, T, d]
+    subgraph "Input"
+        SEQ["Behavior items<br/>B, T, d"]
     end
     FB --> SEQ --> CLS --> POS --> BI --> TE1 --> TE2 --> CLS_OUT --> CONCAT
     FB --> CONCAT --> MLP_NET --> HEAD --> OUT

@@ -16,7 +16,7 @@ import torch
 from torch import Tensor, nn
 import torch.nn.functional as F
 
-from gerbil_train.config.model_config import BaseModelConfig, FieldEntry
+from gerbil_train.config.model_config import AutoIntModelConfig, FieldEntry
 from gerbil_train.utils.embedding import embed_one_field
 from gerbil_train.models.layers import FullyConnectedLayer
 from gerbil_train.models.base_model import BaseModel
@@ -78,7 +78,7 @@ class InteractingLayer(nn.Module):
 class AutoInt(BaseModel):
     """Automatic Feature Interaction Network via Multi-Head Self-Attention."""
 
-    def __init__(self, model_cfg: BaseModelConfig) -> None:
+    def __init__(self, model_cfg: AutoIntModelConfig) -> None:
         super().__init__()
         self._validate_fields(model_cfg)
 
@@ -111,10 +111,10 @@ class AutoInt(BaseModel):
 
         # AutoInt config
         acfg: dict[str, Any] = model_cfg.auto_attention
-        num_layers = int(acfg.get("num_layers", 3))
-        num_heads = int(acfg.get("num_heads", 2))
-        attn_dim = int(acfg.get("attn_dim", 32))
-        attn_dropout = float(acfg.get("dropout", 0.0))
+        num_layers = int(acfg["num_layers"])
+        num_heads = int(acfg["num_heads"])
+        attn_dim = int(acfg["attn_dim"])
+        attn_dropout = float(acfg["dropout"])
 
         # Stacked interacting layers (Transformer encoder)
         self.layers = nn.ModuleList([
@@ -125,14 +125,14 @@ class AutoInt(BaseModel):
         # MLP on top of concatenated field outputs
         n_emb = sum(1 for e in self.fields_cfg.values() if not (e.field_type == 0 and e.concat_type == "direct"))
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [128]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.mlp = FullyConnectedLayer(
             input_dim=n_emb * self.emb_size,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_dim = hidden_dims[-1] if hidden_dims else n_emb * self.emb_size
         self.head = nn.Linear(final_dim, 1)

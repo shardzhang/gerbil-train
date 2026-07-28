@@ -19,6 +19,7 @@ class TrainOptimizerConfig:
     type: str = "adam"
     lr: float = 0.001
     weight_decay: float = 0.0
+    bpr_num_neg: int = 5
 
 
 @dataclass

@@ -20,13 +20,9 @@ optimizer:
   weight_decay: 0.00001
 
 scheduler:
-  enabled: true
-  mode: max
-  factor: 0.5
-  patience: 2
   warmup_steps: 0
   decay_rate: 0
-  learning_rate_min: 1e-6
+  learning_rate_min: 0.000001
 
 checkpoint:
   monitor: val_gauc

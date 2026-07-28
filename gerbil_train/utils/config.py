@@ -37,11 +37,8 @@ def load_experiment_config(experiment_path: str | Path) -> dict[str, Any]:
     :return: Dictionary containing the resolved config sections
     """
     experiment_path = Path(experiment_path)
-    experiment = load_yaml(experiment_path)
-
     project_root = experiment_path.parent.parent
-    if project_root.name == "configs":
-        project_root = project_root.parent
+    experiment = load_yaml(experiment_path)
 
     def _resolve(p: str) -> Path:
         return (project_root / p).resolve()

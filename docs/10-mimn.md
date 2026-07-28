@@ -6,28 +6,28 @@ MIMN uses a **multi-slot memory network** to capture multiple aspects of user in
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Memory
-        MEM[Memory Slots<br/>K x d]
-        WRITE[Write: attention over slots<br/>sequence to memory]
-        READ[Read: target query<br/>memory to interest]
+    subgraph "Memory"
+        MEM["Memory Slots<br/>K x d"]
+        WRITE["Write: attention over slots<br/>sequence to memory"]
+        READ["Read: target query<br/>memory to interest"]
     end
-    subgraph Encoder
-        EMB[Behavior Embedding<br/>B, T, d]
-        LSTM[Bi-LSTM<br/>d to 2h]
+    subgraph "Encoder"
+        EMB["Behavior Embedding<br/>B, T, d"]
+        LSTM["Bi-LSTM<br/>d to 2h"]
     end
-    subgraph Target
-        TGT[Target Embedding<br/>B, d]
-        PROJ[Project to 2h]
+    subgraph "Target"
+        TGT["Target Embedding<br/>B, d"]
+        PROJ["Project to 2h"]
     end
-    FB[feature_bags] --> EMB --> LSTM --> WRITE
+    FB["feature_bags"] --> EMB --> LSTM --> WRITE
     WRITE -.-> MEM
     FB --> TGT --> PROJ --> READ
     MEM -.-> READ

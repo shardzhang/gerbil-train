@@ -8,32 +8,32 @@ $$ \hat{y} = \underbrace{w_0 + \sum_i w_i x_i}_{\text{Linear}} + \underbrace{\te
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph Fusion
-        ADD[+]
+    subgraph "Fusion"
+        ADD["+"]
     end
-    subgraph Linear
-        L1[Linear Embedding<br/>dim=1 per field]
-        LS[sum]
+    subgraph "Linear"
+        L1["Linear Embedding<br/>dim=1 per field"]
+        LS["sum"]
     end
-    subgraph Product_Layer
-        CONCAT[Concat]
+    subgraph "Product_Layer"
+        CONCAT["Concat"]
     end
-    subgraph Deep
-        MLP[MLP<br/>n·k + C(n,2) → ... → 1]
+    subgraph "Deep"
+        MLP["MLP<br/>n·k + C("n,2") → ... → 1"]
     end
-    subgraph Embeddings
-        E1[Field Embedding 1<br/>dim=k]
-        E2[Field Embedding 2<br/>dim=k]
-        E3[...]
+    subgraph "Embeddings"
+        E1["Field Embedding 1<br/>dim=k"]
+        E2["Field Embedding 2<br/>dim=k"]
+        E3["..."]
     end
-    subgraph Inner_Products
-        IP[⟨v₁, v₂⟩, ⟨v₁, v₃⟩, ...]
+    subgraph "Inner_Products"
+        IP["⟨v₁, v₂⟩, ⟨v₁, v₃⟩, ..."]
     end
 
-    I[feature_bags] --> L1 --> LS --> ADD
+    I["feature_bags"] --> L1 --> LS --> ADD
     I --> E1 & E2 & E3
     E1 & E2 & E3 --> CONCAT
     E1 & E2 & E3 --> IP

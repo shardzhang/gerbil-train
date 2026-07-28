@@ -20,13 +20,9 @@ optimizer:
   weight_decay: 0.00001
 
 scheduler:
-  enabled: true          # ReduceLROnPlateau(按需开启)
-  mode: max
-  factor: 0.5
-  patience: 2
-  warmup_steps: 0         # 线性warmup步数(0=禁用)
-  decay_rate: 0           # exponential decay rate(负值, 0=禁用)
-  learning_rate_min: 1e-6 # LR 下限
+  warmup_steps: 0
+  decay_rate: 0
+  learning_rate_min: 0.000001
 
 checkpoint:
   monitor: val_gauc

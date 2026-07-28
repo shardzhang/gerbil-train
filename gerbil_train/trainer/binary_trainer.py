@@ -126,8 +126,8 @@ class BinaryClassificationTrainer(BaseTrainer):
         for step, batch in enumerate(train_pbar, start=1):
             batch = self.move_batch_to_device(batch)
             self.inspect_batch(step, batch)
-            model_out = self.forward_step(batch)
-            loss = self.compute_total_loss(model_out, batch)
+            probs = self.forward_step(batch)
+            loss = self.compute_total_loss(probs, batch)
             self.zero_grad()              # clean the gradient
             self.backward_step(loss)      # compute the gradient
             self.clip_gradients()         # clip the gradients
@@ -146,15 +146,17 @@ class BinaryClassificationTrainer(BaseTrainer):
         return self.model(batch["feature_bags"])
 
 
-    def compute_loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute binary cross-entropy loss."""
+    def compute_loss(self, probs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Compute binary cross-entropy loss.
+        多分类和二分类的compute_loss()方法的入参不同. 多分类输入logits, 二分类输入sigmoid概率值
+        """
         import torch.nn.functional as F
-        return F.binary_cross_entropy(logits, targets)
+        return F.binary_cross_entropy(probs, targets)
 
 
-    def compute_total_loss(self, outputs: torch.Tensor, batch: dict[str, Any]) -> torch.Tensor:
+    def compute_total_loss(self, probs: torch.Tensor, batch: dict[str, Any]) -> torch.Tensor:
         """Compute total loss. Override in subclasses (e.g. DIEN) for auxiliary losses."""
-        return self.compute_loss(outputs, batch["targets"].float())
+        return self.compute_loss(probs, batch["targets"].float())
 
 
     def on_epoch_end(self, epoch: int, metrics: dict[str, float]) -> None:

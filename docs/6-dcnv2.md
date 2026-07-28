@@ -15,26 +15,26 @@ DCNv2 improves DCN-V1 by using a **full d×d weight matrix** per cross layer (vs
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph Combination
-        COMB[Concat → Linear]
+    subgraph "Combination"
+        COMB["Concat → Linear"]
     end
-    subgraph Cross
-        subgraph V2
-            W[Wₗ · xₗ<br/>d×d matrix]
+    subgraph "Cross"
+        subgraph "V2"
+            W["Wₗ · xₗ<br/>d×d matrix"]
         end
-        MUL[x₀ ⊙ (·) + xₗ]
+        MUL["x₀ ⊙ (·) + xₗ"]
         W --> MUL
     end
-    subgraph Deep
-        MLP[MLP]
+    subgraph "Deep"
+        MLP["MLP"]
     end
-    subgraph Input
-        EMB[Concat Field Embeddings]
+    subgraph "Input"
+        EMB["Concat Field Embeddings"]
     end
-    I[feature_bags] --> EMB
+    I["feature_bags"] --> EMB
     EMB --> W --> MUL --> COMB
     EMB --> MLP --> COMB
     COMB --> OUT

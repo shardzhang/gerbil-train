@@ -1,0 +1,6 @@
+name: mf_ml1m
+description: MF (Matrix Factorization) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/1-mf/model.yaml
+train: configs/1-mf/trainer.yaml

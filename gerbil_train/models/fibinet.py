@@ -108,7 +108,7 @@ class FiBiNet(BaseModel):
 
         # SENET Layer (feature importance)
         fibi_cfg: dict[str, Any] = model_cfg.field_attention
-        senet_reduction = int(fibi_cfg.get("senet_reduction", 3))
+        senet_reduction = int(fibi_cfg["senet_reduction"])
         self.senet = SENETLayer(n_emb, self.emb_size, senet_reduction)
 
         # Bilinear Interaction (shared W matrix)
@@ -118,14 +118,14 @@ class FiBiNet(BaseModel):
         # MLP on concat(original_interaction, senet_interaction)
         interaction_dim = self.emb_size * 2  # orig + senet bilinear
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.mlp = FullyConnectedLayer(
             input_dim=interaction_dim,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_dim = hidden_dims[-1] if hidden_dims else interaction_dim
         self.head = nn.Linear(final_dim, 1)

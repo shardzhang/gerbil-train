@@ -1,0 +1,6 @@
+name: dlrm_ml1m
+description: DLRM (Deep Learning Recommendation Model) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/6-dlrm/model.yaml
+train: configs/6-dlrm/trainer.yaml

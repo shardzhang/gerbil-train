@@ -13,9 +13,14 @@
 |-------|------|-------------|-------|
 | **FM** | CTR | Linear (1st-order) + FM (2nd-order pair-wise) terms, no Deep MLP. | [Rendle 2010](https://doi.org/10.1109/ICDM.2010.127) |
 | **FTRL** | CTR | Linear model with FTRL-Proximal optimizer (per-coordinate LR + L1 sparsity). | [McMahan 2013](https://doi.org/10.1145/2487575.2488200) |
+| **FFM** | CTR | Field-aware FM: separate embedding per field pair. Σ_{i<j} ⟨v_{i,f_j}, v_{j,f_i}⟩ | [Juan 2016](https://doi.org/10.1145/2959100.2959137) |
 | **GwEN** | Multiclass | EmbeddingBag per field + optional field-level attention + MLP. | — |
 | **GwEN Binary** | CTR | Binary classification variant with sigmoid output. | — |
 | **YouTubeDNN** | Multiclass | Behavior `mode="mean"`, example age, bias-free head, `encode()` for ANN serving. | [Covington 2016](https://doi.org/10.1145/2959100.2959190) |
+| **EGES** | Recall | Enhanced Graph Embedding with Side Information. Attention-weighted item + side info embeddings. | [Wang 2018](https://doi.org/10.1145/3178876.3186070) |
+| **Word2Vec** | Recall | Skip-gram with negative sampling on behavior sequences. Item embedding via target + context. | [Mikolov 2013](https://arxiv.org/abs/1310.4546) |
+| **SSL** | Recall | Self-supervised contrastive learning. Data augmentation (mask/crop) + InfoNCE loss. | [Xie 2021](https://arxiv.org/abs/2104.06879) |
+| **NCF** | CTR | GMF (element-wise product) + MLP + NeuMF fusion. Learns non-linear user-item interactions. | [He 2017](https://doi.org/10.1145/3038912.3052569) |
 | **AFM** | CTR | FM with learned attention weights per feature pair via attention MLP. | [Xiao 2017](https://doi.org/10.24963/ijcai.2017/435) |
 | **NFM** | CTR | Bi-Interaction Pooling (k-dim vector) + Deep MLP. | [He 2017](https://doi.org/10.1145/3038912.3052569) |
 | **PNN** | CTR | Linear + Product Layer (pair-wise inner products) + MLP. | [Qu 2016](https://doi.org/10.1109/icdm.2016.0151) |
@@ -25,7 +30,10 @@
 | **DCN** | CTR | Cross Network (explicit bounded-degree interactions) + Deep MLP. | [Wang 2017](https://doi.org/10.1145/3124749.3124754) |
 | **DCNv2** | CTR | Full d×d matrix cross layers with optional low-rank approximation. | [Wang 2021](https://doi.org/10.1145/3459637.3481951) |
 | **FiBiNet** | CTR | SENET feature weighting + bilinear interaction + MLP. | [Huang 2019](https://arxiv.org/abs/1905.09433) |
+| **STAR** | CTR | Star topology adaptive network. Per-scenario params = shared ⊙ specific. | [Sheng 2022](https://dl.acm.org/doi/10.1145/3459637.3482412) |
+| **MaskNet** | CTR | Instance-guided mask blocks. Sample-dependent feature mask + FC. | [Wang 2021](https://arxiv.org/abs/2102.07619) |
 | **AutoInt** | CTR | Multi-head self-attention (Transformer) over feature fields. | [Song 2019](https://doi.org/10.1145/3357384.3357925) |
+| **DLRM** | CTR | Bottom MLP (dense) + sparse embeddings + all pairwise dot products + top MLP. | [Naumov 2019](https://arxiv.org/abs/1906.00091) |
 | **DIN** | Sequential | Behavior-sequence attention via LocalActivationUnit. | [Zhou 2018](https://doi.org/10.1145/3219819.3219823) |
 | **DIEN** | Sequential | GRU interest extractor + AUGRU interest evolution. Auxiliary loss. | [Zhou 2019](https://doi.org/10.1609/aaai.v33i01.33015941) |
 | **DSIN** | Sequential | Session division + Bi-LSTM + self-attention across sessions. | [Feng 2019](https://doi.org/10.24963/ijcai.2019/319) |
@@ -37,8 +45,17 @@
 | **SDIM** | Sequential | Probabilistic semantic mask via Gumbel-Sigmoid. Filters irrelevant behavior items. | [Fan 2022](https://doi.org/10.1145/3511808.3557082) |
 | **SASRec** | Sequential | Causal (left-to-right) Transformer. Interest from last behavior only. | [Kang 2018](https://arxiv.org/abs/1808.09781) |
 | **BERT4Rec** | Sequential | [CLS] token + bidirectional Transformer. No causal mask. | [Sun 2019](https://doi.org/10.1145/3357384.3357895) |
+| **TWIN** | Sequential | Two-stage Interest Discovery. Prototype assignment + target-aware attention. | [TWIN 2023](https://arxiv.org/abs/2302.09894) |
+| **ESMM** | Multi-task | Entire-Space Multi-Task for CVR. pCTCVR = pCTR × pCVR. Loss on entire impression space. | [Ma 2018](https://doi.org/10.1145/3209978.3210104) |
 | **Two-Tower** | Retrieval | Two-stage training (implicit pre-train + explicit fine-tune). | [Yi 2019](https://doi.org/10.1145/3298689.3346996) |
+| **MV-DNN** | Retrieval | Multi-View DNN. Independent user/item DNNs + cosine similarity + BPR loss. | [Elkahky 2015](https://www.microsoft.com/en-us/research/publication/multi-view-deep-neural-network-for-cross-view-learning/) |
+| **MMoE** | Multi-task | Multi-gate Mixture-of-Experts. K shared experts + T task gates. Soft routing via gating. | [Ma 2018](https://dl.acm.org/doi/10.1145/3219819.3220007) |
+| **PLE** | Multi-task | Progressive Layered Extraction. Multi-level shared + task-specific experts with progressive separation. | [Tang 2020](https://dl.acm.org/doi/10.1145/3383313.3412236) |
+| **PEPNet** | Multi-task | Parameter Efficient Personalized Network. EPNet generates scale & bias per domain/user. | [Chang 2023](https://dl.acm.org/doi/10.1145/3543507.3583206) |
+| **GateNet** | Multi-task | Per-field sigmoid gates for feature selection + MMoE backbone. | [Dai 2021](https://dl.acm.org/doi/10.1145/3459637.3481952) |
+| **AdaTT** | Multi-task | Adaptive Task-to-Task Fusion. Per-task experts + cross-task gated fusion layers. | [Li 2022](https://dl.acm.org/doi/10.1145/3485447.3512040) |
 | **Learning-to-Rank** | Ranking | Feed-forward network with configurable ranking losses. | [Burges 2005](https://doi.org/10.1145/1102351.1102363) |
+| **BPR** | Ranking | Pairwise ranking loss with negative sampling. User-item dot product. | [Rendle 2009](https://arxiv.org/abs/1205.2618) |
 
 ## Highlights
 

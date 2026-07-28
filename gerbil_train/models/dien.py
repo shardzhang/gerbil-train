@@ -134,7 +134,7 @@ class DIEN(BaseModel):
         # 2. Behavior field embeddings + Interest Extractor + AUGRU
         ie_cfg: dict[str, Any] = model_cfg.interest_extractor
         lau_cfg: dict[str, Any] = model_cfg.local_activation_unit
-        ie_hidden = int(ie_cfg.get("hidden_size", 64))
+        ie_hidden = int(ie_cfg["hidden_size"])
         self.behavior_emb_dims: dict[str, int] = {}
         self.behavior_embedding_bags = nn.ModuleDict()
         self.interest_extractors = nn.ModuleDict()
@@ -154,7 +154,7 @@ class DIEN(BaseModel):
             self.interest_extractors[bf] = InterestExtractorLayer(
                 input_size=emb_dim,
                 hidden_size=ie_hidden,
-                num_layers=int(ie_cfg.get("num_layers", 1)),
+                num_layers=int(ie_cfg["num_layers"]),
             )
             self.augru_cells[bf] = AUGRUCell(
                 input_size=ie_hidden,
@@ -163,7 +163,7 @@ class DIEN(BaseModel):
 
         # 3. Target → ie_hidden projection for attention
         # target_merge="mean" → single emb_size; "proj" → sum of all target emb_sizes
-        ie_hidden = int(ie_cfg.get("hidden_size", 64))
+        ie_hidden = int(ie_cfg["hidden_size"])
         target_dim_for_proj = sum(self.target_embedding_dims.values()) if self.target_merge == "proj" else next(iter(self.target_embedding_dims.values()))
         if target_dim_for_proj != ie_hidden:
             self.target_proj_to_hidden = nn.Linear(target_dim_for_proj, ie_hidden)
@@ -171,12 +171,12 @@ class DIEN(BaseModel):
         # 4. Attention scoring MLP (same structure as DIN's LocalActivationUnit)
         self.score_mlp = FullyConnectedLayer(
             input_dim=4 * ie_hidden,
-            hidden_dims=lau_cfg.get("hidden_dims", [32, 16]),
-            bias=lau_cfg.get("bias", [True, True]),
-            batch_norm=lau_cfg.get("batch_norm", False),
+            hidden_dims=lau_cfg["hidden_dims"],
+            bias=lau_cfg["bias"],
+            batch_norm=lau_cfg["batch_norm"],
             activation="relu",
         )
-        self.score_head = nn.Linear(lau_cfg.get("hidden_dims", [32, 16])[-1], 1)
+        self.score_head = nn.Linear(lau_cfg["hidden_dims"][-1], 1)
 
         # 4. Plain feature field embeddings
         self.plain_field_embedding_dims: dict[str, int] = {}
@@ -207,15 +207,15 @@ class DIEN(BaseModel):
         self.embedding_sum_dim = embed_sum + target_sum + behavior_sum
 
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
-        self.input_bn = nn.BatchNorm1d(self.embedding_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
+        hidden_dims = list(mlp_cfg["hidden_dims"])
+        self.input_bn = nn.BatchNorm1d(self.embedding_sum_dim) if mlp_cfg["input_batch_norm"] else None
         self.mlp = FullyConnectedLayer(
             input_dim=self.embedding_sum_dim,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", True)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_hidden_dim = hidden_dims[-1] if hidden_dims else self.embedding_sum_dim
         self.head = nn.Linear(final_hidden_dim, 1)

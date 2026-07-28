@@ -6,23 +6,23 @@ SASRec uses **causal (left-to-right) self-attention** over behavior sequences, p
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Causal Transformer
-        POS[+ Positional Encoding]
-        CAUSAL[Causal Mask<br/>item_i attends to item_{<i} only]
-        TE1[Transformer Layer 1]
-        TE2[Transformer Layer 2]
-        LAST[Take last valid output → interest]
+    subgraph "Causal Transformer"
+        POS["+ Positional Encoding"]
+        CAUSAL["Causal Mask<br/>item_i attends to item_{"<i"} only"]
+        TE1["Transformer Layer 1"]
+        TE2["Transformer Layer 2"]
+        LAST["Take last valid output → interest"]
     end
-    subgraph Input
-        SEQ[Behavior items<br/>B, T, d]
+    subgraph "Input"
+        SEQ["Behavior items<br/>B, T, d"]
     end
     FB --> SEQ --> POS --> CAUSAL --> TE1 --> TE2 --> LAST --> CONCAT
     FB --> CONCAT --> MLP_NET --> HEAD --> OUT

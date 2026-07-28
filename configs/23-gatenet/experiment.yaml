@@ -1,0 +1,6 @@
+name: gatenet_ml1m
+description: GateNet on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/23-gatenet/model.yaml
+train: configs/23-gatenet/trainer.yaml

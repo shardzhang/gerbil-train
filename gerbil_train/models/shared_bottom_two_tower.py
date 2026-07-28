@@ -68,17 +68,17 @@ class SharedBottomTwoTower(nn.Module):
         explicit_hidden_dims = self._get_hidden_dims(explicit_tower, "explicit_tower")
         implicit_hidden_dims = self._get_hidden_dims(implicit_tower, "implicit_tower")
 
-        shared_activation = str(shared_bottom.get("activation", "relu"))
-        shared_dropout = float(shared_bottom.get("dropout", 0.0))
-        shared_batch_norm = bool(shared_bottom.get("batch_norm", False))
+        shared_activation = str(shared_bottom["activation"])
+        shared_dropout = float(shared_bottom["dropout"])
+        shared_batch_norm = bool(shared_bottom["batch_norm"])
 
-        explicit_activation = str(explicit_tower.get("activation", shared_activation))
-        explicit_dropout = float(explicit_tower.get("dropout", shared_dropout))
-        explicit_batch_norm = bool(explicit_tower.get("batch_norm", shared_batch_norm))
+        explicit_activation = str(explicit_tower["activation"])
+        explicit_dropout = float(explicit_tower["dropout"])
+        explicit_batch_norm = bool(explicit_tower["batch_norm"])
 
-        implicit_activation = str(implicit_tower.get("activation", shared_activation))
-        implicit_dropout = float(implicit_tower.get("dropout", shared_dropout))
-        implicit_batch_norm = bool(implicit_tower.get("batch_norm", shared_batch_norm))
+        implicit_activation = str(implicit_tower["activation"])
+        implicit_dropout = float(implicit_tower["dropout"])
+        implicit_batch_norm = bool(implicit_tower["batch_norm"])
 
         self.normalize_embedding = normalize_embedding
         self.temperature = temperature

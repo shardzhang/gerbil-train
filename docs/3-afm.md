@@ -16,24 +16,24 @@ $$ a_{ij} = \frac{\exp(a'_{ij})}{\sum_{(p,q)} \exp(a'_{pq})} $$
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph Fusion
-        ADD[+]
+    subgraph "Fusion"
+        ADD["+"]
     end
-    subgraph Linear
-        L1[Linear Embedding<br/>dim=1 per field]
-        LS[sum]
+    subgraph "Linear"
+        L1["Linear Embedding<br/>dim=1 per field"]
+        LS["sum"]
     end
-    subgraph Attentional_FM
-        P[pair-wise products<br/>v_i ⊙ v_j]
-        ATTN[Attention Net<br/>Linear + ReLU + Linear]
-        SM[softmax over pairs]
-        WS[weighted sum]
+    subgraph "Attentional_FM"
+        P["pair-wise products<br/>v_i ⊙ v_j"]
+        ATTN["Attention Net<br/>Linear + ReLU + Linear"]
+        SM["softmax over pairs"]
+        WS["weighted sum"]
     end
-    subgraph Input
-        I[feature_bags]
+    subgraph "Input"
+        I["feature_bags"]
     end
 
     I --> L1 --> LS --> ADD

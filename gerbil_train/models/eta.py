@@ -93,13 +93,13 @@ class ETA(BaseModel):
 
         # ETA config
         eta_cfg: dict[str, Any] = model_cfg.interest_extractor
-        num_tables = int(eta_cfg.get("num_tables", 4))
-        num_bits = int(eta_cfg.get("num_bits", 4))
+        num_tables = int(eta_cfg["num_tables"])
+        num_bits = int(eta_cfg["num_bits"])
 
         self.hash_encoder = HashEncoder(self.emb_size, num_tables=num_tables, num_bits=num_bits)
 
         # Activation Unit (same as DIN)
-        au_hidden = dict(model_cfg.local_activation_unit).get("hidden_dims", [32, 16])
+        au_hidden = dict(model_cfg.local_activation_unit)["hidden_dims"]
         self.activation_unit = nn.Sequential(
             nn.Linear(self.emb_size * 3, int(au_hidden[0])), nn.ReLU(),
             nn.Linear(int(au_hidden[0]), int(au_hidden[1])), nn.ReLU(),
@@ -112,11 +112,11 @@ class ETA(BaseModel):
         mlp_input_dim = plain_dim + target_dim + self.emb_size
 
         mlp_cfg: dict[str, Any] = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.mlp = FullyConnectedLayer(
             input_dim=mlp_input_dim, hidden_dims=hidden_dims, bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)), activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]), activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_dim = hidden_dims[-1] if hidden_dims else mlp_input_dim
         self.head = nn.Linear(final_dim, 1)

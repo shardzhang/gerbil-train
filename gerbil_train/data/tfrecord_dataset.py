@@ -263,13 +263,12 @@ class TFRecordDataset(IterableDataset):
 class BinaryTFRecordDataset(TFRecordDataset):
     """TFRecord dataset for binary CTR classification."""
     def _extract_target(self, example: example_pb2.Example) -> float:
-        target_feature = example.features.feature.get("target")
+        target_feature = example.features.feature.get("label")
         if target_feature is None:
             raise ValueError("Missing target feature in TFRecord example")
         if target_feature.float_list.value:
-            rating = float(target_feature.float_list.value[0])
-            return 1.0 if rating > 3.0 else 0.0
-        raise ValueError("Target feature exists but has no values")
+            return float(target_feature.float_list.value[0])
+        raise ValueError("Label feature exists but has no values")
 
 
 class MultiTFRecordDataset(TFRecordDataset):
@@ -285,7 +284,7 @@ class MultiTFRecordDataset(TFRecordDataset):
 class RatingTFRecordDataset(TFRecordDataset):
     """TFRecord dataset for rating prediction."""
     def _extract_target(self, example: example_pb2.Example) -> float:
-        target_feature = example.features.feature.get("target")
+        target_feature = example.features.feature.get("rating")
         if target_feature is None:
             raise ValueError("Missing target feature in TFRecord example")
         if target_feature.float_list.value:
@@ -293,4 +292,4 @@ class RatingTFRecordDataset(TFRecordDataset):
             if rating < 1 or rating > 5:
                 raise ValueError(f"Rating {rating} is out of range [1, 5]")
             return rating - 1
-        raise ValueError("Target feature exists but has no values")
+        raise ValueError("Rating feature exists but has no values")

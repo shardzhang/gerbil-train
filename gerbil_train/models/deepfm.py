@@ -59,6 +59,7 @@ class DeepFM(BaseModel):
             else:
                 raise ValueError(f"Unsupported field_type={entry.field_type} concat_type={entry.concat_type}")
         self.deep_sum_dim = sum(self.deep_field_dims.values())
+        self.fm_emb_dim = next(iter(self.fm_fields.values())).emb_size
         self.fm_sum_dim = sum(int(v.emb_size) for v in self.fm_fields.values())
 
         # EmbeddingBags for deep term (vocab → k)
@@ -101,20 +102,24 @@ class DeepFM(BaseModel):
 
         # Deep network
         mlp_cfg = model_cfg.mlp
-        self.deep_input_bn = nn.BatchNorm1d(self.deep_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
-        self.fm_input_bn = nn.BatchNorm1d(self.fm_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
-
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [128, 64]))
+        self.deep_input_bn = nn.BatchNorm1d(self.deep_sum_dim) if mlp_cfg["input_batch_norm"] else None
+        # FM批归一化
+        self.fm_input_bn = nn.BatchNorm1d(self.fm_sum_dim) if mlp_cfg["input_batch_norm"] else None
+        # FM层归一化
+        self.fm_input_ln = nn.LayerNorm(self.fm_emb_dim) if mlp_cfg["input_layer_norm"] else None
+        hidden_dims = list(mlp_cfg["hidden_dims"])
         self.deep_network = FullyConnectedLayer(
             input_dim=self.deep_sum_dim,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", False)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         deep_output_dim = hidden_dims[-1] if hidden_dims else self.deep_sum_dim
         self.deep_head = nn.Linear(deep_output_dim, 1)
+
+        self.bias = nn.Parameter(torch.zeros(1))
         self.reset_parameters()
 
 
@@ -173,20 +178,22 @@ class DeepFM(BaseModel):
             )
             fm_emb_list.append(feature_emb)
 
-        if fm_emb_list:
-            fm_input_emb = torch.cat(fm_emb_list, dim=-1)
-            if self.fm_input_bn is not None:
-                fm_input_emb = self.fm_input_bn(fm_input_emb)
-            # [batch_size, len(self.fm_fields), emb_size]
-            stacked = fm_input_emb.view(batch_size, len(self.fm_fields), -1)
-            # [batch_size, emb_size]
-            square_of_summed = stacked.sum(dim=1) * stacked.sum(dim=1)
-            # [batch_size, emb_size]
-            sum_of_squared = (stacked * stacked).sum(dim=1)
-            # [batch_size, ]
-            fm_logits = 0.5 * (square_of_summed - sum_of_squared).sum(dim=1) / len(self.fm_fields)
-        else:
-            fm_logits = torch.zeros(batch_size, device=device)
+        # fm_input_emb = torch.cat(fm_emb_list, dim=-1)
+        # if self.fm_input_bn is not None:
+            # fm_input_emb = self.fm_input_bn(fm_input_emb)
+        # [batch_size, len(self.fm_fields), emb_size]
+        # stacked = fm_input_emb.view(batch_size, len(self.fm_fields), -1)
+
+        stacked = torch.stack(fm_emb_list, dim=1)       # [B, N, d]
+        if self.fm_input_ln is not None:
+            stacked = self.fm_input_ln(stacked)
+        
+        # [batch_size, emb_size]
+        square_of_summed = stacked.sum(dim=1) * stacked.sum(dim=1)
+        # [batch_size, emb_size]
+        sum_of_squared = (stacked * stacked).sum(dim=1)
+        # [batch_size, ]
+        fm_logits = 0.5 * (square_of_summed - sum_of_squared).sum(dim=1)
 
         # 3. Deep term: high-order non-linear interactions via MLP
         # Deep = MLP(concat(v_1, ..., v_n))
@@ -217,5 +224,5 @@ class DeepFM(BaseModel):
         deep_logit = self.deep_head(self.deep_network(deep_input_emb)).squeeze(-1)
 
         # [batch_size, ]
-        logits = linear_logit + fm_logits + deep_logit
+        logits = self.bias + linear_logit + fm_logits + deep_logit
         return torch.sigmoid(logits)

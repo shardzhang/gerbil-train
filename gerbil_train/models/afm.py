@@ -13,7 +13,7 @@ from typing import Mapping
 import torch
 from torch import Tensor, nn
 
-from gerbil_train.config.model_config import BaseModelConfig, FieldEntry
+from gerbil_train.config.model_config import AFMModelConfig, FieldEntry
 from gerbil_train.utils.embedding import embed_one_field
 from gerbil_train.models.base_model import BaseModel
 
@@ -27,7 +27,7 @@ class AFM(BaseModel):
     feature interaction via a small MLP.
     """
 
-    def __init__(self, model_cfg: BaseModelConfig) -> None:
+    def __init__(self, model_cfg: AFMModelConfig) -> None:
         super().__init__()
         self._validate_fields(model_cfg)
 
@@ -59,8 +59,8 @@ class AFM(BaseModel):
                 )
 
         # Attention network: takes paired embedding (v_i ⊙ v_j) → scalar score
-        attn_hidden = model_cfg.afm_attention.get("hidden_size", 128)
-        attn_dropout = model_cfg.afm_attention.get("dropout", 0.0)
+        attn_hidden = model_cfg.afm_attention["hidden_size"]
+        attn_dropout = model_cfg.afm_attention["dropout"]
         self.attention = nn.Sequential(
             nn.Linear(self.emb_size, attn_hidden),
             nn.ReLU(),

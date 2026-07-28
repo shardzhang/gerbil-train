@@ -6,24 +6,24 @@ ETA uses **locality-sensitive hashing (LSH)** to constrain target attention to o
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph MLP
-        CONCAT[Concat: plain + target + interest]
-        MLP_NET[MLP]
-        HEAD[Linear Head]
+    subgraph "MLP"
+        CONCAT["Concat: plain + target + interest"]
+        MLP_NET["MLP"]
+        HEAD["Linear Head"]
     end
-    subgraph Hash-Constrained Attention
-        HASH_SEQ[Hash behavior items<br/>multi-table x multi-bit]
-        HASH_TGT[Hash target]
-        MASK[Mask: no hash match → -inf]
-        AU[Activation Unit<br/>DIN-style]
-        SOFT[Softmax → weighted sum]
+    subgraph "Hash-Constrained Attention"
+        HASH_SEQ["Hash behavior items<br/>multi-table x multi-bit"]
+        HASH_TGT["Hash target"]
+        MASK["Mask: no hash match → -inf"]
+        AU["Activation Unit<br/>DIN-style"]
+        SOFT["Softmax → weighted sum"]
     end
-    subgraph Input
-        SEQ[Behavior Seq<br/>B, T, d]
-        TGT[Target<br/>B, d]
+    subgraph "Input"
+        SEQ["Behavior Seq<br/>B, T, d"]
+        TGT["Target<br/>B, d"]
     end
     FB --> SEQ --> HASH_SEQ --> MASK
     FB --> TGT --> HASH_TGT --> MASK

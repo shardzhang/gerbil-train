@@ -75,15 +75,15 @@ class YouTubeDNN(BaseModel):
 
         # MLP
         mlp_cfg = model_cfg.mlp
-        hidden_dims = list(mlp_cfg.get("hidden_dims", [256, 128]))
-        self.input_bn = nn.BatchNorm1d(self.embedding_sum_dim) if mlp_cfg.get("input_batch_norm", False) else None
+        hidden_dims = list(mlp_cfg["hidden_dims"])
+        self.input_bn = nn.BatchNorm1d(self.embedding_sum_dim) if mlp_cfg["input_batch_norm"] else None
         self.mlp = FullyConnectedLayer(
             input_dim=self.embedding_sum_dim,
             hidden_dims=hidden_dims,
             bias=[True] * len(hidden_dims),
-            batch_norm=bool(mlp_cfg.get("batch_norm", True)),
-            activation=str(mlp_cfg.get("activation", "relu")),
-            dropout=float(mlp_cfg.get("dropout", 0.0)),
+            batch_norm=bool(mlp_cfg["batch_norm"]),
+            activation=str(mlp_cfg["activation"]),
+            dropout=float(mlp_cfg["dropout"]),
         )
         final_hidden_dim = hidden_dims[-1] if hidden_dims else self.embedding_sum_dim
         # head.weight = item_embedding_matrix (no bias for ANN serving)

@@ -1,0 +1,6 @@
+name: mmoe_ml1m
+description: MMoE (Multi-gate Mixture-of-Experts) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/21-mmoe/model.yaml
+train: configs/21-mmoe/trainer.yaml

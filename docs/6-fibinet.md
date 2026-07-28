@@ -6,35 +6,35 @@ FiBiNet = **SENET** (field-level importance weighting) + **Bilinear Interaction*
 
 ```mermaid
 graph TB
-    subgraph Output
-        OUT[sigmoid]
+    subgraph "Output"
+        OUT["sigmoid"]
     end
-    subgraph Fusion
-        ADD[Linear → sum]
+    subgraph "Fusion"
+        ADD["Linear → sum"]
     end
-    subgraph Linear
-        L1[Linear EmbeddingBag<br/>dim=1 per field]
-        LS[sum]
+    subgraph "Linear"
+        L1["Linear EmbeddingBag<br/>dim=1 per field"]
+        LS["sum"]
     end
-    subgraph Bilinear
-        B1[Bilinear Interaction<br/>v_i ⊙ W · v_j]
-        BP[sum pooling]
+    subgraph "Bilinear"
+        B1["Bilinear Interaction<br/>v_i ⊙ W · v_j"]
+        BP["sum pooling"]
     end
-    subgraph SENET
-        SE[Squeeze: mean pooling]
-        EX[Excitation: MLP<br/>k/r → k]
-        RW[Re-weight: field embeddings]
+    subgraph "SENET"
+        SE["Squeeze: mean pooling"]
+        EX["Excitation: MLP<br/>k/r → k"]
+        RW["Re-weight: field embeddings"]
     end
-    subgraph Deep
-        DC[concat field embs]
-        DM[MLP]
-        DH[Linear]
+    subgraph "Deep"
+        DC["concat field embs"]
+        DM["MLP"]
+        DH["Linear"]
     end
-    subgraph Embeddings
-        EMB[Field Embeddings<br/>dim=k per field]
+    subgraph "Embeddings"
+        EMB["Field Embeddings<br/>dim=k per field"]
     end
 
-    I[feature_bags] --> L1 --> LS --> ADD
+    I["feature_bags"] --> L1 --> LS --> ADD
     I --> EMB --> SE --> EX --> RW
     RW --> B1
     EMB --> B1

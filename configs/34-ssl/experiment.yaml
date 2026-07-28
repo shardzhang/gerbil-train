@@ -1,0 +1,6 @@
+name: ssl_ml1m
+description: SSL (Self-Supervised Learning with contrastive learning) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/34-ssl/model.yaml
+train: configs/34-ssl/trainer.yaml

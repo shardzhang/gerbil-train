@@ -1,0 +1,6 @@
+name: eges_ml1m
+description: EGES (Enhanced Graph Embedding with Side Information) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/31-eges/model.yaml
+train: configs/31-eges/trainer.yaml

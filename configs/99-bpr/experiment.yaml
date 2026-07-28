@@ -1,0 +1,6 @@
+name: bpr_ml1m
+description: BPR (Bayesian Personalized Ranking) on MovieLens 1M TFRecord samples.
+
+data: configs/0-data/ml1m_binary_tfrecord.yaml
+model: configs/99-bpr/model.yaml
+train: configs/99-bpr/trainer.yaml

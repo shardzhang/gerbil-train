@@ -41,46 +41,46 @@
 
 ```mermaid
 graph TB
-    subgraph Output
+    subgraph "Output"
         OUT["sigmoid output<br/>batch_size"]
     end
 
-    subgraph Head
-        PRED[Linear Head]
+    subgraph "Head"
+        PRED["Linear Head"]
     end
 
-    subgraph MLP
+    subgraph "MLP"
         MLP_NET["MLP<br/>256 → 128 → ReLU"]
     end
 
-    subgraph Fusion
-        CONCAT[Concat]
+    subgraph "Fusion"
+        CONCAT["Concat"]
     end
 
-    subgraph Non_Behavior_Fields
+    subgraph "Non_Behavior_Fields"
         EB1["EmbeddingBag<br/>user_id<br/>vocab=5344, dim=16"]
         EB2["EmbeddingBag<br/>item_id<br/>vocab=3156, dim=16"]
         EB3["EmbeddingBag<br/>gender<br/>vocab=3, dim=8"]
     end
 
-    subgraph Behavior_Sequence
+    subgraph "Behavior_Sequence"
         BEH_IDS["behavior indices<br/>total_items"]
         BEH_EMB["nn.Embedding<br/>per-item lookup"]
         BEH_OFFSETS["offsets → sample_ids<br/>torch.searchsorted"]
     end
 
-    subgraph Attention_Unit
+    subgraph "Attention_Unit"
         AU_CONCAT["Concat: behavior + target + behavior*target"]
         AU_MLP["MLP: 3d → 36 → 1"]
         AU_SCORE["attention scores<br/>per behavior item"]
     end
 
-    subgraph Interest_Pooling
+    subgraph "Interest_Pooling"
         IP_SOFTMAX["segment softmax<br/>per sample"]
         IP_SUM["weighted sum<br/>per sample"]
     end
 
-    subgraph Input
+    subgraph "Input"
         FB["feature_bags dict<br/>{indices, offsets, weights}"]
     end
 
@@ -152,11 +152,11 @@ flowchart TD
     PROD["behavior_emb * target_emb<br/>逐元素乘积"] --> CONCAT
 
     CONCAT["Concat: 3×d"] --> AU1["Linear: 3d → 36"]
-    AU1 --> AU2[ReLU]
+    AU1 --> AU2["ReLU"]
     AU2 --> AU3["Linear: 36 → 1"]
     AU3 --> SCORES["scores<br/>每个历史物品一个分数"]
 
-    SCORES --> SM{per sample softmax}
+    SCORES --> SM{"per sample softmax"}
     SM -->|weights| WS["weighted sum<br/>Σ wᵢ · behavior_embᵢ"]
     WS --> INTEREST["interest_emb<br/>batch_size, d"]
 

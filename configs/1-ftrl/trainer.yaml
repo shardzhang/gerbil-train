@@ -22,7 +22,9 @@ optimizer:
   lambda2: 1.0
 
 scheduler:
-  enabled: false
+  warmup_steps: 0
+  decay_rate: 0
+  learning_rate_min: 0.000001
 
 checkpoint:
   monitor: val_gauc
