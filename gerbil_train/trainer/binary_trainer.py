@@ -86,15 +86,23 @@ class BinaryClassificationTrainer(BaseTrainer):
                 log_every=train_cfg.inspector.log_every,
             ))
 
-
     def _create_optimizer(self, model: nn.Module, optimizer_cfg: Any) -> optim.Optimizer:
-        """Create optimizer. Override in subclasses (e.g. FTRL) for different optimizers."""
+        opt_type = getattr(optimizer_cfg, "type", "adamw")
+        lr = optimizer_cfg.lr
+        wd = optimizer_cfg.weight_decay
 
-        return torch.optim.AdamW(
-            model.parameters(),
-            lr=optimizer_cfg.lr,
-            weight_decay=optimizer_cfg.weight_decay,
-        )
+        if opt_type == "sgd":
+            return torch.optim.SGD(model.parameters(), lr=lr, weight_decay=wd, momentum=getattr(optimizer_cfg, "momentum", 0.0))
+        elif opt_type == "adagrad":
+            return torch.optim.Adagrad(model.parameters(), lr=lr, weight_decay=wd)
+        elif opt_type == "rmsprop":
+            return torch.optim.RMSprop(model.parameters(), lr=lr, weight_decay=wd)
+        elif opt_type == "adam":
+            return torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
+        elif opt_type == "adamw":
+            return torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
+        else:
+            raise ValueError(f"Unsupported optimizer type: {opt_type}")
 
 
     def fit(self, train_loader: DataLoader, validation_loader: DataLoader | None, test_loader: DataLoader | None = None) -> None:
@@ -129,11 +137,11 @@ class BinaryClassificationTrainer(BaseTrainer):
             self.inspect_batch(step, batch)
             probs = self.forward_step(batch)
             loss = self.compute_total_loss(probs, batch)
-            self.zero_grad()              # clean the gradient
-            self.backward_step(loss)      # compute the gradient
-            self.clip_gradients()         # clip the gradients
-            self.optimizer_step()         # update the parameters
-            self.scheduler_step(self.global_step)
+            self.zero_grad()                        # clean the gradient
+            self.backward_step(loss)                # compute the gradient
+            self.clip_gradients()                   # clip the gradients
+            self.optimizer_step()                   # update the parameters
+            self.scheduler_step(self.global_step)   # update the learning rate scheduler
             total_loss += float(loss.item())
             total_steps += 1
             train_pbar.set_postfix(loss=f"{total_loss / step:.4f}")

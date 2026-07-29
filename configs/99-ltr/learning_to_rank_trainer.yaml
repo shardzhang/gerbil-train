@@ -5,7 +5,7 @@ epochs: 1
 loss_name: lambdarank
 
 optimizer:
-  type: adam
+  type: adamw  # adamw | adam | sgd | adagrad | rmsprop
   lr: 0.001
   weight_decay: 0.0
 

@@ -25,7 +25,7 @@ from gerbil_train.models.lr import LR
 from gerbil_train.trainer.binary_trainer import BinaryClassificationTrainer
 from gerbil_train.trainer.multi_trainer import MultiClassClassificationTrainer
 from gerbil_train.trainer.dien_trainer import DIENTrainer
-from gerbil_train.trainer.lr_trainer import FTRLTrainer
+from gerbil_train.trainer.ftrl_trainer import FTRLTrainer
 
 
 class CliModelInstantiationTests(unittest.TestCase):

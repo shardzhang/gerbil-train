@@ -18,7 +18,7 @@ loss:
   num_neg: 50                  # negative samples per positive
 
 optimizer:
-  type: adam
+  type: adamw  # adamw | adam | sgd | adagrad | rmsprop
   lr: 0.001
   weight_decay: 0.00001
 

@@ -1,8 +1,7 @@
 """Coordinate-descent SLIM solver with fsSLIM (feature selection).
 
 Implements:
-    Ning & Karypis, "SLIM: Sparse Linear Methods for Top-N Recommender
-    Systems", ICDM 2011.
+    Ning & Karypis, "SLIM: Sparse Linear Methods for Top-N Recommender Systems", ICDM 2011.
 
 Solves, for each column j:
 

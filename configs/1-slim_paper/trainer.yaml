@@ -11,7 +11,7 @@ data:
 compile:
   enabled: false
 optimizer:
-  type: adam
+  type: adamw  # adamw | adam | sgd | adagrad | rmsprop
   lr: 0.001
   weight_decay: 0.00001
 scheduler:

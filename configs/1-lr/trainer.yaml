@@ -15,11 +15,11 @@ compile:
   mode: default
 
 optimizer:
-  type: ftrl
-  lr: 0.1         # 或 "adam"
-  beta: 1.0       # FTRL
-  lambda1: 1.0    # FTRL 
-  lambda2: 1.0    # FTRL
+  type: ftrl      # ftrl | adamw | adam | sgd | adagrad | rmsprop
+  lr: 0.1         # learning rate
+  beta: 1.0       # FTRL beta
+  lambda1: 1.0    # FTRL l1 regularization
+  lambda2: 1.0    # FTRL l2 regularization
 
 scheduler:
   warmup_steps: 0

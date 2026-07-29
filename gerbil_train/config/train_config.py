@@ -19,6 +19,7 @@ class TrainOptimizerConfig:
     type: str = "adam"
     lr: float = 0.001
     weight_decay: float = 0.0
+
 @dataclass
 class FTRLOptimizerConfig(TrainOptimizerConfig):
     beta: float = 1.0

@@ -1,6 +1,0 @@
-name: slim_ml1m
-description: SLIM (Sparse Linear Method) on MovieLens 1M TFRecord samples.
-
-data: 0-data/ml1m_binary_tfrecord.yaml
-model: 1-slim/model.yaml
-train: 1-slim/trainer.yaml

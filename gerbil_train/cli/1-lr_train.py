@@ -16,7 +16,7 @@ from gerbil_train.config.model_config import BaseModelConfig
 from gerbil_train.config.train_config import TrainConfig
 from gerbil_train.models.lr import LR
 from gerbil_train.trainer.binary_trainer import BinaryClassificationTrainer
-from gerbil_train.trainer.lr_trainer import FTRLTrainer
+from gerbil_train.trainer.ftrl_trainer import FTRLTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 CONFIG_PATH = PROJECT_ROOT / "configs/1-lr/experiment.yaml"
@@ -40,7 +40,6 @@ def main() -> None:
     train_loader, validation_loader, test_loader = build_dataloaders(data_cfg, model_cfg, train_cfg)
     model = LR(model_cfg)
     if train_cfg.optimizer.type == "ftrl":
-        # FTRL is designed for online learning; torch.compile not applicable
         trainer = FTRLTrainer(model, train_cfg, data_cfg)
     else:
         trainer = BinaryClassificationTrainer(model, train_cfg, data_cfg)

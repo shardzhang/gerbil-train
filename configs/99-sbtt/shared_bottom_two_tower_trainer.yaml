@@ -12,11 +12,11 @@ trainer:
 
 optimizer:
   implicit:
-    type: adam
+    type: adamw  # adamw | adam | sgd | adagrad | rmsprop
     lr: 0.001
     weight_decay: 0.00001
   explicit:
-    type: adam
+    type: adamw  # adamw | adam | sgd | adagrad | rmsprop
     lr: 0.0005
     weight_decay: 0.00001
 
