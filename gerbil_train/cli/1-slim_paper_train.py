@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from gerbil_train.utils.config import load_experiment_config, parse_args
-from gerbil_train.utils.run import close_exp_log, create_run_dir, save_run_configs, setup_exp_log
+from gerbil_train.utils.run import close_run_log, create_run_dir, save_run_configs, setup_run_log
 from gerbil_train.trainer.slim_paper_trainer import SLIMPaperTrainer
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
@@ -16,7 +16,7 @@ def main() -> None:
     args = parse_args(CONFIG_PATH)
     exp_cfg = load_experiment_config(args.config)
     data_cfg = exp_cfg["data"]
-    slim_cfg = exp_cfg.get("slim", {})
+    train_cfg = exp_cfg["train"]
 
     root = Path(data_cfg["paths"]["tfrecord_root"])
     train_dir = root / data_cfg["split_subdirs"]["train"] / "tfrecord"
@@ -24,11 +24,11 @@ def main() -> None:
     test_dir = root / data_cfg["split_subdirs"]["test"] / "tfrecord"
 
     run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "slim_paper")
-    setup_exp_log(run_dir)
+    setup_run_log(run_dir)
     print(f"Run dir: {run_dir}")
     print(f"Data root: {root}")
 
-    trainer = SLIMPaperTrainer(data_cfg, slim_cfg)
+    trainer = SLIMPaperTrainer(data_cfg, train_cfg)
     W = trainer.run(
         train_dir=str(train_dir),
         val_dir=str(val_dir),
@@ -41,7 +41,7 @@ def main() -> None:
     scipy.sparse.save_npz(str(w_path), W)
     print(f"W saved to {w_path}")
     save_run_configs(args.config, run_dir, project_root=PROJECT_ROOT)
-    close_exp_log()
+    close_run_log()
 
 
 if __name__ == "__main__":

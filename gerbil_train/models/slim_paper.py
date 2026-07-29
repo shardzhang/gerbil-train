@@ -66,7 +66,7 @@ def solve_slim_fs(
     Parameters
     ----------
     A : csc_matrix, shape (m, n)
-        User-item interaction matrix (binary).
+        User-item interaction matrix (binary/rating).
     beta : float
         L2 regularisation.
     lambda_ : float
@@ -87,6 +87,7 @@ def solve_slim_fs(
     m, n = A.shape
 
     # Precompute column norms
+    # col_norm_sq[k] = ‖A_k‖², item k 列的非零平方和, 更新公式的分母会用到
     col_norm_sq = np.array((A.multiply(A)).sum(axis=0)).ravel()
 
     # Feature selection
@@ -107,21 +108,19 @@ def solve_slim_fs(
 
     for epoch in range(max_iter):
         max_change = 0.0
-
         for j in range(n):
             if col_norm_sq[j] == 0:
                 continue
 
             # a_j as dense
-            a_j = A_csc[:, j].toarray().ravel()
-
-            # Current w_j (build from sparse storage)
-            w_j = np.zeros(n)
+            a_j = A_csc[:, j].toarray().ravel()     # (m,) 真实标签
+            w_j = np.zeros(n)                       # (n,) 权重向量
             for idx, k in enumerate(W_rows[j]):
                 w_j[k] = W_vals[j][idx]
 
             # Current prediction: A·w_j
-            pred = (A_csc @ w_j).ravel()
+            # 当前预测: pred = A @ w_j
+            pred = (A_csc @ w_j).ravel()            # (m,) 预测值
 
             # Coordinate descent over candidate features only
             for k in candidates[j]:

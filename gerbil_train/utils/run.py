@@ -27,7 +27,7 @@ class _ExpTee:
             f.flush()
 
 
-def setup_exp_log(run_dir: str | Path) -> None:
+def setup_run_log(run_dir: str | Path) -> None:
     """Redirect stdout to both terminal and exp.log in the run directory."""
     global _log_file, _orig_stdout
     log_path = Path(run_dir) / "exp.log"
@@ -37,7 +37,7 @@ def setup_exp_log(run_dir: str | Path) -> None:
     sys.stdout = _ExpTee(sys.stdout, _log_file)
 
 
-def close_exp_log() -> None:
+def close_run_log() -> None:
     """Restore stdout and close the exp.log file."""
     global _log_file, _orig_stdout
     if _orig_stdout is not None:

@@ -43,7 +43,7 @@ def load_field_specs(path: str | Path) -> list[FieldEntry]:
                 continue
             parts = [p.strip() for p in line.split(",")]
             if len(parts) < 4:
-                continue
+                raise DataError(f"Invalid field spec line: {line}")
             specs.append(FieldEntry(field_name=parts[0], field_index=int(parts[1]), field_type=int(parts[2]), dim=int(parts[3])))
     specs.sort(key=lambda s: s.field_index)
     return specs
@@ -179,13 +179,11 @@ class TFRecordDataset(IterableDataset):
         if not self.field_specs:
             raise ValueError("field_specs must not be empty")
 
-
     def _extract_target(self, example: example_pb2.Example) -> int | float:
         """Extract the target label from a TFRecord ``Example``.
         Subclasses must override this method.
         """
         raise NotImplementedError
-
 
     def _extract_field_values(self, features: dict[str, example_pb2.Feature], field_name: str) -> tuple[list[int], list[float]]:
         """Extract indices and values for a named field from a TFRecord example.
@@ -198,7 +196,6 @@ class TFRecordDataset(IterableDataset):
         indices: list[int] = [int(v) for v in idx_feat.int64_list.value]
         values: list[float] = [float(v) for v in val_feat.float_list.value]
         return indices, values
-
 
     def _select_files_for_worker(self) -> list[str]:
         """Select files for the current worker."""  
@@ -213,9 +210,24 @@ class TFRecordDataset(IterableDataset):
             random.Random(worker_seed).shuffle(selected)
         return selected
 
-
     def __iter__(self):
         """Iterator over the dataset.
+
+        1. 为什么要这么做
+        TFRecord 文件中的数据是按原始顺序存储的(如按时间戳排列的曝光日志), 如果不打乱, 每个 batch 内的样本在时间/用户/物品上高度相关, 模型收敛变差. 
+        但 TFRecord 不像普通内存数据集可以 random.shuffle() 整个数据, 它是流式读取的, 所以用固定大小的缓冲区做局部打乱
+
+        2. 与 DataLoader(shuffle=True) 的关系
+        DataLoader 的 shuffle 工作在样本粒度(按 index 打乱), 对 TFRecord 这种 iterator-style 的 dataset 无效.
+        这里用 yield 把 TFRecord 的流式读取包装成了 generator, shuffle_buffer 是唯一的打乱机会. 
+        shuffle_buffer 越大, 打乱越彻底, 但内存占用也越大
+
+        3. 后续的 DataLoader(shuffle=True) 对iterable-style 的 TFRecord 数据集没有效果
+        PyTorch 的 shuffle 工作方式是先根据 len(dataset) 生成 [0, 1, 2, ..., N-1] 的索引数组, 打乱后按新顺序取 dataset[i]. 
+        但 TFRecordDataset 是 iterable-style (通过 __iter__ / yield 流式读取), 没有 __getitem__ 和 __len__, DataLoader 无法按索引重排. 
+        shuffle=True 会在 PyTorch 无提示地忽略或报错(取决于版本)
+        真正的打乱逻辑在 dataset 内部的 shuffle_buffer (缓冲区积累 → random.shuffle → yield), 和 DataLoader 无关. 
+
         Note: key of sample is field_name
         """
         selected_files = self._select_files_for_worker()
@@ -255,10 +267,9 @@ class TFRecordDataset(IterableDataset):
                 else:
                     yield sample
 
-        if self.shuffle_buffer > 0 and buf:
+        if self.shuffle_buffer > 0 and buf:     # 文件读完，剩余不足一缓冲区
             random.shuffle(buf)
-            yield from buf
-
+            yield from buf                      # 也打乱输出
 
 class BinaryTFRecordDataset(TFRecordDataset):
     """TFRecord dataset for binary CTR classification."""
@@ -280,6 +291,7 @@ class MultiTFRecordDataset(TFRecordDataset):
         if target_feature.float_list.value:
             return int(target_feature.float_list.value[0])
         raise ValueError("Target feature exists but has no values")
+
 
 class RatingTFRecordDataset(TFRecordDataset):
     """TFRecord dataset for rating prediction."""

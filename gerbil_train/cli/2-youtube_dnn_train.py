@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from gerbil_train.utils.config import load_experiment_config, parse_args
-from gerbil_train.utils.run import close_exp_log, create_run_dir, save_run_configs, setup_exp_log
+from gerbil_train.utils.run import close_run_log, create_run_dir, save_run_configs, setup_run_log
 from gerbil_train.utils.training import build_dataloaders, build_model_config
 from gerbil_train.config.model_config import YouTubeDNNModelConfig
 from gerbil_train.config.train_config import TrainConfig
@@ -28,7 +28,7 @@ def main() -> None:
     model_cfg: YouTubeDNNModelConfig = build_model_config(exp_cfg, YouTubeDNNModelConfig)
 
     run_dir = create_run_dir(PROJECT_ROOT / "checkpoints" / "youtube_dnn")
-    setup_exp_log(run_dir)
+    setup_run_log(run_dir)
     train_cfg: TrainConfig = TrainConfig.from_dict(exp_cfg["train"])
     train_cfg.checkpoint.path = str(run_dir)
     train_cfg.logging.plot_path = str(run_dir)
@@ -50,7 +50,7 @@ def main() -> None:
         test_metrics = trainer.evaluate(test_loader)
         print(f"Final test metrics: {test_metrics}")
     save_run_configs(args.config, run_dir, project_root=PROJECT_ROOT)
-    close_exp_log()
+    close_run_log()
 
 
 if __name__ == "__main__":

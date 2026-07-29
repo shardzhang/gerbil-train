@@ -4,11 +4,3 @@ description: SLIM (paper, coordinate descent with fsSLIM) on MovieLens 1M TFReco
 data: 0-data/ml1m_binary_tfrecord.yaml
 model: 1-slim_paper/model.yaml
 train: 1-slim_paper/trainer.yaml
-
-slim:
-  beta: 1.0
-  lambda: 0.5
-  max_iter: 5
-  tol: 1e-4
-  top_k: 50
-  max_samples: 10000

@@ -8,6 +8,7 @@ data:
   drop_last: false
   prefetch_factor: 4
   shuffle_buffer: 8192
+  shuffle_files: false
 compile:
   enabled: false
 optimizer:
@@ -26,3 +27,12 @@ early_stop:
 evaluation: {}
 inspector:
   enabled: false
+
+slim:
+  beta: 1.0
+  lambda: 0.5
+  max_iter: 5
+  tol: 1e-4
+  top_k: 50
+  max_samples: 10000
+  shuffle_buffer: 8192
