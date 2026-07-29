@@ -149,6 +149,7 @@ def solve_slim_fs(
                     delta = w_new - w_kj
                     pred += A_k * delta
                     w_j[k] = w_new
+                # 抹零会把 w_j[k] 设为 0.0, 导致本轮结束 np.nonzero(w_j) 不再包含 k. 下一 epoch 这个 k 就不会被加载进 w_j, 相当于彻底"遗忘"了这个特征
                 elif w_kj != 0:
                     w_j[k] = 0.0
 
@@ -180,11 +181,12 @@ def solve_slim_fs(
 
     if all_rows:
         W = sp.csc_matrix(
-            (np.concatenate(all_vals),
-             (np.concatenate(all_rows), np.concatenate(all_cols))),
+            (np.concatenate(all_vals), (np.concatenate(all_rows), np.concatenate(all_cols))),
             shape=(n, n),
         )
     else:
         W = sp.csc_matrix((n, n))
+
+    # 删除稀疏矩阵中显式存储的零值. 确保最终 W 矩阵里没有显式存储的零, 减少存储空间并提升下游 @ 运算效率
     W.eliminate_zeros()
     return W

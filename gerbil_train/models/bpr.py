@@ -31,7 +31,6 @@ class BPR(BaseModel):
     def __init__(self, model_cfg: BaseModelConfig) -> None:
         super().__init__()
 
-
         self.embedding_fields: Mapping[str, FieldEntry] = model_cfg.embedding_fields
 
         # Designate user/item fields from mlp config
@@ -55,20 +54,16 @@ class BPR(BaseModel):
             embedding_dim=int(item_entry.emb_size),
             mode="sum",
         )
-
         self._validate_fields(model_cfg)
         self.reset_parameters()
-
 
     def _validate_fields(self, model_cfg: BaseModelConfig) -> None:
         if not model_cfg.embedding_fields:
             raise ValueError("embedding_fields must be a non-empty mapping")
 
-
     def reset_parameters(self) -> None:
         nn.init.xavier_uniform_(self.user_embedding_bag.weight)
         nn.init.xavier_uniform_(self.item_embedding_bag.weight)
-
 
     def forward(self, feature_bags: Mapping[str, Mapping[str, Tensor]]) -> Tensor:
         """Compute BPR scores for a batch of (user, item) pairs.
@@ -98,7 +93,6 @@ class BPR(BaseModel):
         )
         # [batch_size,]
         return (user_emb * item_emb).sum(dim=-1)
-
 
     def predict(self, user_ids: Tensor, item_ids: Tensor) -> Tensor:
         """Direct dot product for arbitrary user-item pairs (single-valued).

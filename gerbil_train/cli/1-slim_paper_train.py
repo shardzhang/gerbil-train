@@ -40,6 +40,13 @@ def main() -> None:
     w_path = Path(run_dir) / "W.npz"
     scipy.sparse.save_npz(str(w_path), W)
     print(f"W saved to {w_path}")
+
+    """
+    W = scipy.sparse.load_npz("path/to/W.npz")
+    print(type(W))       # <class 'scipy.sparse._csc.csc_matrix'>
+    print(W.shape)       # (3705, 3705)
+    print(W.nnz)         # 34378 (非零元素个数)
+    """
     save_run_configs(args.config, run_dir, project_root=PROJECT_ROOT)
     close_run_log()
 

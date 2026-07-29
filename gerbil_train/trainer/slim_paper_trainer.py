@@ -38,11 +38,12 @@ class SLIMPaperTrainer:
     # ------------------------------------------------------------------
     #  Build matrix A
     # ------------------------------------------------------------------
-    def _build_matrix(self, split_dir: str, split_name: str = "") -> tuple[sp.csc_matrix, np.ndarray]:
-        """Build sparse user-item matrix A from TFRecord."""
+    def _build_matrix(self, split_dir: str, split_name: str = "") -> tuple[sp.csc_matrix, np.ndarray, np.ndarray, np.ndarray]:
+        """Build sparse user-item matrix A from TFRecord.
+        Returns (A, labels, rows, cols)."""
         files = collect_tfrecord_part_files(split_dir)
         if not files:
-            return sp.csc_matrix(self.A_shape or (0, 0)), np.array([], dtype=float)
+            return sp.csc_matrix(self.A_shape or (0, 0)), np.array([], dtype=float), np.array([], dtype=int), np.array([], dtype=int)
 
         use_files = files[:1] if self.max_samples else files
         pm_path = Path(self.data_cfg["paths"]["pos_map_txt"])
@@ -99,45 +100,65 @@ class SLIMPaperTrainer:
             if self.max_samples > 0 and n_loaded >= self.max_samples:
                 break
 
-        if not rows:
-            return sp.csc_matrix(self.A_shape), np.array([], dtype=float)
+        rows_arr = np.array(rows, dtype=int)
+        cols_arr = np.array(cols, dtype=int)
 
-        # COO (Coordinate)
-        # CSC (Compressed Sparse Column)
+        if not rows:
+            return sp.csc_matrix(self.A_shape), np.array([], dtype=float), rows_arr, cols_arr
+
         A = sp.coo_matrix(
-            (np.array(vals, dtype=np.float64), (rows, cols)),
+            (np.array(vals, dtype=np.float64), (rows_arr, cols_arr)),
             shape=self.A_shape,
         ).tocsc()
 
         tag = f"[{split_name}] " if split_name else ""
         print(f"  {tag}{n_loaded} samples, {A.shape[0]} users, {A.shape[1]} items, density={A.nnz / (A.shape[0] * A.shape[1]):.3%}")
-        return A, np.array(all_labels, dtype=float)
+        return A, np.array(all_labels, dtype=float), rows_arr, cols_arr
 
     # ------------------------------------------------------------------
     #  Evaluation
     # ------------------------------------------------------------------
     def _evaluate(
         self, 
-        A: sp.csc_matrix, 
         W: sp.csc_matrix,
-        labels: np.ndarray, 
+        rows: np.ndarray,
+        cols: np.ndarray,
         prefix: str = "",
     ) -> dict[str, float]:
-        if A.shape[0] == 0 or W.nnz == 0:
+        """
+        推荐时，对用户 u 计算 scores = A_train[u, :] @ W
+        即用用户已交互过的 item 加权聚合, 得到所有 item 的推荐得分
+        """
+        if len(rows) == 0 or W.nnz == 0:
             return {}
 
-        S = (A @ W).toarray()
-        rows_nz, cols_nz = A.nonzero()
-        scores = S[rows_nz, cols_nz]
+        n_users, n_items = self.A_train.shape
+        S = (self.A_train @ W).toarray()
 
-        # shape: (n_observed,) 即交互矩阵 A 中非零元素的数量（有评分记录的总样本数）
-        t_labels = torch.from_numpy(labels)
-        t_scores = torch.from_numpy(scores)
-        rmse = float(torch.sqrt((t_scores - t_labels).pow(2).mean()))
-        mae = float((t_scores - t_labels).abs().mean())
+        # For each held-out pair, find rank of the item
+        hits = 0
+        rr_sum = 0.0
+        for u, i in zip(rows, cols):
+            scores = S[u].copy()
+            # Exclude items already in training set
+            # 把用户 u 已经交互过的 item(训练集里非零的列)的得分设为负无穷, 避免推荐已看过/买过的 item
+            scores[self.A_train[u].nonzero()[1]] = -np.inf
+
+            # 统计有多少个 item 的得分比 held-out item i 的得分高. 加 1 就是 i 的排名. 
+            # 例如有 2 个 item 得分比 i 高, 则 rank = 3
+            rank = int(np.sum(scores > scores[i])) + 1
+            if rank <= 10:
+                hits += 1
+
+            # 累加 reciprocal rank（倒数排名），排名第 1 贡献 1/1=1，排名第 3 贡献 1/3≈0.33。
+            rr_sum += 1.0 / rank
+
+        # hits / n = HR@10（Hit Rate @ 10）
+        # rr_sum / n = ARHR（Average Reciprocal Hit-Rank）
+        n = len(rows)
         return {
-            f"{prefix}rmse": round(rmse, 4),
-            f"{prefix}mae": round(mae, 4),
+            f"{prefix}hr@10": round(hits / n, 4),
+            f"{prefix}arhr": round(rr_sum / n, 4),
         }
 
     # ------------------------------------------------------------------
@@ -156,13 +177,13 @@ class SLIMPaperTrainer:
         ms = self.max_samples
         m_str = f" (max {ms} samples)" if ms else ""
         print(f"\n[1/3] Building matrix A{m_str} …")
-        self.A_train, _ = self._build_matrix(train_dir, "Train")
+        self.A_train, _, _, _ = self._build_matrix(train_dir, "Train")
         print(f"  Training set done. {self.A_shape[1]} items total.")
 
         if val_dir:
-            self.A_val, self.val_labels = self._build_matrix(val_dir, "Val")
+            self.A_val, self.val_labels, self.val_rows, self.val_cols = self._build_matrix(val_dir, "Val")
         if test_dir:
-            self.A_test, self.test_labels = self._build_matrix(test_dir, "Test")
+            self.A_test, self.test_labels, self.test_rows, self.test_cols = self._build_matrix(test_dir, "Test")
 
         n_users, n_items = self.A_train.shape
         print(f"\n[2/3] Solving W …")
@@ -180,13 +201,13 @@ class SLIMPaperTrainer:
         )
         print(f"  W: {W.nnz} non-zeros / {n_items*n_items} ({W.nnz / (n_items * n_items):.4%})")
 
-        if val_dir and self.A_val is not None:
+        if val_dir and len(self.val_rows) > 0:
             print(f"\n[3/3] Validation …")
-            for k, v in self._evaluate(self.A_val, W, self.val_labels, "val_").items():
+            for k, v in self._evaluate(W, self.val_rows, self.val_cols, "val_").items():
                 print(f"  {k}: {v}")
 
-        if test_dir and self.A_test is not None:
+        if test_dir and len(self.test_rows) > 0:
             print(f"  Test …")
-            for k, v in self._evaluate(self.A_test, W, self.test_labels, "test_").items():
+            for k, v in self._evaluate(W, self.test_rows, self.test_cols, "test_").items():
                 print(f"  {k}: {v}")
         return W

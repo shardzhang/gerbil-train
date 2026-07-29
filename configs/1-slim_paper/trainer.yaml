@@ -31,8 +31,8 @@ inspector:
 slim:
   beta: 1.0
   lambda: 0.5
-  max_iter: 5
+  max_iter: 500
   tol: 1e-4
   top_k: 50
-  max_samples: 10000
+  max_samples: 0
   shuffle_buffer: 8192
