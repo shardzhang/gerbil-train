@@ -19,8 +19,6 @@ def parse_args(path: Path) -> argparse.Namespace:
         default=path,
     )
     args = parser.parse_args()
-    if not args.config.is_absolute():
-        args.config = (path.parent.parent / args.config).resolve()
     return args
 
 
