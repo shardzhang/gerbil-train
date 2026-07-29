@@ -102,9 +102,9 @@ def solve_slim_fs(
     W_rows: list[list[int]] = [[] for _ in range(n)]
     W_vals: list[list[float]] = [[] for _ in range(n)]
 
-    # Precompute A as LIL for fast column slicing
-    A_lil = A.tolil()
-    A_csc = A  # keep for column view
+    # Precompute all columns as dense arrays for O(1) inner-loop access
+    A_cols = [A[:, j].toarray().ravel() for j in range(n)]
+    A_csc = A  # keep for matvec (A_csc @ w_j)
 
     for epoch in range(max_iter):
         max_change = 0.0
@@ -112,14 +112,12 @@ def solve_slim_fs(
             if col_norm_sq[j] == 0:
                 continue
 
-            # a_j as dense
-            a_j = A_csc[:, j].toarray().ravel()     # (m,) 真实标签
+            a_j = A_cols[j]                         # (m,) 真实标签
             w_j = np.zeros(n)                       # (n,) 权重向量
             for idx, k in enumerate(W_rows[j]):
                 w_j[k] = W_vals[j][idx]
 
             # Current prediction: A·w_j
-            # 当前预测: pred = A @ w_j
             pred = (A_csc @ w_j).ravel()            # (m,) 预测值
 
             # Coordinate descent over candidate features only
@@ -128,7 +126,7 @@ def solve_slim_fs(
                     continue
 
                 w_kj = w_j[k]
-                A_k = A_lil[:, k].toarray().ravel()
+                A_k = A_cols[k]
 
                 # Residual without feature k
                 residual = a_j - pred + A_k * w_kj

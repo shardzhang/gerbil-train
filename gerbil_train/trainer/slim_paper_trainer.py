@@ -26,12 +26,12 @@ class SLIMPaperTrainer:
         slim_cfg = train_cfg.get("slim", {})
         self.data_cfg = data_cfg
         self.slim_cfg = slim_cfg
-        self.beta = slim_cfg["beta"]
-        self.lambda_ = slim_cfg["lambda"]
-        self.max_iter = slim_cfg["max_iter"]
-        self.tol = slim_cfg["tol"]
-        self.top_k = slim_cfg["top_k"]
-        self.max_samples = slim_cfg["max_samples"]
+        self.beta = float(slim_cfg["beta"])
+        self.lambda_ = float(slim_cfg["lambda"])
+        self.max_iter = int(slim_cfg["max_iter"])
+        self.tol = float(slim_cfg["tol"])
+        self.top_k = int(slim_cfg["top_k"])
+        self.max_samples = int(slim_cfg["max_samples"])
 
         self.A_shape: tuple[int, int] | None = None
 
