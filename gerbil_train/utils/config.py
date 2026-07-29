@@ -18,7 +18,10 @@ def parse_args(path: Path) -> argparse.Namespace:
         type=Path,
         default=path,
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.config.is_absolute():
+        args.config = (path.parent.parent / args.config).resolve()
+    return args
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
